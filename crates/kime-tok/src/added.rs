@@ -180,6 +180,11 @@ impl Added {
         let mut offset = 0;
         let mut pos = 0;
         while pos < hay.len() {
+            // Most bytes cannot start a pattern, so jump to the next one that can.
+            match hay[pos..].iter().position(|&b| m.root[usize::from(b)] != 0) {
+                Some(skip) => pos += skip,
+                None => break,
+            }
             let Some((len, idx)) = m.at(hay, pos) else {
                 pos += 1;
                 continue;

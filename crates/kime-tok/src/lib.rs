@@ -42,7 +42,8 @@ impl Normalizer {
         match self {
             Normalizer::None => Cow::Borrowed(s),
             Normalizer::Nfc => {
-                if is_nfc_quick(s.chars()) == IsNormalized::Yes {
+                // ASCII is always in NFC, and checking for it runs many bytes at a time.
+                if s.is_ascii() || is_nfc_quick(s.chars()) == IsNormalized::Yes {
                     Cow::Borrowed(s)
                 } else {
                     Cow::Owned(s.nfc().collect())
