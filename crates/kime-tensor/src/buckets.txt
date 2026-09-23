@@ -1,0 +1,34 @@
+# The shape buckets plans are built for, see spec/07-engine.md. A batch runs in the smallest bucket
+# of its stage that holds its tokens, sequences and markers. Each bucket gets its own arena, and on
+# the GPU backends its own captured graph, so a bucket is a trade between padding and memory.
+#
+# stage     tokens  seqs  markers
+compat          64    16       64
+compat         128    32      128
+compat         256    64      256
+compat         512   128      512
+compat        1024   256     1024
+compat        2048   512     2048
+compat        4096  1024     4096
+compat        8192  1024     8192
+compat       16384  1024     8192
+state           64   256        0
+state          128   256        0
+state          256   256        0
+state          512   256        0
+state         1024   256        0
+state         2048   256        0
+state         4096   256        0
+state         8192   256        0
+state        16384   256        0
+state        32768   256        0
+state        65536   256        0
+question        32  1024     8192
+question        64  1024     8192
+question       128  1024     8192
+question       256  1024     8192
+question       512  1024     8192
+question      1024  1024     8192
+question      2048  1024     8192
+question      4096  1024     8192
+question      8192  1024     8192

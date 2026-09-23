@@ -89,6 +89,24 @@ impl<'a> Shared<'a> {
     }
 }
 
+impl Shared<'_> {
+    /// Reads element `i`.
+    ///
+    /// # Safety
+    ///
+    /// No other thread may write element `i` while this Shared is alive.
+    ///
+    /// # Panics
+    ///
+    /// If `i` is out of bounds.
+    #[inline(always)]
+    pub unsafe fn get(&self, i: usize) -> f32 {
+        assert!(i < self.len);
+        // SAFETY: in bounds by the assert, and the caller guarantees no other thread writes i.
+        unsafe { self.ptr.add(i).read() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -3,8 +3,14 @@
 //! One of the six crates where `unsafe` is allowed. Every block carries a `// SAFETY:` comment
 //! that names the invariant which makes it sound.
 
+pub mod backend;
 pub mod blob;
+pub mod bucket;
 pub mod dtype;
+pub mod plan;
 
+pub use backend::{Backend, Batch, BatchBuf, Caps, Error, Executor, HostTensor, Outputs, Result};
 pub use blob::Blob;
+pub use bucket::{Bucket, Buckets};
 pub use dtype::DType;
+pub use plan::{Epilogue, Graph, Layout, Op, Rows, Shape, Val, W, layout};

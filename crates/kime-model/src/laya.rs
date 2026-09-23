@@ -24,11 +24,19 @@
 
 use serde_json::Value;
 
+use kime_tensor::plan::{Epilogue, Graph, Op, Rows};
+
 use crate::error::{Error, Result};
 use crate::tensors::Tensors;
 
 /// Head dimension of every attention in the family.
 pub const HEAD_DIM: usize = 64;
+
+/// PyTorch's LayerNorm default, which the decision head and the scorer use.
+pub const TORCH_EPS: f64 = 1e-5;
+
+/// Width of the act head's hidden layer.
+pub const ACT_HIDDEN: usize = 256;
 
 /// The encoder's shape, from `encoder/config.json` (a HF ModernBERT config).
 #[derive(Debug, Clone, PartialEq)]
@@ -435,5 +443,95 @@ impl LayaGraph {
             act_out: aff("act_head.2"),
             temperature: w("temperature"),
         })
+    }
+
+    /// The forward pass as ops for a backend to lower, the graph in the module comment. Values are
+    /// token rows until the markers are gathered, and a backend runs each op on the rows the batch
+    /// has.
+    #[must_use]
+    pub fn plan(&self, spec: &LayaSpec) -> Graph {
+        let e = &spec.encoder;
+        let d = e.d;
+        let mut g = Graph::default();
+        let tok = |g: &mut Graph, w| g.val(Rows::Tokens, w);
+        let emb = tok(&mut g, d);
+        let h = tok(&mut g, d);
+        g.push(Op::Embed { table: self.tok_embeddings, out: emb });
+        g.push(Op::LayerNorm { x: emb, w: self.embed_norm, b: None, eps: e.norm_eps, out: h });
+        let gemm = |g: &mut Graph, a, w, b, epilogue, out| {
+            g.push(Op::Gemm { a, w, b, epilogue, out });
+        };
+        for l in &self.layers {
+            let x = match l.attn_norm {
+                Some(n) => {
+                    let x = tok(&mut g, d);
+                    g.push(Op::LayerNorm { x: h, w: n, b: None, eps: e.norm_eps, out: x });
+                    x
+                }
+                None => h,
+            };
+            let qkv = tok(&mut g, 3 * d);
+            gemm(&mut g, x, l.wqkv, None, Epilogue::None, qkv);
+            g.push(Op::Rope { qkv, theta: l.rope_theta });
+            let att = tok(&mut g, d);
+            let window = (!l.global).then_some(e.window / 2);
+            g.push(Op::Attention { qkv, window, out: att });
+            gemm(&mut g, att, l.wo, None, Epilogue::Accumulate, h);
+            let x = tok(&mut g, d);
+            g.push(Op::LayerNorm { x: h, w: l.mlp_norm, b: None, eps: e.norm_eps, out: x });
+            let u = tok(&mut g, 2 * e.inter);
+            gemm(&mut g, x, l.wi, None, Epilogue::None, u);
+            let a = tok(&mut g, e.inter);
+            g.push(Op::GeGlu { x: u, out: a });
+            gemm(&mut g, a, l.mlp_wo, None, Epilogue::Accumulate, h);
+        }
+        let h2 = tok(&mut g, d);
+        g.push(Op::LayerNorm { x: h, w: self.final_norm, b: None, eps: e.norm_eps, out: h2 });
+        let h = h2;
+        g.push(Op::AddType { h, table: self.type_emb });
+        for l in &self.head {
+            let x = tok(&mut g, d);
+            g.push(Op::LayerNorm {
+                x: h,
+                w: l.norm1_w,
+                b: Some(l.norm1_b),
+                eps: TORCH_EPS,
+                out: x,
+            });
+            let qkv = tok(&mut g, 3 * d);
+            gemm(&mut g, x, l.in_proj_w, Some(l.in_proj_b), Epilogue::None, qkv);
+            let att = tok(&mut g, d);
+            g.push(Op::Attention { qkv, window: None, out: att });
+            gemm(&mut g, att, l.out_proj_w, Some(l.out_proj_b), Epilogue::Accumulate, h);
+            let x = tok(&mut g, d);
+            g.push(Op::LayerNorm {
+                x: h,
+                w: l.norm2_w,
+                b: Some(l.norm2_b),
+                eps: TORCH_EPS,
+                out: x,
+            });
+            let f = tok(&mut g, 4 * d);
+            gemm(&mut g, x, l.linear1_w, Some(l.linear1_b), Epilogue::Relu, f);
+            gemm(&mut g, f, l.linear2_w, Some(l.linear2_b), Epilogue::Accumulate, h);
+        }
+        let m = g.val(Rows::Markers, d);
+        g.push(Op::GatherMarkers { h, out: m });
+        let mn = g.val(Rows::Markers, d);
+        let sn = self.scorer_norm;
+        g.push(Op::LayerNorm { x: m, w: sn.w, b: Some(sn.b), eps: TORCH_EPS, out: mn });
+        let z = g.val(Rows::Markers, d);
+        gemm(&mut g, mn, self.scorer_in.w, Some(self.scorer_in.b), Epilogue::Gelu, z);
+        let logits = g.val(Rows::Markers, 1);
+        gemm(&mut g, z, self.scorer_out.w, Some(self.scorer_out.b), Epilogue::None, logits);
+        let f = g.val(Rows::Seqs, d + 4);
+        g.push(Op::ActFeatures { h, logits, out: f });
+        let a = g.val(Rows::Seqs, ACT_HIDDEN);
+        gemm(&mut g, f, self.act_in.w, Some(self.act_in.b), Epilogue::Gelu, a);
+        let act = g.val(Rows::Seqs, 2);
+        gemm(&mut g, a, self.act_out.w, Some(self.act_out.b), Epilogue::None, act);
+        g.logits = Some(logits);
+        g.act = Some(act);
+        g
     }
 }

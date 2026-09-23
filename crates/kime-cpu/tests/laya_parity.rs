@@ -10,12 +10,13 @@
 //! the default 32 on an i9-13900K moves the English logits by up to 9.4e-5 and the probabilities
 //! by up to 1.2e-5, because MKL splits the sums differently. kime cannot be held closer to Laya
 //! than Laya is to itself, so the bounds sit a little above that, and argmax has to agree on every
-//! question.
+//! question. The plan executor has to match the reference bit for bit on every chunk.
 
 use std::path::PathBuf;
 
-use kime_cpu::{Compat, Input, par};
+use kime_cpu::{Compat, Input, executor, par};
 use kime_model::Model;
+use kime_tensor::{BatchBuf, Outputs};
 use serde_json::Value;
 
 struct Question {
@@ -70,6 +71,8 @@ fn check(name: &str, sub: &str) {
     };
     let model = Model::open(&dir).unwrap();
     let mut compat = Compat::new(&model, par::available());
+    let mut exec = executor(&model, par::available()).unwrap();
+    let (mut buf, mut plan) = (BatchBuf::default(), Outputs::default());
     let qs = questions(name);
     assert!(qs.len() >= 600, "{name}: only {} questions", qs.len());
 
@@ -82,6 +85,22 @@ fn check(name: &str, sub: &str) {
             .map(|q| Input { ids: &q.ids, markers: &q.markers, qtype: q.qtype })
             .collect();
         let outs = compat.forward(&inputs);
+        // The plan executor runs the same kernels, so it has to give the same bits.
+        buf.clear();
+        for q in chunk {
+            buf.push(&q.ids, &q.markers, q.qtype as u8);
+        }
+        exec.run(&buf.batch(), &mut plan).unwrap();
+        let flat: Vec<u32> =
+            outs.iter().flat_map(|o| o.logits.iter().map(|x| x.to_bits())).collect();
+        assert_eq!(
+            flat,
+            plan.logits.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+            "plan logits"
+        );
+        for (o, a) in outs.iter().zip(&plan.act) {
+            assert_eq!(o.act.map(f32::to_bits), a.map(f32::to_bits), "plan act");
+        }
         for (q, o) in chunk.iter().zip(&outs) {
             assert_eq!(o.logits.len(), q.logits.len(), "{}", q.case);
             for (a, b) in o.logits.iter().zip(&q.logits) {
