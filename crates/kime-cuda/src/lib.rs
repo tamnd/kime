@@ -15,6 +15,7 @@
 mod compat;
 mod lt;
 mod plan;
+mod tune;
 
 pub use compat::executor;
 pub use plan::{CudaPlan, Weights};
@@ -102,6 +103,7 @@ pub struct CudaBackend {
     name: String,
     arch: (i32, i32),
     precision: Precision,
+    picks: tune::Picks,
 }
 
 impl std::fmt::Debug for CudaBackend {
@@ -134,7 +136,8 @@ impl CudaBackend {
         let lt = lt::Handle::new()?;
         let workspace = stream.alloc_zeros::<u8>(WORKSPACE).map_err(dev)?;
         let name = ctx.name().map_err(dev)?;
-        Ok(Self { stream, k, lt, workspace, name, arch, precision })
+        let picks = tune::Picks::for_gpu(&name);
+        Ok(Self { stream, k, lt, workspace, name, arch, precision, picks })
     }
 
     /// The GPU's name, as the driver reports it.

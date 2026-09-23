@@ -137,8 +137,9 @@ mod tests {
         assert_eq!(t.stage("question").len(), 9);
         let b = t.pick("compat", 119, 1, 4).unwrap();
         assert_eq!(b, Bucket { tokens: 128, seqs: 32, markers: 128 });
+        assert_eq!(t.stage("compat").len(), 20);
         // Many short sequences push past the sequence limit before the token limit.
-        assert_eq!(t.pick("compat", 100, 40, 80).unwrap().tokens, 256);
+        assert_eq!(t.pick("compat", 100, 41, 80).unwrap().tokens, 192);
         assert_eq!(t.pick("compat", 20000, 1, 1), None);
         assert_eq!(t.pick("nothing", 1, 1, 1), None);
     }
