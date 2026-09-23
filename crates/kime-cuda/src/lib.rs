@@ -13,6 +13,8 @@
 //! that names the invariant which makes it sound.
 
 mod compat;
+#[cfg(test)]
+mod kernel_tests;
 mod lt;
 mod plan;
 mod tune;
@@ -123,6 +125,18 @@ impl CudaBackend {
     ///
     /// [`Error::Device`] when there is no such GPU, no driver, or the kernels do not compile.
     pub fn new(ordinal: usize, precision: Precision) -> Result<Self> {
+        // cudarc panics on first use of a library it cannot load, so check for all three first.
+        // SAFETY: these only try to open the libraries, which runs no code of theirs we rely on.
+        let present = unsafe {
+            [
+                ("the CUDA driver", cudarc::driver::sys::is_culib_present()),
+                ("NVRTC", cudarc::nvrtc::sys::is_culib_present()),
+                ("cuBLASLt", cudarc::cublaslt::sys::is_culib_present()),
+            ]
+        };
+        if let Some((name, _)) = present.iter().find(|p| !p.1) {
+            return Err(Error::Device(format!("{name} is not installed")));
+        }
         let ctx = CudaContext::new(ordinal).map_err(dev)?;
         // SAFETY: all work goes to one stream, in order, and the plan synchronizes that stream
         // before it reads results or frees buffers, so cudarc's per buffer events are not needed.

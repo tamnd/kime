@@ -1,5 +1,6 @@
 //! After a bucket's plan is built, running a batch in it allocates nothing, on any thread. This is
-//! its own test binary because the counting allocator sees the whole process.
+//! its own test binary, run without libtest's harness, because the counting allocator sees the
+//! whole process.
 
 mod common;
 
@@ -42,8 +43,7 @@ unsafe impl GlobalAlloc for Counting {
 #[global_allocator]
 static GLOBAL: Counting = Counting;
 
-#[test]
-fn a_warm_plan_does_not_allocate() {
+fn main() {
     let (spec, graph, tensors) = tiny();
     let mut exec = executor_from(&spec, &graph, &tensors, 4).unwrap();
     let mut rng = Rng(9);
@@ -64,4 +64,5 @@ fn a_warm_plan_does_not_allocate() {
     ON.store(false, Ordering::SeqCst);
     assert_eq!(exec.warm().collect::<Vec<_>>(), warm);
     assert_eq!(COUNT.load(Ordering::SeqCst), 0, "allocations on the warm path");
+    println!("a warm plan does not allocate: ok");
 }

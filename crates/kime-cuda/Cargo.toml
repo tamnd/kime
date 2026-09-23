@@ -21,5 +21,11 @@ kime-tensor.workspace = true
 kime-cpu.workspace = true
 serde_json.workspace = true
 
+# Without libtest's harness, whose own threads allocate (its 60 second warning, for one) while
+# the counting allocator is on.
+[[test]]
+name = "no_alloc"
+harness = false
+
 [lints]
 workspace = true
