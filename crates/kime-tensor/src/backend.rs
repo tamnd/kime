@@ -122,6 +122,8 @@ pub enum Error {
     },
     /// The graph uses something the backend does not have, or weights of the wrong shape.
     Unsupported(String),
+    /// The device or its driver failed.
+    Device(String),
 }
 
 impl fmt::Display for Error {
@@ -133,6 +135,7 @@ impl fmt::Display for Error {
                 "no {stage} bucket holds {tokens} tokens, {seqs} sequences and {markers} markers"
             ),
             Error::Unsupported(m) => write!(f, "unsupported: {m}"),
+            Error::Device(m) => write!(f, "device: {m}"),
         }
     }
 }

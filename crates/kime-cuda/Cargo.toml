@@ -13,7 +13,13 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+cudarc.workspace = true
+kime-model.workspace = true
 kime-tensor.workspace = true
+
+[dev-dependencies]
+kime-cpu.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

@@ -36,6 +36,8 @@ kime-train = { version = "=0.0.2", path = "crates/kime-train" }
 
 # Outside crates. Each one is here because writing it ourselves would be worse, and the list is meant to stay short enough to read.
 blake3 = { version = "1.8.7", features = ["rayon"] }
+# The CUDA driver, NVRTC and cuBLASLt, loaded at run time so the build needs no toolkit.
+cudarc = { version = "0.19.9", default-features = false, features = ["std", "driver", "nvrtc", "cublaslt", "dynamic-loading", "cuda-12090"] }
 half = "2.7.1"
 libm = "0.2.16"
 memmap2 = "0.9.11"
