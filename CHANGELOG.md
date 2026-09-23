@@ -4,6 +4,10 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+## 0.0.6
+
+kime answers questions end to end. The engine lays out requests as Laya does, runs them on the CPU or CUDA, and builds Laya's answers from the logits, and the CLI can pull a model and predict with it. On the CPU, every parity answer equals Laya's, except a few rounded numbers that are off by 1 in the fourth decimal.
+
 - `kime pull` downloads a model into the Hugging Face cache in the layout `huggingface_hub` uses, blobs named by ETag with relative links from the snapshot, so Laya and kime reuse each other's downloads. It goes through the system `curl`, hands `HF_TOKEN` to curl on stdin rather than on its command line, honours `HF_ENDPOINT`, and checks every LFS file against its SHA-256 before keeping it. Pulling both Laya checkpoints on server3 took 29.6 s for 846 MB and 43.4 s for 678 MB, the files are byte identical to the hub's, and a second pull fetches nothing.
 - `kime-engine` has the `decide` API from spec/07-engine.md, re-exported by the `kime` crate: `Kime::builder().model("laya").device(Device::Auto).build()`, then `decide`, `decide_batch` and `decide_async`. It lays out each question as Laya does, packs the questions of all the requests in a call into shared batches on the CPU or a CUDA GPU, and builds Laya's answers from the logits. Models are found by path, by `hf://org/repo/subfolder` or by the aliases `laya` and `laya-multilingual`, in the Hugging Face cache layout so Laya's downloads are reused. `Request` gained a builder (`Request::new(state).choice(..).score(..).noul(..)`). Run through `decide_batch` on the CPU, all 200 parity requests per model come back with every answer equal to Laya's, except 7 English and 4 multilingual requests that differ by 1 in the fourth decimal of a rounded number.
 - `kime predict` answers questions from the command line: `--state @file --questions @file` or `--request @file`, `--format table`, and `--batch` for JSONL in and out, where a bad line gets an error line and the rest go on. `--device auto|cpu|cuda:N`, `--threads` and `--precision f16|f32` pick where it runs.
