@@ -4,6 +4,7 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime-cuda` has a tiled attention kernel and a new layer norm. Attention stages 32 keys of k and v at a time in shared memory for a block of 16 query rows and prefetches the next tile while it scores the current one, where before every warp read its own keys from memory. Layer norm runs one block per row with the row held in registers. On an RTX 4090 a 128 token question now spends 8.2 us per attention call instead of 28.8 and 3.4 us per layer norm instead of 9.0, and one question at a time is 2.08 ms at p50 in FP16 (8.3x Laya). A new test runs every kernel against the FP32 reference on a small random model, with batches that cross sequence ends and window edges.
 - `kime-cuda` captures each plan as one CUDA graph when it is lowered: the copy of the batch's index tables in, every launch, and the copy of the outputs back, both copies through page locked buffers. A run is one graph launch and one wait, with no allocation. On an RTX 4090 with the English model one question at a time went from 4.03 ms to 2.68 ms at p50 in FP16 (6.4x Laya's 17.2 ms) and from 5.57 ms to 4.83 ms in FP32.
 
 ## 0.0.3

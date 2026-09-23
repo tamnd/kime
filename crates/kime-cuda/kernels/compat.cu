@@ -50,27 +50,56 @@ extern "C" __global__ void embed(float* out, const float* table, const unsigned*
     for (int c = threadIdx.x; c < d; c += blockDim.x) dst[c] = src[c];
 }
 
-// LayerNorm with FP32 statistics, one warp per row and four rows per block. `kind` picks the row
-// count from `n`. `b` may be null.
+// Sum over a block of LN_THREADS threads. `red` is shared scratch of one float per warp, and every
+// thread gets the total.
+#define LN_THREADS 128
+#define LN_PER (1024 / LN_THREADS)
+
+__device__ __forceinline__ float block_sum(float v, float* red) {
+    int wid = threadIdx.x / 32, lane = threadIdx.x % 32;
+    v = warp_sum(v);
+    __syncthreads();
+    if (lane == 0) red[wid] = v;
+    __syncthreads();
+    float t = 0.0f;
+#pragma unroll
+    for (int k = 0; k < LN_THREADS / 32; k++) t += red[k];
+    return t;
+}
+
+// LayerNorm with FP32 statistics, one block of LN_THREADS per row with the row held in registers,
+// so d is at most 1024. `kind` picks the row count from `n`. `b` may be null.
 template <typename TI, typename TO>
 __device__ void layer_norm(TO* out, const TI* x, const float* w, const float* b, const unsigned* n, int kind, int d, float eps) {
-    unsigned r = blockIdx.x * 4 + threadIdx.x / 32;
-    int lane = threadIdx.x % 32;
+    __shared__ float red[LN_THREADS / 32];
+    unsigned r = blockIdx.x;
     if (r >= n[kind]) return;
     const TI* xr = x + (size_t)r * d;
+    float v[LN_PER];
     float s = 0.0f;
-    for (int c = lane; c < d; c += 32) s += ld(xr, c);
-    float mean = warp_sum(s) / d;
-    float v = 0.0f;
-    for (int c = lane; c < d; c += 32) {
-        float t = ld(xr, c) - mean;
-        v += t * t;
+#pragma unroll
+    for (int k = 0; k < LN_PER; k++) {
+        int c = threadIdx.x + k * LN_THREADS;
+        v[k] = c < d ? ld(xr, c) : 0.0f;
+        s += v[k];
     }
-    float rstd = 1.0f / sqrtf(warp_sum(v) / d + eps);
-    for (int c = lane; c < d; c += 32) {
-        float y = (ld(xr, c) - mean) * rstd * w[c];
-        if (b) y += b[c];
-        st(out, (size_t)r * d + c, y);
+    float mean = block_sum(s, red) / d;
+    float q = 0.0f;
+#pragma unroll
+    for (int k = 0; k < LN_PER; k++) {
+        int c = threadIdx.x + k * LN_THREADS;
+        float t = c < d ? v[k] - mean : 0.0f;
+        q += t * t;
+    }
+    float rstd = 1.0f / sqrtf(block_sum(q, red) / d + eps);
+#pragma unroll
+    for (int k = 0; k < LN_PER; k++) {
+        int c = threadIdx.x + k * LN_THREADS;
+        if (c < d) {
+            float y = (v[k] - mean) * rstd * w[c];
+            if (b) y += b[c];
+            st(out, (size_t)r * d + c, y);
+        }
     }
 }
 
@@ -120,90 +149,137 @@ __device__ void rope(T* qkv, const float* cosv, const float* sinv, const unsigne
 extern "C" __global__ void rope_f16(half_t* x, const float* c, const float* s, const unsigned* p, const unsigned* n, int h) { rope(x, c, s, p, n, h); }
 extern "C" __global__ void rope_f32(float* x, const float* c, const float* s, const unsigned* p, const unsigned* n, int h) { rope(x, c, s, p, n, h); }
 
-// q . k over one head, q already scaled and in shared memory.
-__device__ __forceinline__ float dot64(const float* q, const half_t* kp) {
-    const uint4* k = (const uint4*)kp;
-    float dot = 0.0f;
-#pragma unroll
-    for (int c = 0; c < 8; c++) {
-        uint4 u = k[c];
-        const float* qq = q + c * 8;
-        dot += qq[0] * h2f(u.x & 0xffff) + qq[1] * h2f(u.x >> 16);
-        dot += qq[2] * h2f(u.y & 0xffff) + qq[3] * h2f(u.y >> 16);
-        dot += qq[4] * h2f(u.z & 0xffff) + qq[5] * h2f(u.z >> 16);
-        dot += qq[6] * h2f(u.w & 0xffff) + qq[7] * h2f(u.w >> 16);
-    }
-    return dot;
-}
-
-__device__ __forceinline__ float dot64(const float* q, const float* kp) {
-    const float4* k = (const float4*)kp;
-    float dot = 0.0f;
-#pragma unroll
-    for (int c = 0; c < 16; c++) {
-        float4 u = k[c];
-        const float* qq = q + c * 4;
-        dot += qq[0] * u.x + qq[1] * u.y + qq[2] * u.z + qq[3] * u.w;
-    }
-    return dot;
-}
-
-// Channels 2 lane and 2 lane + 1 of one head.
-__device__ __forceinline__ float2 pair(const half_t* v, int lane) {
-    unsigned u = ((const unsigned*)v)[lane];
-    return make_float2(h2f(u & 0xffff), h2f(u >> 16));
-}
-
-__device__ __forceinline__ float2 pair(const float* v, int lane) { return ((const float2*)v)[lane]; }
-
 // Attention over [q | k | v] rows of heads of 64, within each sequence and, when window >= 0, only
-// to keys at most `window` positions away. One warp per (query row, head), four rows per block.
-// Keys go 32 at a time, one per lane, with an online softmax, and each lane then owns two of the
-// 64 output channels.
+// to keys at most `window` positions away. One block per ATT_Q query rows and one head. The keys
+// any of the rows can see are walked ATT_K at a time, each tile of k and v staged in shared memory
+// once for the whole block. Each of the ATT_W warps keeps an online softmax for ATT_R rows: a lane
+// scores one key of the tile, then owns two of the 64 output channels. The sums are split in four
+// so that no chain of dependent adds is longer than 16.
+#ifndef ATT_W
+#define ATT_W 16
+#endif
+#ifndef ATT_R
+#define ATT_R 1
+#endif
+#define ATT_Q (ATT_W * ATT_R)
+#define ATT_K 32
+// Elements of a k or v tile each thread moves.
+#define ATT_E (ATT_K * 64 / (32 * ATT_W))
+
 template <typename T, typename TO>
 __device__ void attention(TO* out, const T* qkv, const unsigned* seq, const unsigned* cu, const unsigned* n, int heads, int window) {
-    __shared__ float qs[4][64];
+    __shared__ float qs[ATT_Q][64];
+    __shared__ float ks[ATT_K][65];
+    __shared__ __align__(16) float vs[ATT_K][64];
     int wid = threadIdx.x / 32, lane = threadIdx.x % 32;
-    unsigned i = blockIdx.x * 4 + wid;
+    int nt = n[0];
+    int i0 = blockIdx.x * ATT_Q;
+    if (i0 >= nt) return;
     int h = blockIdx.y;
-    if (i >= n[0]) return;
     int d = heads * 64;
     size_t stride = 3 * (size_t)d;
-    unsigned s = seq[i];
-    int lo = cu[s], hi = cu[s + 1];
-    int a = lo, b = hi;
-    if (window >= 0) {
-        a = max(lo, (int)i - window);
-        b = min(hi, (int)i + window + 1);
-    }
-    size_t q = i * stride + h * 64;
-    qs[wid][lane] = ld(qkv, q + lane) * 0.125f;
-    qs[wid][lane + 32] = ld(qkv, q + lane + 32) * 0.125f;
-    __syncwarp();
-    float m = -INF, l = 0.0f, acc0 = 0.0f, acc1 = 0.0f;
-    for (int j0 = a; j0 < b; j0 += 32) {
-        int j = j0 + lane;
-        float sc = -INF;
-        if (j < b) sc = dot64(qs[wid], qkv + (size_t)j * stride + d + h * 64);
-        float mn = fmaxf(m, warp_max(sc));
-        float corr = expf(m - mn);
-        float p = j < b ? expf(sc - mn) : 0.0f;
-        l = l * corr + warp_sum(p);
-        acc0 *= corr;
-        acc1 *= corr;
-        int cnt = min(32, b - j0);
-        for (int t = 0; t < cnt; t++) {
-            float pt = __shfl_sync(0xffffffff, p, t);
-            float2 v = pair(qkv + (size_t)(j0 + t) * stride + 2 * d + h * 64, lane);
-            acc0 += pt * v.x;
-            acc1 += pt * v.y;
+    // Rows are sorted by sequence, so both ends of a row's key range only grow with the row, and
+    // the block's range runs from its first row's start to its last row's end.
+    int lo[ATT_R], hi[ATT_R];
+    for (int k = 0; k < ATT_R; k++) {
+        int i = i0 + wid * ATT_R + k;
+        if (i < nt) {
+            unsigned sq = seq[i];
+            lo[k] = cu[sq];
+            hi[k] = cu[sq + 1];
+            if (window >= 0) {
+                lo[k] = max(lo[k], i - window);
+                hi[k] = min(hi[k], i + window + 1);
+            }
+        } else {
+            lo[k] = hi[k] = 0;
         }
-        m = mn;
     }
-    float inv = 1.0f / l;
-    size_t o = (size_t)i * d + h * 64 + 2 * lane;
-    st(out, o, acc0 * inv);
-    st(out, o + 1, acc1 * inv);
+    int last = min(i0 + ATT_Q, nt) - 1;
+    int a = cu[seq[i0]], b = cu[seq[last] + 1];
+    if (window >= 0) {
+        a = max(a, i0 - window);
+        b = min(b, last + window + 1);
+    }
+    for (int e = threadIdx.x; e < ATT_Q * 64; e += blockDim.x) {
+        int r = e / 64, c = e % 64;
+        qs[r][c] = i0 + r < nt ? ld(qkv, (size_t)(i0 + r) * stride + h * 64 + c) * 0.125f : 0.0f;
+    }
+    float m[ATT_R], l[ATT_R], acc0[ATT_R], acc1[ATT_R];
+    for (int k = 0; k < ATT_R; k++) {
+        m[k] = -INF;
+        l[k] = acc0[k] = acc1[k] = 0.0f;
+    }
+    __syncthreads();
+    float qr[ATT_R][64];
+#pragma unroll
+    for (int k = 0; k < ATT_R; k++)
+#pragma unroll
+        for (int c = 0; c < 64; c++) qr[k][c] = qs[wid * ATT_R + k][c];
+    // The next tile is read into registers while the current one is scored.
+    float kr[ATT_E], vr[ATT_E];
+#pragma unroll
+    for (int u = 0; u < ATT_E; u++) {
+        int e = threadIdx.x + u * 32 * ATT_W, j = a + e / 64;
+        size_t at = (size_t)j * stride + h * 64 + e % 64;
+        kr[u] = j < b ? ld(qkv, at + d) : 0.0f;
+        vr[u] = j < b ? ld(qkv, at + 2 * d) : 0.0f;
+    }
+    for (int j0 = a; j0 < b; j0 += ATT_K) {
+        __syncthreads();
+#pragma unroll
+        for (int u = 0; u < ATT_E; u++) {
+            int e = threadIdx.x + u * 32 * ATT_W;
+            ks[e / 64][e % 64] = kr[u];
+            vs[e / 64][e % 64] = vr[u];
+        }
+        __syncthreads();
+        int jn = j0 + ATT_K;
+        if (jn < b) {
+#pragma unroll
+            for (int u = 0; u < ATT_E; u++) {
+                int e = threadIdx.x + u * 32 * ATT_W, j = jn + e / 64;
+                size_t at = (size_t)j * stride + h * 64 + e % 64;
+                kr[u] = j < b ? ld(qkv, at + d) : 0.0f;
+                vr[u] = j < b ? ld(qkv, at + 2 * d) : 0.0f;
+            }
+        }
+        int j = j0 + lane;
+#pragma unroll
+        for (int k = 0; k < ATT_R; k++) {
+            if (hi[k] <= j0 || lo[k] >= j0 + ATT_K) continue;
+            float sc = -INF;
+            if (j >= lo[k] && j < hi[k]) {
+                float s4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+#pragma unroll
+                for (int c = 0; c < 64; c++) s4[c % 4] += qr[k][c] * ks[lane][c];
+                sc = (s4[0] + s4[1]) + (s4[2] + s4[3]);
+            }
+            float mn = fmaxf(m[k], warp_max(sc));
+            float corr = expf(m[k] - mn);
+            float p = sc == -INF ? 0.0f : expf(sc - mn);
+            l[k] = l[k] * corr + warp_sum(p);
+            float s0[2] = {0.0f, 0.0f}, s1[2] = {0.0f, 0.0f};
+#pragma unroll
+            for (int t = 0; t < ATT_K; t++) {
+                float pt = __shfl_sync(0xffffffff, p, t);
+                float2 v = *(const float2*)&vs[t][2 * lane];
+                s0[t % 2] += pt * v.x;
+                s1[t % 2] += pt * v.y;
+            }
+            acc0[k] = acc0[k] * corr + (s0[0] + s0[1]);
+            acc1[k] = acc1[k] * corr + (s1[0] + s1[1]);
+            m[k] = mn;
+        }
+    }
+    for (int k = 0; k < ATT_R; k++) {
+        int i = i0 + wid * ATT_R + k;
+        if (i >= nt) continue;
+        float inv = l[k] > 0.0f ? 1.0f / l[k] : 0.0f;
+        size_t o = (size_t)i * d + h * 64 + 2 * lane;
+        st(out, o, acc0[k] * inv);
+        st(out, o + 1, acc1[k] * inv);
+    }
 }
 
 extern "C" __global__ void attention_f32_f32(float* o, const float* x, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, s, cu, n, h, w); }

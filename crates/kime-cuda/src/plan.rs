@@ -17,6 +17,10 @@ use crate::{CudaBackend, Precision, WORKSPACE, dev};
 /// Width of one attention head.
 const HEAD: usize = 64;
 
+/// Query rows and warps per attention block, `ATT_Q` and `ATT_W` in the kernels.
+const ATT_Q: usize = 16;
+const ATT_W: u32 = 16;
+
 /// A weight on the device in FP32, with an FP16 copy made the first time a plan needs one.
 struct Tensor {
     shape: Vec<usize>,
@@ -389,7 +393,7 @@ impl CudaBackend {
                 let mut l = s.launch_builder(f);
                 l.arg(&out.ptr).arg(&x.ptr).arg(&w).arg(&bias).arg(&n).arg(&k).arg(&d).arg(&eps);
                 // SAFETY: see above.
-                unsafe { l.launch(rows(b.rows(x.rows).div_ceil(4), 128)) }.map_err(dev)?;
+                unsafe { l.launch(rows(b.rows(x.rows), 128)) }.map_err(dev)?;
             }
             Step::ToHalf { x, len } => {
                 let blocks = len.div_ceil(256).min(65_535) as u32;
@@ -431,8 +435,8 @@ impl CudaBackend {
                 l.arg(&out.ptr).arg(&qkv.ptr).arg(&seq).arg(&cu).arg(&n);
                 l.arg(&heads).arg(&window);
                 let cfg = LaunchConfig {
-                    grid_dim: (b.tokens.div_ceil(4) as u32, heads as u32, 1),
-                    block_dim: (128, 1, 1),
+                    grid_dim: (b.tokens.div_ceil(ATT_Q) as u32, heads as u32, 1),
+                    block_dim: (32 * ATT_W, 1, 1),
                     shared_mem_bytes: 0,
                 };
                 // SAFETY: see above.
@@ -593,9 +597,12 @@ impl Backend for CudaBackend {
                     let ok = shape(nw)? == [x.width]
                         && b.map_or(Ok(true), |b| shape(b).map(|s| s == [x.width]))?
                         && x.width == out.width
+                        && x.width <= 1024
                         && x.rows == out.rows;
                     if !ok {
-                        return bad(format!("op {i}: layer norm shapes do not match"));
+                        return bad(format!(
+                            "op {i}: layer norm shapes do not match or are over 1024"
+                        ));
                     }
                     let eps = eps as f32;
                     Step::LayerNorm { x, w: self.ptr32(w, nw)?, b: bias(b)?, eps, out }
