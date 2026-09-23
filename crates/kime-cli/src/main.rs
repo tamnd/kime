@@ -101,9 +101,8 @@ fn cpu_features() -> Vec<&'static str> {
         if std::arch::is_x86_feature_detected!("avx512bf16") {
             found.push("avx512bf16");
         }
-        if std::arch::is_x86_feature_detected!("amx-int8") {
-            found.push("amx-int8");
-        }
+        // AMX is not listed: std's detection of it is unstable, and reading CPUID ourselves needs
+        // unsafe on our minimum Rust. kime-cpu will probe it next to the AMX kernels.
     }
     #[cfg(target_arch = "aarch64")]
     {
