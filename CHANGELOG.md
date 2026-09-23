@@ -4,6 +4,10 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime-tensor` has the engine's core: an op graph that model builders emit, the `Backend` trait, arena layout by live ranges, and the bucket table as data (`buckets.txt`, or any table loaded at run time). The `Executor` picks the smallest bucket that holds a batch, builds its plan on first use and replays it after that. `kime-model` emits the whole Laya compat graph as ops.
+- `kime-cpu` lowers that graph into a CPU plan run on a persistent worker pool that spins briefly and then sleeps. Once a bucket is warm a batch allocates nothing, which a counting allocator test checks. The plan gives the same bits as the FP32 reference on both Laya checkpoints and all 625 parity questions per model, and a question gives the same bits alone as inside any batch. On an i9-13900K with the English model, batches of 16 take 178.6 ms per question against 227.6 ms for the reference, and one question at a time is 160.5 ms at p50 on 16 threads. Matrix products and attention take 85 to 95% of that time, so they are the next target.
+- `kime doctor` no longer lists AMX, because std's detection of it is unstable and broke the Linux build.
+
 ## 0.0.2
 
 The first model runs. Both Laya checkpoints load, pack into `.kime` and run through the FP32 CPU reference, which agrees with Laya on every parity question. The input side (request validation, Laya exact rendering, both tokenizers and the sequence layout) matches Laya byte for byte and id for id.
