@@ -140,21 +140,21 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "kime"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-core",
 ]
 
 [[package]]
 name = "kime-ane"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-tensor",
 ]
 
 [[package]]
 name = "kime-cli"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime",
  "kime-model",
@@ -162,14 +162,14 @@ dependencies = [
 
 [[package]]
 name = "kime-core"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "kime-cpu"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-model",
  "kime-tensor",
@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "kime-cuda"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "cudarc",
  "kime-cpu",
@@ -190,7 +190,7 @@ dependencies = [
 
 [[package]]
 name = "kime-engine"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-core",
  "kime-model",
@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "kime-eval"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-core",
  "kime-tok",
@@ -208,14 +208,14 @@ dependencies = [
 
 [[package]]
 name = "kime-metal"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-tensor",
 ]
 
 [[package]]
 name = "kime-model"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "blake3",
  "kime-core",
@@ -226,14 +226,14 @@ dependencies = [
 
 [[package]]
 name = "kime-route"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-core",
 ]
 
 [[package]]
 name = "kime-serve"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-core",
  "kime-engine",
@@ -241,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "kime-tensor"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "half",
  "memmap2",
@@ -249,7 +249,7 @@ dependencies = [
 
 [[package]]
 name = "kime-tok"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "kime-train"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "kime-core",
  "kime-model",
@@ -437,7 +437,7 @@ checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
 
 [[package]]
 name = "xtask"
-version = "0.0.4"
+version = "0.0.5"
 
 [[package]]
 name = "zerocopy"
