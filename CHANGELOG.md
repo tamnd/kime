@@ -4,6 +4,10 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+## 0.0.4
+
+The CUDA path is 10x Laya. Each plan is captured as one CUDA graph, the kernels were rewritten, and GEMMs run the cuBLASLt algorithm tuned for their shape. On an RTX 4090 one question takes 1.72 ms at p50 in FP16 against 17.2 ms for Laya on the same card, with the same answers on every English parity question.
+
 - `kime-cuda` pins cuBLASLt's algorithm per GEMM shape from a table, `tuned.txt`, keyed by GPU. cuBLASLt's first choice is often not its fastest at the few rows one question has: on an RTX 4090 at 80 rows the 1024 by 1024 projection runs in 10.6 us on its seventh ranked algorithm against 18.8 us on the first. A run with `KIME_CUDA_TUNE=1` times every rank of every GEMM in place and prints the lines to add, and the table ships 73 of them for the RTX 4090. Pinning by rank keeps plans the same on every start, as spec 07 asks.
 - `kime-cuda` has faster kernels for attention, layer norm, rope, GEGLU and bias. Attention runs 8 warps of 2 query rows each over 32 key tiles held in padded shared memory, and is 1.5x to 1.9x faster than before (6.7 us instead of 10.8 us for 128 tokens). Layer norm runs one warp per row. Every kernel now loads all it needs into registers before it stores anything, since a store between loads keeps the compiler from overlapping them.
 - The compat stage has 20 buckets instead of 9, adding 48, 80, 96, 112, 160, 192, 224, 288, 320 and 384 tokens, so a typical question pads to less.
