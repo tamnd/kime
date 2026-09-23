@@ -108,6 +108,35 @@ jobs:
           "./target/$dir/kime$exe" --version
           "./target/$dir/kime$exe" doctor
 
+  # The tokenizers have to give the ids Hugging Face gives, and the only way to know is to load the
+  # real tokenizer files. They are small (about 40 MB for both) and fetched at a pinned revision of
+  # convaiinnovations/laya, so the test cannot pass by skipping.
+  tokenizers:
+    name: tokenizer parity
+    needs: quick
+    runs-on: ubuntu-24.04
+    env:
+      LAYA_REVISION: 5e7b2b1b8ca2ecdd3f2322d94069c9b6ce7e844b
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: tokenizers
+      - name: fetch the tokenizer files
+        run: |
+          set -euo pipefail
+          for f in tokenizer/tokenizer.json tokenizer/tokenizer_config.json multilingual/tokenizer/tokenizer.json multilingual/tokenizer/tokenizer_config.json; do
+            mkdir -p "models/laya/$(dirname "$f")"
+            curl --fail --silent --show-error --location --retry 3 -o "models/laya/$f" "https://huggingface.co/convaiinnovations/laya/resolve/$LAYA_REVISION/$f"
+          done
+      - name: cargo test
+        env:
+          KIME_MODELS: ${{ github.workspace }}/models
+          KIME_REQUIRE_MODELS: "1"
+        run: cargo test --release -p kime-tok
+
   docs:
     name: documentation
     needs: quick
@@ -193,7 +222,7 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [quick, test, docs, msrv, audit, workflows]
+    needs: [quick, test, tokenizers, docs, msrv, audit, workflows]
     runs-on: ubuntu-24.04
     steps:
       - name: fail if anything upstream failed

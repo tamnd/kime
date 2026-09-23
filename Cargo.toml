@@ -34,6 +34,12 @@ kime-tensor = { version = "=0.0.1", path = "crates/kime-tensor" }
 kime-tok = { version = "=0.0.1", path = "crates/kime-tok" }
 kime-train = { version = "=0.0.1", path = "crates/kime-train" }
 
+# Outside crates. Each one is here because writing it ourselves would be worse, and the list is meant to stay short enough to read.
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.151", features = ["preserve_order", "float_roundtrip"] }
+unicode-normalization = "0.1.25"
+unicode-properties = { version = "0.1.4", default-features = false, features = ["general-category"] }
+
 [workspace.lints.rust]
 missing_debug_implementations = "warn"
 rust_2018_idioms = "warn"

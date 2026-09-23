@@ -34,3 +34,7 @@ Running the same cases with `--device cuda` on an RTX 4090 uses Laya's bf16 auto
 | laya-multilingual | 625 | 623 (99.7%) | 0.068 | 0.41 |
 
 So Laya on a GPU does not agree with Laya on a CPU for 5 of 1,250 questions. The tolerance in `spec/15-testing.md` for kime's FP16 backends is a probability error of 6e-3 with 100% argmax agreement, which is more than ten times tighter than that.
+
+## Tokenizer corpus
+
+`tok_corpus.py` writes the MASSIVE train utterances in all 51 languages plus 200,000 fuzz strings to a JSON lines file, with the ids Hugging Face tokenizers gives for each line under both Laya tokenizers, and prints how fast Hugging Face was on one thread. The parquet files are cached in `--cache`, and a cache that already has all 51 is used without touching the network. `cargo run --release -p kime-tok --example corpus -- <models>/laya tok-corpus.jsonl` then checks kime against every line and times it the same way.
