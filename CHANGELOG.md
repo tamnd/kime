@@ -4,6 +4,10 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+## 0.0.7
+
+- `kime-cli` builds on Windows again. 0.0.6 imported `PathBuf` for `kime pull` on every OS, but only the unix code path uses it, so the unused import stopped the Windows build under `-D warnings`.
+
 ## 0.0.6
 
 kime answers questions end to end. The engine lays out requests as Laya does, runs them on the CPU or CUDA, and builds Laya's answers from the logits, and the CLI can pull a model and predict with it. On the CPU, every parity answer equals Laya's, except a few rounded numbers that are off by 1 in the fourth decimal.
