@@ -17,6 +17,7 @@ name = "kime"
 path = "src/main.rs"
 
 [dependencies]
+kime-model.workspace = true
 kime.workspace = true
 
 [lints]
