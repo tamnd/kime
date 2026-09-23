@@ -59,30 +59,40 @@ fn main() {
             lines.len() as f64 / best,
             bytes as f64 / 1e6 / best
         );
-        // One 2 KB request made of whole ASCII lines, the size the spec budgets 15 microseconds for.
-        let mut request = String::new();
-        for line in lines.iter().filter(|l| l.is_ascii()) {
-            if request.len() + line.len() + 1 > 2048 {
-                break;
+        // Distinct 2 KB requests made of whole lines, the size the spec budgets 15 microseconds for.
+        // Each is encoded once, so the word cache only helps as much as it would with real traffic.
+        let mut requests = vec![String::new()];
+        for line in &lines {
+            let last = requests.last_mut().expect("never empty");
+            if last.len() + line.len() + 1 > 2048 {
+                requests.push(String::new());
             }
-            request.push_str(line);
-            request.push('\n');
+            let last = requests.last_mut().expect("never empty");
+            last.push_str(line);
+            last.push('\n');
         }
-        let reps = 20_000;
-        let mut samples = Vec::with_capacity(reps);
-        for _ in 0..reps {
+        requests.retain(|r| r.len() > 1900);
+        let fresh = Tokenizer::from_dir(format!("{models}/{dir}")).expect("load the tokenizer");
+        let t = Instant::now();
+        out.clear();
+        fresh.encode_into(&requests[0], &mut out);
+        let cold = t.elapsed().as_nanos() as f64 / 1e3;
+        let mut samples = Vec::with_capacity(requests.len());
+        let mut tokens = 0usize;
+        for r in &requests {
             let t = Instant::now();
             out.clear();
-            tok.encode_into(&request, &mut out);
+            fresh.encode_into(r, &mut out);
             samples.push(t.elapsed().as_nanos() as u64);
+            tokens += out.len();
         }
         samples.sort_unstable();
+        let n = samples.len();
         println!(
-            "{name}: {} byte request, {} tokens, p50 {:.1} us, p99 {:.1} us",
-            request.len(),
-            out.len(),
-            samples[reps / 2] as f64 / 1e3,
-            samples[reps * 99 / 100] as f64 / 1e3
+            "{name}: {n} distinct 2 KB requests, {:.0} tokens each, first {cold:.1} us, p50 {:.1} us, p99 {:.1} us",
+            tokens as f64 / n as f64,
+            samples[n / 2] as f64 / 1e3,
+            samples[n * 99 / 100] as f64 / 1e3
         );
         failed |= bad > 0;
     }

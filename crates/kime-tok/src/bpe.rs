@@ -2,11 +2,56 @@
 //! by rank and then position, over a linked list of symbols. Any other order can give different
 //! ids on words where two merges compete, so this one is kept exactly.
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
+use std::hash::Hasher;
+use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
 
 use crate::bytelevel::BYTE_TO_CHAR;
-use crate::hash::FxMap;
+use crate::hash::{Fx, FxMap};
+
+/// Words longer than this skip the cache. They are rare, and keeping them out keeps every slot small.
+const CACHE_MAX_WORD: usize = 48;
+/// Slots in each thread's cache. A slot is overwritten on collision, so memory stays bounded.
+const CACHE_SLOTS: usize = 1 << 16;
+
+static NEXT_UID: AtomicU32 = AtomicU32::new(1);
+
+#[derive(Default)]
+struct Slot {
+    hash: u64,
+    uid: u32,
+    word: Box<[u8]>,
+    ids: Box<[u32]>,
+}
+
+/// Per thread state: the word cache and the buffers the merge loop reuses, so a warm encode does
+/// not allocate. Keyed by the model's uid as well as the word, so two tokenizers on one thread
+/// never see each other's entries.
+#[derive(Default)]
+struct Scratch {
+    slots: Vec<Slot>,
+    syms: Vec<Symbol>,
+    heap: BinaryHeap<Merge>,
+}
+
+thread_local! {
+    static SCRATCH: RefCell<Scratch> = RefCell::new(Scratch::default());
+}
+
+fn word_hash(uid: u32, word: &[u8]) -> u64 {
+    let mut h = Fx::default();
+    h.write_u32(uid);
+    let mut chunks = word.chunks_exact(8);
+    for c in &mut chunks {
+        h.write_u64(u64::from_le_bytes(c.try_into().expect("eight bytes")));
+    }
+    let mut tail = [0u8; 8];
+    tail[..chunks.remainder().len()].copy_from_slice(chunks.remainder());
+    h.write_u64(u64::from_le_bytes(tail) ^ ((word.len() as u64) << 56));
+    h.finish()
+}
 
 #[derive(Debug)]
 pub(crate) struct Bpe {
@@ -23,6 +68,7 @@ pub(crate) struct Bpe {
     fallback: Option<[Option<u32>; 256]>,
     unk: Option<u32>,
     fuse_unk: bool,
+    uid: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -105,7 +151,8 @@ impl Bpe {
             Some(u) => Some(*vocab.get(u).ok_or_else(|| format!("the unknown token {u:?} is not in the vocabulary"))?),
             None => None,
         };
-        Ok(Bpe { vocab, vocab_r, chars, merges: table, byte_ids, fallback, unk, fuse_unk })
+        let uid = NEXT_UID.fetch_add(1, AtomicOrdering::Relaxed);
+        Ok(Bpe { vocab, vocab_r, chars, merges: table, byte_ids, fallback, unk, fuse_unk, uid })
     }
 
     pub(crate) fn vocab_len(&self) -> usize {
@@ -127,27 +174,30 @@ impl Bpe {
     /// A byte level word: each byte starts as the token of its GPT-2 char. A byte whose char is
     /// not in the vocabulary is dropped, which is what Hugging Face does with no unknown token.
     pub(crate) fn encode_bytelevel(&self, word: &[u8], out: &mut Vec<u32>) {
-        let mut syms: Vec<Symbol> = Vec::with_capacity(word.len());
-        for &b in word {
-            if let Some(id) = self.byte_ids[usize::from(b)] {
-                push(&mut syms, id);
+        self.cached(word, out, |syms| {
+            for &b in word {
+                if let Some(id) = self.byte_ids[usize::from(b)] {
+                    push(syms, id);
+                }
             }
-        }
-        self.merge(&mut syms, out);
+        });
     }
 
     /// A word of chars, as SentencePiece style models see it. A char outside the vocabulary becomes
     /// its UTF-8 bytes as `<0xNN>` tokens with byte fallback, or the unknown token without.
     pub(crate) fn encode_chars(&self, word: &str, out: &mut Vec<u32>) {
-        let mut syms: Vec<Symbol> = Vec::with_capacity(word.len());
+        self.cached(word.as_bytes(), out, |syms| self.chars_to_symbols(word, syms));
+    }
+
+    fn chars_to_symbols(&self, word: &str, syms: &mut Vec<Symbol>) {
         let mut unk_pending = false;
         for c in word.chars() {
             if let Some(&id) = self.chars.get(&(c as u32)) {
                 if unk_pending {
-                    push(&mut syms, self.unk.expect("pending only when there is an unknown token"));
+                    push(syms, self.unk.expect("pending only when there is an unknown token"));
                     unk_pending = false;
                 }
-                push(&mut syms, id);
+                push(syms, id);
                 continue;
             }
             if let Some(fb) = &self.fallback {
@@ -156,27 +206,62 @@ impl Bpe {
                 // Only when every byte has a token, otherwise the char is unknown, as in Hugging Face.
                 if bytes.iter().all(|&b| fb[usize::from(b)].is_some()) {
                     for &b in bytes {
-                        push(&mut syms, fb[usize::from(b)].expect("checked above"));
+                        push(syms, fb[usize::from(b)].expect("checked above"));
                     }
                     continue;
                 }
             }
             if let Some(unk) = self.unk {
                 if unk_pending && !self.fuse_unk {
-                    push(&mut syms, unk);
+                    push(syms, unk);
                 }
                 unk_pending = true;
             }
         }
         if unk_pending {
-            push(&mut syms, self.unk.expect("pending only when there is an unknown token"));
+            push(syms, self.unk.expect("pending only when there is an unknown token"));
         }
-        self.merge(&mut syms, out);
     }
 
-    fn merge(&self, syms: &mut [Symbol], out: &mut Vec<u32>) {
+    /// Looks `word` up in this thread's cache, and on a miss builds its symbols with `init`, merges
+    /// them and stores the result.
+    fn cached(&self, word: &[u8], out: &mut Vec<u32>, init: impl FnOnce(&mut Vec<Symbol>)) {
+        SCRATCH.with(|cell| {
+            let Ok(mut guard) = cell.try_borrow_mut() else {
+                // Only reachable if encoding re-enters itself on this thread, which it does not, but
+                // falling back to fresh buffers is cheap and keeps this free of panics.
+                let mut syms = Vec::with_capacity(word.len());
+                init(&mut syms);
+                self.merge(&mut syms, &mut BinaryHeap::new(), out);
+                return;
+            };
+            let scratch = &mut *guard;
+            let cacheable = word.len() <= CACHE_MAX_WORD;
+            let hash = word_hash(self.uid, word);
+            let at = (hash as usize) & (CACHE_SLOTS - 1);
+            if cacheable {
+                if scratch.slots.is_empty() {
+                    scratch.slots.resize_with(CACHE_SLOTS, Slot::default);
+                }
+                let slot = &scratch.slots[at];
+                if slot.hash == hash && slot.uid == self.uid && *slot.word == *word {
+                    out.extend_from_slice(&slot.ids);
+                    return;
+                }
+            }
+            scratch.syms.clear();
+            init(&mut scratch.syms);
+            let start = out.len();
+            self.merge(&mut scratch.syms, &mut scratch.heap, out);
+            if cacheable {
+                scratch.slots[at] = Slot { hash, uid: self.uid, word: word.into(), ids: out[start..].into() };
+            }
+        });
+    }
+
+    fn merge(&self, syms: &mut [Symbol], heap: &mut BinaryHeap<Merge>, out: &mut Vec<u32>) {
         let n = syms.len();
-        let mut heap = BinaryHeap::with_capacity(n);
+        heap.clear();
         for i in 0..n.saturating_sub(1) {
             if let Some(&(rank, new_id)) = self.merges.get(&pair(syms[i].id, syms[i + 1].id)) {
                 heap.push(Merge { pos: i, rank, new_id });
