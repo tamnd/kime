@@ -63,6 +63,8 @@ pub(crate) struct Gemm {
     c: sys::cublasLtMatrixLayout_t,
     algo: sys::cublasLtMatmulAlgo_t,
     beta: f32,
+    /// Rows, inner size and columns.
+    pub(crate) dims: (usize, usize, usize),
     /// Device addresses of `w`, `x` and `y`.
     pub(crate) w: u64,
     pub(crate) x: u64,
@@ -97,6 +99,7 @@ impl Gemm {
             // SAFETY: an all zero algo is a valid value to overwrite below.
             algo: unsafe { std::mem::zeroed() },
             beta: if accumulate { 1.0 } else { 0.0 },
+            dims: (m, k, n),
             w,
             x,
             y,

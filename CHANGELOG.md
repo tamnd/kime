@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime-cuda` captures each plan as one CUDA graph when it is lowered: the copy of the batch's index tables in, every launch, and the copy of the outputs back, both copies through page locked buffers. A run is one graph launch and one wait, with no allocation. On an RTX 4090 with the English model one question at a time went from 4.03 ms to 2.68 ms at p50 in FP16 (6.4x Laya's 17.2 ms) and from 5.57 ms to 4.83 ms in FP32.
+
 ## 0.0.3
 
 The engine runs on a plan, and on the GPU. Graphs are lowered once per bucket and replayed, on the CPU with zero allocations once warm and on NVIDIA GPUs through cuBLASLt and kime's own kernels. On an RTX 4090 the FP16 path answers one question in 4.03 ms at p50 against 17.2 ms for Laya on the same card.

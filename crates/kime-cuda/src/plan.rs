@@ -1,10 +1,13 @@
 //! Graphs lowered for the GPU: every value gets an element type and a place in one device arena,
 //! every GEMM its cuBLASLt setup, and a run is a copy of the batch's index tables, a fixed list of
-//! launches and a copy of the outputs back.
+//! launches and a copy of the outputs back. Lowering captures all three as one CUDA graph, with both
+//! copies going through page locked host buffers, so a run is one graph launch and one wait.
 
 use std::sync::OnceLock;
 
-use cudarc::driver::{CudaSlice, DevicePtr, LaunchConfig, PushKernelArg};
+use cudarc::driver::{
+    CudaGraph, CudaSlice, DevicePtr, LaunchConfig, PinnedHostSlice, PushKernelArg, result, sys,
+};
 use kime_tensor::plan::{Epilogue, Graph, Op, Rows, Val, layout};
 use kime_tensor::{Backend, Batch, Bucket, Caps, Error, HostTensor, Outputs, Result};
 
@@ -108,6 +111,23 @@ enum Step {
     },
 }
 
+impl Step {
+    fn name(&self) -> &'static str {
+        match self {
+            Step::Embed { .. } => "embed",
+            Step::LayerNorm { .. } => "layer norm",
+            Step::ToHalf { .. } => "to half",
+            Step::Gemm { .. } => "gemm",
+            Step::Rope { .. } => "rope",
+            Step::Attention { .. } => "attention",
+            Step::GeGlu { .. } => "geglu",
+            Step::AddType { .. } => "type embedding",
+            Step::Gather { .. } => "gather markers",
+            Step::ActFeatures { .. } => "act features",
+        }
+    }
+}
+
 /// Where each index table sits in the staging buffer, in u32 elements.
 #[derive(Debug, Clone, Copy)]
 struct Index {
@@ -169,20 +189,32 @@ pub struct CudaPlan {
     steps: Vec<Step>,
     gemms: Vec<lt::Gemm>,
     arena: CudaSlice<u8>,
-    base: u64,
     /// FP16 copies of FP32 GEMM inputs.
     _stage: CudaSlice<u16>,
     stage: u64,
     /// Held so the rope tables the steps point at stay alive.
     _ropes: Vec<(u64, CudaSlice<f32>, CudaSlice<f32>)>,
-    index: CudaSlice<u32>,
-    index_host: Vec<u32>,
+    _index: CudaSlice<u32>,
+    /// The index tables on the host, page locked so the copy in the graph is asynchronous.
+    index_host: PinnedHostSlice<u32>,
     at: Index,
     ptrs: Ptrs,
     logits: Loc,
     act: Loc,
-    host_out: Vec<f32>,
+    /// The bucket's logits then its act outputs, page locked.
+    host_out: PinnedHostSlice<f32>,
+    graph: Option<Captured>,
+    profile: Option<Vec<u64>>,
+    /// Runs timed since profiling started.
+    profiled: u64,
 }
+
+/// A captured run.
+struct Captured(CudaGraph);
+
+// SAFETY: a CUDA graph exec may be launched from any thread as long as calls on it are serialized.
+// The plan is only used through `&mut CudaPlan`, so they are.
+unsafe impl Send for Captured {}
 
 impl std::fmt::Debug for CudaPlan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -205,6 +237,48 @@ impl CudaPlan {
     #[must_use]
     pub fn arena_bytes(&self) -> usize {
         self.arena.len()
+    }
+
+    /// Times every step from now on. Each step then waits for the GPU and the graph is not used,
+    /// so this is for finding where the time goes, not for measuring the total.
+    pub fn profile(&mut self) {
+        self.profile = Some(vec![0; self.steps.len()]);
+        self.profiled = 0;
+    }
+
+    /// Time per GEMM shape since [`CudaPlan::profile`]: rows, inner size, columns, calls over all
+    /// timed runs and nanoseconds, largest first.
+    #[must_use]
+    pub fn gemm_timings(&self) -> Vec<((usize, usize, usize), u64, u64)> {
+        let mut by: Vec<((usize, usize, usize), u64, u64)> = Vec::new();
+        for (s, &ns) in self.steps.iter().zip(self.profile.iter().flatten()) {
+            if let Step::Gemm { gemm, .. } = *s {
+                let d = self.gemms[gemm].dims;
+                match by.iter_mut().find(|b| b.0 == d) {
+                    Some(b) => {
+                        b.1 += self.profiled;
+                        b.2 += ns;
+                    }
+                    None => by.push((d, self.profiled, ns)),
+                }
+            }
+        }
+        by.sort_by_key(|b| std::cmp::Reverse(b.2));
+        by
+    }
+
+    /// Time per kind of step since [`CudaPlan::profile`], in nanoseconds, largest first.
+    #[must_use]
+    pub fn timings(&self) -> Vec<(&'static str, u64)> {
+        let mut by: Vec<(&'static str, u64)> = Vec::new();
+        for (s, &ns) in self.steps.iter().zip(self.profile.iter().flatten()) {
+            match by.iter_mut().find(|b| b.0 == s.name()) {
+                Some(b) => b.1 += ns,
+                None => by.push((s.name(), ns)),
+            }
+        }
+        by.sort_by_key(|b| std::cmp::Reverse(b.1));
+        by
     }
 }
 
@@ -398,6 +472,50 @@ impl CudaBackend {
         }
         Ok(())
     }
+
+    /// Enqueues the copy of the index tables to the device.
+    fn copy_in(&self, p: &CudaPlan) -> Result<()> {
+        let src = p.index_host.as_slice().map_err(dev)?;
+        // SAFETY: the device table holds `at.len` u32 values, as many as the host one, and both
+        // live as long as the plan, which outlives every run and the graph.
+        unsafe { result::memcpy_htod_async(p.ptrs.n, src, self.stream.cu_stream()) }.map_err(dev)
+    }
+
+    /// Enqueues the copy of the bucket's logits and act outputs to the host.
+    fn copy_out(&self, p: &mut CudaPlan) -> Result<()> {
+        let (lp, ap, m) = (p.logits.ptr, p.act.ptr, p.bucket.markers);
+        let cu = self.stream.cu_stream();
+        let dst = p.host_out.as_mut_slice().map_err(dev)?;
+        let (logits, act) = dst.split_at_mut(m);
+        // SAFETY: lowering sized the host buffer for one logit per marker and two act values per
+        // sequence of the bucket, the sizes of the two arena values, and it lives as the plan does.
+        unsafe {
+            result::memcpy_dtoh_async(logits, lp, cu).map_err(dev)?;
+            result::memcpy_dtoh_async(act, ap, cu).map_err(dev)
+        }
+    }
+
+    /// Captures a whole run as one graph.
+    fn capture(&self, p: &mut CudaPlan) -> Result<Captured> {
+        let s = &self.stream;
+        // Relaxed, because the pinned buffers wait on their own event, never recorded, before they
+        // hand out their pointers, and a stricter mode refuses any wait during a capture.
+        s.begin_capture(sys::CUstreamCaptureMode::CU_STREAM_CAPTURE_MODE_RELAXED).map_err(dev)?;
+        let mut enqueue = || {
+            self.copy_in(p)?;
+            for step in &p.steps {
+                self.launch_step(p, step)?;
+            }
+            self.copy_out(p)
+        };
+        let queued = enqueue();
+        let flags = sys::CUgraphInstantiate_flags::CUDA_GRAPH_INSTANTIATE_FLAG_AUTO_FREE_ON_LAUNCH;
+        let graph = s.end_capture(flags).map_err(dev)?;
+        queued?;
+        let graph = graph.ok_or_else(|| Error::Device("graph capture recorded nothing".into()))?;
+        graph.upload().map_err(dev)?;
+        Ok(Captured(graph))
+    }
 }
 
 impl Backend for CudaBackend {
@@ -405,7 +523,7 @@ impl Backend for CudaBackend {
     type Plan = CudaPlan;
 
     fn caps(&self) -> Caps {
-        Caps { name: "cuda", threads: 1, graphs: false, unified_memory: false }
+        Caps { name: "cuda", threads: 1, graphs: true, unified_memory: false }
     }
 
     fn upload(&self, tensors: &[HostTensor<'_>]) -> Result<Weights> {
@@ -611,29 +729,44 @@ impl Backend for CudaBackend {
         let at = Index::new(bucket);
         let index = self.stream.alloc_zeros::<u32>(at.len).map_err(dev)?;
         let ptrs = Ptrs::new(index.device_ptr(&self.stream).0, at);
+        let ctx = self.stream.context();
+        // SAFETY: both buffers are zeroed below before anything reads them.
+        let (mut index_host, mut host_out) = unsafe {
+            (
+                ctx.alloc_pinned::<u32>(at.len).map_err(dev)?,
+                ctx.alloc_pinned::<f32>(bucket.markers + 2 * bucket.seqs).map_err(dev)?,
+            )
+        };
+        index_host.as_mut_slice().map_err(dev)?.fill(0);
+        host_out.as_mut_slice().map_err(dev)?.fill(0.0);
         self.stream.synchronize().map_err(dev)?;
-        Ok(CudaPlan {
+        let mut plan = CudaPlan {
             bucket,
             steps,
             gemms,
             arena,
-            base,
             _stage: stage,
             stage: stage_base,
             _ropes: ropes,
-            index,
-            index_host: vec![0; at.len],
+            _index: index,
+            index_host,
             at,
             ptrs,
             logits,
             act,
-            host_out: vec![0.0; bucket.markers + 2 * bucket.seqs],
-        })
+            host_out,
+            graph: None,
+            profile: None,
+            profiled: 0,
+        };
+        plan.graph = Some(self.capture(&mut plan)?);
+        Ok(plan)
     }
 
     fn run(&self, p: &mut CudaPlan, batch: &Batch<'_>, out: &mut Outputs) -> Result<()> {
         let (t, s, m) = (batch.ids.len(), batch.seqs(), batch.markers.len());
-        let (h, at) = (&mut p.index_host, p.at);
+        let at = p.at;
+        let h = p.index_host.as_mut_slice().map_err(dev)?;
         h[..4].copy_from_slice(&[t as u32, s as u32, m as u32, 0]);
         h[at.ids..at.ids + t].copy_from_slice(batch.ids);
         h[at.cu..=at.cu + s].copy_from_slice(batch.cu);
@@ -649,45 +782,32 @@ impl Backend for CudaBackend {
             }
             h[at.qtype + q] = u32::from(batch.qtype[q]);
         }
-        self.stream.memcpy_htod(&p.index_host[..], &mut p.index).map_err(dev)?;
-        for step in &p.steps {
-            self.launch_step(p, step)?;
+        if p.profile.is_some() {
+            self.copy_in(p)?;
+            self.stream.synchronize().map_err(dev)?;
+            for i in 0..p.steps.len() {
+                let t = std::time::Instant::now();
+                self.launch_step(p, &p.steps[i])?;
+                self.stream.synchronize().map_err(dev)?;
+                let ns = t.elapsed().as_nanos() as u64;
+                if let Some(v) = p.profile.as_mut() {
+                    v[i] += ns;
+                }
+            }
+            self.copy_out(p)?;
+            p.profiled += 1;
+        } else if let Some(g) = &p.graph {
+            g.0.launch().map_err(dev)?;
         }
-        let (lo, ao) = (off(p, p.logits), off(p, p.act));
-        let (logits, rest) = p.host_out.split_at_mut(p.bucket.markers);
-        let bytes = |o: usize, n: usize| o..o + 4 * n;
-        read(&self.stream, &p.arena, bytes(lo, m), &mut logits[..m])?;
-        read(&self.stream, &p.arena, bytes(ao, 2 * s), &mut rest[..2 * s])?;
         self.stream.synchronize().map_err(dev)?;
+        let host = p.host_out.as_slice().map_err(dev)?;
+        let (logits, act) = host.split_at(p.bucket.markers);
         out.logits.clear();
         out.logits.extend_from_slice(&logits[..m]);
         out.act.clear();
-        out.act.extend(rest[..2 * s].as_chunks::<2>().0.iter().copied());
+        out.act.extend(act[..2 * s].as_chunks::<2>().0.iter().copied());
         Ok(())
     }
-}
-
-/// Byte offset of a value in the arena.
-fn off(p: &CudaPlan, l: Loc) -> usize {
-    (l.ptr - p.base) as usize
-}
-
-/// Copies FP32 values from a byte range of the arena.
-fn read(
-    s: &std::sync::Arc<cudarc::driver::CudaStream>,
-    arena: &CudaSlice<u8>,
-    range: std::ops::Range<usize>,
-    dst: &mut [f32],
-) -> Result<()> {
-    if dst.is_empty() {
-        return Ok(());
-    }
-    let view = arena.slice(range);
-    // SAFETY: the range holds dst.len() f32 values written by the plan, and u8 has no alignment
-    // or validity requirement, so viewing the f32 destination as bytes is sound.
-    let bytes =
-        unsafe { std::slice::from_raw_parts_mut(dst.as_mut_ptr().cast::<u8>(), 4 * dst.len()) };
-    s.memcpy_dtoh(&view, bytes).map_err(dev)
 }
 
 /// cos and sin tables `[len, 32]` for heads of 64, computed as the CPU backend does.
