@@ -14,6 +14,8 @@ The minor version is the number of milestones finished. Work inside M0 is tagged
 
 Tagging is the whole release process. Push a tag that matches the version in `Cargo.toml`, and the release workflow checks the tag against the manifest, checks that CHANGELOG.md has a section for it, runs the gate, builds the archives for every target, attests them and publishes. If any of those fail there is no release.
 
+The crates go to crates.io with `.github/publish-crates.sh`, which is safe to run more than once and waits out the rate limits for new crates. Run it from a machine that holds the token, with `KIME_ENV_FILE` pointing at the file the token lives in, and it reads that one variable and nothing else.
+
 Every release that ships weights states the model hashes and the `.kime` format version, because a packed model outlives the build that wrote it.
 
 ## Running the checks
