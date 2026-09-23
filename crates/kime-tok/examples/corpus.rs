@@ -15,7 +15,8 @@ fn main() {
         std::process::exit(2);
     };
     let text = std::fs::read_to_string(corpus).expect("read the corpus");
-    let rows: Vec<Value> = text.lines().map(|l| serde_json::from_str(l).expect("a JSON line")).collect();
+    let rows: Vec<Value> =
+        text.lines().map(|l| serde_json::from_str(l).expect("a JSON line")).collect();
     let lines: Vec<&str> = rows.iter().map(|r| r["text"].as_str().expect("text")).collect();
     let bytes: usize = lines.iter().map(|l| l.len()).sum();
     let mut failed = false;
@@ -29,7 +30,12 @@ fn main() {
         for (row, line) in rows.iter().zip(&lines) {
             out.clear();
             tok.encode_into(line, &mut out);
-            let want: Vec<u32> = row[name].as_array().expect("ids").iter().map(|v| v.as_u64().expect("id") as u32).collect();
+            let want: Vec<u32> = row[name]
+                .as_array()
+                .expect("ids")
+                .iter()
+                .map(|v| v.as_u64().expect("id") as u32)
+                .collect();
             if out != want {
                 bad += 1;
                 if shown < 5 {

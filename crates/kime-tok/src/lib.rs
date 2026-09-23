@@ -31,7 +31,10 @@ enum Normalizer {
     None,
     Nfc,
     /// Replace every occurrence of one string with another. mmBERT uses it to turn spaces into `▁`.
-    Replace { from: String, to: String },
+    Replace {
+        from: String,
+        to: String,
+    },
 }
 
 impl Normalizer {
@@ -70,7 +73,9 @@ enum PreTokenizer {
 enum Decoder {
     ByteLevel,
     /// `▁` back to a space, `<0xNN>` tokens back to bytes, then everything joined.
-    Metaspace { replacement: char },
+    Metaspace {
+        replacement: char,
+    },
 }
 
 /// The special tokens the input layouts need. Ids come from `tokenizer_config.json` when it is
@@ -115,7 +120,8 @@ impl Tokenizer {
     /// Load `tokenizer.json`, and `tokenizer_config.json` next to it when there is one.
     pub fn from_dir(dir: impl AsRef<Path>) -> Result<Tokenizer, Error> {
         let dir = dir.as_ref();
-        let json = std::fs::read(dir.join("tokenizer.json")).map_err(|e| Error::Io(dir.join("tokenizer.json"), e))?;
+        let json = std::fs::read(dir.join("tokenizer.json"))
+            .map_err(|e| Error::Io(dir.join("tokenizer.json"), e))?;
         let config = match std::fs::read(dir.join("tokenizer_config.json")) {
             Ok(b) => Some(b),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
@@ -185,9 +191,13 @@ impl Tokenizer {
             return;
         }
         match &self.pre {
-            PreTokenizer::ByteLevel => bytelevel::split(text, |word| self.bpe.encode_bytelevel(word, out)),
+            PreTokenizer::ByteLevel => {
+                bytelevel::split(text, |word| self.bpe.encode_bytelevel(word, out))
+            }
             PreTokenizer::Metaspace { replacement, prepend, split } => {
-                metaspace::split(text, *replacement, *prepend, *split, |word| self.bpe.encode_chars(word, out))
+                metaspace::split(text, *replacement, *prepend, *split, |word| {
+                    self.bpe.encode_chars(word, out)
+                })
             }
         }
     }

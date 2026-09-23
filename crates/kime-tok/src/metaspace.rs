@@ -5,7 +5,13 @@ use std::borrow::Cow;
 /// Replace spaces, put the replacement char in front when `prepend` is set and the text does not
 /// already start with it, then cut before every replacement char. The replacement char is merged
 /// with what follows it, so `▁a▁▁b` gives `▁a`, `▁` and `▁b`.
-pub(crate) fn split(text: &str, replacement: char, prepend: bool, split: bool, mut f: impl FnMut(&str)) {
+pub(crate) fn split(
+    text: &str,
+    replacement: char,
+    prepend: bool,
+    split: bool,
+    mut f: impl FnMut(&str),
+) {
     let mut s: Cow<'_, str> = if text.contains(' ') {
         let mut buf = [0u8; 4];
         Cow::Owned(text.replace(' ', replacement.encode_utf8(&mut buf)))

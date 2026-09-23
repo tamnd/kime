@@ -7,31 +7,70 @@
 
 use unicode_properties::{GeneralCategoryGroup, UnicodeGeneralCategory};
 
-fn is_letter(c: char) -> bool {
-    if c.is_ascii() {
-        return c.is_ascii_alphabetic();
+/// Which of the pattern's char classes a char is in. Every char is in exactly one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Class {
+    Letter,
+    Number,
+    Space,
+    Other,
+}
+
+/// Classes of the ASCII chars, so the common case never decodes UTF-8 or looks at Unicode tables.
+const ASCII_CLASS: [Class; 128] = {
+    let mut t = [Class::Other; 128];
+    let mut b = 0;
+    while b < 128 {
+        let c = b as u8;
+        t[b] = if c.is_ascii_alphabetic() {
+            Class::Letter
+        } else if c.is_ascii_digit() {
+            Class::Number
+        } else if matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r') {
+            // `char::is_whitespace` on ASCII, which unlike Python leaves out 0x1c to 0x1f.
+            Class::Space
+        } else {
+            Class::Other
+        };
+        b += 1;
     }
-    c.general_category_group() == GeneralCategoryGroup::Letter
-}
+    t
+};
 
-fn is_number(c: char) -> bool {
+fn class(c: char) -> Class {
     if c.is_ascii() {
-        return c.is_ascii_digit();
+        return ASCII_CLASS[c as usize];
     }
-    c.general_category_group() == GeneralCategoryGroup::Number
+    if c.is_whitespace() {
+        return Class::Space;
+    }
+    match c.general_category_group() {
+        GeneralCategoryGroup::Letter => Class::Letter,
+        GeneralCategoryGroup::Number => Class::Number,
+        _ => Class::Other,
+    }
 }
 
-fn is_space(c: char) -> bool {
-    c.is_whitespace()
-}
-
-fn is_other(c: char) -> bool {
-    !is_space(c) && !is_letter(c) && !is_number(c)
-}
-
-/// The end of the run of chars from `i` that satisfy `pred`.
-fn run(text: &str, i: usize, pred: impl Fn(char) -> bool) -> usize {
-    text[i..].char_indices().find(|&(_, c)| !pred(c)).map_or(text.len(), |(j, _)| i + j)
+/// The end of the run of chars from `i` in class `k`.
+fn run(text: &str, i: usize, k: Class) -> usize {
+    let bytes = text.as_bytes();
+    let mut j = i;
+    while j < bytes.len() {
+        let b = bytes[j];
+        if b < 0x80 {
+            if ASCII_CLASS[usize::from(b)] != k {
+                return j;
+            }
+            j += 1;
+            continue;
+        }
+        let c = char_at(text, j).expect("j is a char boundary inside the text");
+        if class(c) != k {
+            return j;
+        }
+        j += c.len_utf8();
+    }
+    j
 }
 
 fn char_at(text: &str, i: usize) -> Option<char> {
@@ -51,26 +90,23 @@ fn next_token(text: &str, i: usize) -> usize {
         }
     }
     let c = char_at(text, i).expect("i is a char boundary inside the text");
-    // ` ?\p{L}+`, ` ?\p{N}+` and ` ?[^\s\p{L}\p{N}]+`, with the optional leading space.
-    let (after_space, next) = if c == ' ' {
-        match char_at(text, i + 1) {
-            Some(n) => (i + 1, n),
-            None => (i, c),
+    let kc = class(c);
+    // ` ?\p{L}+`, ` ?\p{N}+` and ` ?[^\s\p{L}\p{N}]+`, with the optional leading space. The
+    // alternatives are tried in order, and for each one the form with the space comes first.
+    if c == ' '
+        && let Some(next) = char_at(text, i + 1)
+    {
+        let kn = class(next);
+        if kn != Class::Space {
+            return run(text, i + 1, kn) - i;
         }
-    } else {
-        (i, c)
-    };
-    for pred in [is_letter as fn(char) -> bool, is_number, is_other] {
-        if pred(next) {
-            return run(text, after_space, pred) - i;
-        }
-        if pred(c) {
-            return run(text, i, pred) - i;
-        }
+    }
+    if kc != Class::Space {
+        return run(text, i, kc) - i;
     }
     // `\s+(?!\S)` and then `\s+`. A run of spaces followed by more text gives back its last char,
     // so that the next pre-token can start with it, unless the run is a single char.
-    let end = run(text, i, is_space);
+    let end = run(text, i, Class::Space);
     if end == text.len() {
         return end - i;
     }
@@ -96,7 +132,8 @@ pub(crate) const fn byte_to_char_table() -> [char; 256] {
     let mut n = 0u32;
     let mut b = 0usize;
     while b < 256 {
-        let printable = (b >= 0x21 && b <= 0x7e) || (b >= 0xa1 && b <= 0xac) || (b >= 0xae && b <= 0xff);
+        let printable =
+            (b >= 0x21 && b <= 0x7e) || (b >= 0xa1 && b <= 0xac) || (b >= 0xae && b <= 0xff);
         table[b] = if printable {
             match char::from_u32(b as u32) {
                 Some(c) => c,
@@ -119,7 +156,8 @@ pub(crate) const BYTE_TO_CHAR: [char; 256] = byte_to_char_table();
 
 fn char_to_byte(c: char) -> Option<u8> {
     let u = c as u32;
-    let direct = (0x21..=0x7e).contains(&u) || (0xa1..=0xac).contains(&u) || (0xae..=0xff).contains(&u);
+    let direct =
+        (0x21..=0x7e).contains(&u) || (0xa1..=0xac).contains(&u) || (0xae..=0xff).contains(&u);
     if direct {
         return Some(u as u8);
     }

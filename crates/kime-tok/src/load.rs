@@ -29,7 +29,9 @@ impl fmt::Display for Error {
         match self {
             Error::Io(p, e) => write!(f, "reading {}: {e}", p.display()),
             Error::Json(m) => write!(f, "tokenizer file: {m}"),
-            Error::Unsupported(m) => write!(f, "tokenizer file asks for something kime does not support: {m}"),
+            Error::Unsupported(m) => {
+                write!(f, "tokenizer file asks for something kime does not support: {m}")
+            }
             Error::Invalid(m) => write!(f, "tokenizer file is invalid: {m}"),
         }
     }
@@ -110,7 +112,9 @@ fn normalizer(v: Option<&Value>) -> Result<Normalizer, Error> {
             let from = v.pointer("/pattern/String").and_then(Value::as_str);
             let to = v.get("content").and_then(Value::as_str);
             match (from, to) {
-                (Some(from), Some(to)) => Ok(Normalizer::Replace { from: from.to_string(), to: to.to_string() }),
+                (Some(from), Some(to)) => {
+                    Ok(Normalizer::Replace { from: from.to_string(), to: to.to_string() })
+                }
                 _ => Err(Error::Unsupported("a Replace normalizer with a regex pattern".into())),
             }
         }
@@ -127,7 +131,9 @@ fn normalizer(v: Option<&Value>) -> Result<Normalizer, Error> {
 }
 
 fn pre_tokenizer(v: Option<&Value>) -> Result<PreTokenizer, Error> {
-    let v = v.filter(|v| !v.is_null()).ok_or_else(|| Error::Unsupported("a tokenizer without a pre-tokenizer".into()))?;
+    let v = v
+        .filter(|v| !v.is_null())
+        .ok_or_else(|| Error::Unsupported("a tokenizer without a pre-tokenizer".into()))?;
     match kind(v) {
         "ByteLevel" => {
             if v.get("add_prefix_space").and_then(Value::as_bool) == Some(true) {
@@ -146,11 +152,14 @@ fn pre_tokenizer(v: Option<&Value>) -> Result<PreTokenizer, Error> {
                     _ => None,
                 }
             });
-            let replacement = replacement.ok_or_else(|| Error::Invalid("Metaspace replacement is not one char".into()))?;
+            let replacement = replacement
+                .ok_or_else(|| Error::Invalid("Metaspace replacement is not one char".into()))?;
             let prepend = match v.get("prepend_scheme").and_then(Value::as_str) {
                 Some("always") => true,
                 Some("never") => false,
-                Some(other) => return Err(Error::Unsupported(format!("Metaspace prepend_scheme {other:?}"))),
+                Some(other) => {
+                    return Err(Error::Unsupported(format!("Metaspace prepend_scheme {other:?}")));
+                }
                 None => v.get("add_prefix_space").and_then(Value::as_bool).unwrap_or(true),
             };
             let split = v.get("split").and_then(Value::as_bool).unwrap_or(true);
@@ -166,16 +175,24 @@ fn decoder(v: Option<&Value>, pre: &PreTokenizer) -> Result<Decoder, Error> {
     };
     match (kind(v), pre) {
         ("ByteLevel", PreTokenizer::ByteLevel) => Ok(Decoder::ByteLevel),
-        ("Metaspace", PreTokenizer::Metaspace { replacement, .. }) => Ok(Decoder::Metaspace { replacement: *replacement }),
+        ("Metaspace", PreTokenizer::Metaspace { replacement, .. }) => {
+            Ok(Decoder::Metaspace { replacement: *replacement })
+        }
         ("Sequence", PreTokenizer::Metaspace { replacement, .. }) => {
-            let names: Vec<&str> = v.get("decoders").and_then(Value::as_array).map(|a| a.iter().map(kind).collect()).unwrap_or_default();
+            let names: Vec<&str> = v
+                .get("decoders")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().map(kind).collect())
+                .unwrap_or_default();
             if names == ["Replace", "ByteFallback", "Fuse"] {
                 Ok(Decoder::Metaspace { replacement: *replacement })
             } else {
                 Err(Error::Unsupported(format!("the decoder sequence {names:?}")))
             }
         }
-        (other, _) => Err(Error::Unsupported(format!("the {other:?} decoder with this pre-tokenizer"))),
+        (other, _) => {
+            Err(Error::Unsupported(format!("the {other:?} decoder with this pre-tokenizer")))
+        }
     }
 }
 
@@ -212,7 +229,8 @@ pub(crate) fn load(json: &[u8], config: Option<&[u8]>) -> Result<Tokenizer, Erro
             })
             .collect::<Result<_, _>>()?,
     };
-    let bpe = Bpe::new(m.vocab, &merges, m.unk_token.as_deref(), m.byte_fallback, m.fuse_unk).map_err(Error::Invalid)?;
+    let bpe = Bpe::new(m.vocab, &merges, m.unk_token.as_deref(), m.byte_fallback, m.fuse_unk)
+        .map_err(Error::Invalid)?;
 
     let norm = normalizer(file.normalizer.as_ref())?;
     let pre = pre_tokenizer(file.pre_tokenizer.as_ref())?;
@@ -234,12 +252,16 @@ pub(crate) fn load(json: &[u8], config: Option<&[u8]>) -> Result<Tokenizer, Erro
     let added = Added::new(tokens, |s| norm.apply(s).into_owned());
 
     let config: Value = match config {
-        Some(b) => serde_json::from_slice(b).map_err(|e| Error::Json(format!("tokenizer_config.json: {e}")))?,
+        Some(b) => serde_json::from_slice(b)
+            .map_err(|e| Error::Json(format!("tokenizer_config.json: {e}")))?,
         None => Value::Null,
     };
     let lookup = |key: &str, default: &str| -> Result<(u32, String), Error> {
         let name = config_token(&config, key).unwrap_or_else(|| default.to_string());
-        let id = added.id_of(&name).or_else(|| bpe.id_of(&name)).ok_or_else(|| Error::Invalid(format!("{key} {name:?} is not a token")))?;
+        let id = added
+            .id_of(&name)
+            .or_else(|| bpe.id_of(&name))
+            .ok_or_else(|| Error::Invalid(format!("{key} {name:?} is not a token")))?;
         Ok((id, name))
     };
     let (cls, _) = lookup("cls_token", "[CLS]")?;
@@ -247,5 +269,13 @@ pub(crate) fn load(json: &[u8], config: Option<&[u8]>) -> Result<Tokenizer, Erro
     let (mask, mask_text) = lookup("mask_token", "[MASK]")?;
     let (pad, _) = lookup("pad_token", "[PAD]")?;
 
-    Ok(Tokenizer { normalizer: norm, pre, decoder: dec, added, bpe, specials: Specials { cls, sep, mask, pad }, mask_text })
+    Ok(Tokenizer {
+        normalizer: norm,
+        pre,
+        decoder: dec,
+        added,
+        bpe,
+        specials: Specials { cls, sep, mask, pad },
+        mask_text,
+    })
 }

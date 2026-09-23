@@ -130,7 +130,13 @@ impl Added {
                 raw.push((t.content.clone().into_bytes().into_boxed_slice(), i));
             }
         }
-        Added { tokens, raw: Matcher::new(raw), normalized: Matcher::new(normalized), by_content, by_id }
+        Added {
+            tokens,
+            raw: Matcher::new(raw),
+            normalized: Matcher::new(normalized),
+            by_content,
+            by_id,
+        }
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -182,8 +188,10 @@ impl Added {
             let (mut start, mut stop) = (pos, pos + len);
             pos = stop;
             if tok.single_word {
-                let start_space = start == 0 || !text[..start].chars().next_back().is_some_and(is_word_char);
-                let stop_space = stop == hay.len() || !text[stop..].chars().next().is_some_and(is_word_char);
+                let start_space =
+                    start == 0 || !text[..start].chars().next_back().is_some_and(is_word_char);
+                let stop_space =
+                    stop == hay.len() || !text[stop..].chars().next().is_some_and(is_word_char);
                 if !start_space || !stop_space {
                     continue;
                 }
@@ -197,7 +205,10 @@ impl Added {
                 start = new_start.max(offset);
             }
             if tok.rstrip {
-                stop += text[stop..].char_indices().find(|(_, c)| !c.is_whitespace()).map_or(hay.len() - stop, |(i, _)| i);
+                stop += text[stop..]
+                    .char_indices()
+                    .find(|(_, c)| !c.is_whitespace())
+                    .map_or(hay.len() - stop, |(i, _)| i);
                 pos = stop;
             }
             if offset < start {

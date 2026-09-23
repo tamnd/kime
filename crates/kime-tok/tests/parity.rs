@@ -23,7 +23,10 @@ fn ids(v: &Value) -> Vec<u32> {
 
 fn check(model: &str, tok_dir: &str) {
     let Some(root) = models() else {
-        assert!(std::env::var_os("KIME_REQUIRE_MODELS").is_none(), "KIME_MODELS is not set or has no laya folder");
+        assert!(
+            std::env::var_os("KIME_REQUIRE_MODELS").is_none(),
+            "KIME_MODELS is not set or has no laya folder"
+        );
         eprintln!("skipping {model}: set KIME_MODELS to a folder holding laya/");
         return;
     };
@@ -39,12 +42,17 @@ fn check(model: &str, tok_dir: &str) {
                 pieces += 1;
                 let got = tok.encode(text);
                 if got != want && bad.len() < 5 {
-                    bad.push(format!("{} {}: {text:?}\n  want {want:?}\n  got  {got:?}", row["id"], q["qid"]));
+                    bad.push(format!(
+                        "{} {}: {text:?}\n  want {want:?}\n  got  {got:?}",
+                        row["id"], q["qid"]
+                    ));
                 }
             };
             check_one(p["head"].as_str().unwrap(), ids(&p["head_ids"]));
             check_one(p["state"].as_str().unwrap(), ids(&p["state_ids"]));
-            for (o, want) in p["options"].as_array().unwrap().iter().zip(p["option_ids"].as_array().unwrap()) {
+            for (o, want) in
+                p["options"].as_array().unwrap().iter().zip(p["option_ids"].as_array().unwrap())
+            {
                 check_one(o.as_str().unwrap(), ids(want));
             }
         }

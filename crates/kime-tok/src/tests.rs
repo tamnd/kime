@@ -10,7 +10,10 @@ fn gpt2_split(text: &str) -> Vec<String> {
 #[test]
 fn bytelevel_split_follows_the_gpt2_pattern() {
     assert_eq!(gpt2_split("Hello world"), ["Hello", " world"]);
-    assert_eq!(gpt2_split("I'm here, they'll see"), ["I", "'m", " here", ",", " they", "'ll", " see"]);
+    assert_eq!(
+        gpt2_split("I'm here, they'll see"),
+        ["I", "'m", " here", ",", " they", "'ll", " see"]
+    );
     assert_eq!(gpt2_split("a  b"), ["a", " ", " b"]);
     assert_eq!(gpt2_split("a\n\nb"), ["a", "\n", "\n", "b"]);
     assert_eq!(gpt2_split("end   "), ["end", "   "]);

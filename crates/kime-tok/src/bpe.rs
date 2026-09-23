@@ -43,12 +43,12 @@ thread_local! {
 fn word_hash(uid: u32, word: &[u8]) -> u64 {
     let mut h = Fx::default();
     h.write_u32(uid);
-    let mut chunks = word.chunks_exact(8);
-    for c in &mut chunks {
-        h.write_u64(u64::from_le_bytes(c.try_into().expect("eight bytes")));
+    let (chunks, rest) = word.as_chunks::<8>();
+    for c in chunks {
+        h.write_u64(u64::from_le_bytes(*c));
     }
     let mut tail = [0u8; 8];
-    tail[..chunks.remainder().len()].copy_from_slice(chunks.remainder());
+    tail[..rest.len()].copy_from_slice(rest);
     h.write_u64(u64::from_le_bytes(tail) ^ ((word.len() as u64) << 56));
     h.finish()
 }
@@ -124,12 +124,18 @@ impl Bpe {
         let mut table = FxMap::with_capacity_and_hasher(merges.len(), Default::default());
         let mut joined = String::new();
         for (rank, (a, b)) in merges.iter().enumerate() {
-            let ia = *vocab.get(a.as_str()).ok_or_else(|| format!("merge {rank} uses {a:?}, which is not in the vocabulary"))?;
-            let ib = *vocab.get(b.as_str()).ok_or_else(|| format!("merge {rank} uses {b:?}, which is not in the vocabulary"))?;
+            let ia = *vocab.get(a.as_str()).ok_or_else(|| {
+                format!("merge {rank} uses {a:?}, which is not in the vocabulary")
+            })?;
+            let ib = *vocab.get(b.as_str()).ok_or_else(|| {
+                format!("merge {rank} uses {b:?}, which is not in the vocabulary")
+            })?;
             joined.clear();
             joined.push_str(a);
             joined.push_str(b);
-            let new_id = *vocab.get(joined.as_str()).ok_or_else(|| format!("merge {rank} makes {joined:?}, which is not in the vocabulary"))?;
+            let new_id = *vocab.get(joined.as_str()).ok_or_else(|| {
+                format!("merge {rank} makes {joined:?}, which is not in the vocabulary")
+            })?;
             let rank = u32::try_from(rank).map_err(|_| "more than 4 billion merges".to_string())?;
             // The first merge of a pair wins, as it does when Hugging Face builds its map.
             table.entry(pair(ia, ib)).or_insert((rank, new_id));
@@ -148,7 +154,11 @@ impl Bpe {
             None
         };
         let unk = match unk {
-            Some(u) => Some(*vocab.get(u).ok_or_else(|| format!("the unknown token {u:?} is not in the vocabulary"))?),
+            Some(u) => Some(
+                *vocab
+                    .get(u)
+                    .ok_or_else(|| format!("the unknown token {u:?} is not in the vocabulary"))?,
+            ),
             None => None,
         };
         let uid = NEXT_UID.fetch_add(1, AtomicOrdering::Relaxed);
@@ -256,7 +266,8 @@ impl Bpe {
             let start = out.len();
             self.merge(&mut scratch.syms, &mut scratch.heap, out);
             if cacheable {
-                scratch.slots[at] = Slot { hash, uid: self.uid, word: word.into(), ids: out[start..].into() };
+                scratch.slots[at] =
+                    Slot { hash, uid: self.uid, word: word.into(), ids: out[start..].into() };
             }
         });
     }
