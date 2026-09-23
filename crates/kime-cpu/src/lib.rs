@@ -2,3 +2,13 @@
 //!
 //! One of the six crates where `unsafe` is allowed. Every block carries a `// SAFETY:` comment
 //! that names the invariant which makes it sound.
+
+pub mod attention;
+pub mod compat;
+pub mod gemm;
+pub mod ops;
+pub mod par;
+#[cfg(test)]
+mod testing;
+
+pub use compat::{Compat, Input, Output};
