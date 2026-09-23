@@ -6,9 +6,9 @@
 //! sequence `s`, and no token sees another sequence. A window `w` limits each token to keys at most
 //! `w` positions away on either side, which is ModernBERT's local attention with `w = 64`.
 //!
-//! Scores go through the same dot as the GEMMs, the softmax is taken in f32 in key order, and the
-//! output is the probability weighted sum of values in key order, so the result does not depend
-//! on the thread count either.
+//! Scores go through the same dot as the GEMMs. The softmax sum and the probability weighted sum
+//! of values are taken in f64 in key order and rounded once, so the result does not depend on the
+//! thread count either.
 
 use crate::gemm::dot;
 use crate::par::{self, Shared};
@@ -59,7 +59,7 @@ pub fn attention(
         let (s, h, q0) = tasks[task];
         let (lo, hi) = (cu[s], cu[s + 1]);
         let mut p = Vec::new();
-        let mut acc = [0f32; HEAD];
+        let mut acc = [0f64; HEAD];
         for i in q0..(q0 + QB).min(hi) {
             let (a, b) = match window {
                 Some(w) => (i.saturating_sub(w).max(lo), (i + w + 1).min(hi)),
@@ -69,22 +69,22 @@ pub fn attention(
             p.clear();
             p.extend((a..b).map(|j| dot(q, &qkv[j * stride + d + h * HEAD..][..HEAD]) * scale));
             let mx = p.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-            let mut sum = 0f32;
+            let mut sum = 0f64;
             for x in &mut p {
                 *x = (*x - mx).exp();
-                sum += *x;
+                sum += f64::from(*x);
             }
             acc.fill(0.0);
             for (j, &e) in (a..b).zip(&p) {
-                let pj = e / sum;
+                let pj = f64::from(e) / sum;
                 let v = &qkv[j * stride + 2 * d + h * HEAD..][..HEAD];
                 for c in 0..HEAD {
-                    acc[c] = pj.mul_add(v[c], acc[c]);
+                    acc[c] = pj.mul_add(f64::from(v[c]), acc[c]);
                 }
             }
             for (c, &v) in acc.iter().enumerate() {
                 // SAFETY: row i, head h belongs to this task alone.
-                unsafe { shared.set(i * d + h * HEAD + c, v) };
+                unsafe { shared.set(i * d + h * HEAD + c, v as f32) };
             }
         }
     });
