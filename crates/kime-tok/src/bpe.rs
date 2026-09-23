@@ -4,7 +4,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::BinaryHeap;
 use std::hash::Hasher;
 use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
 
@@ -55,7 +55,7 @@ fn word_hash(uid: u32, word: &[u8]) -> u64 {
 
 #[derive(Debug)]
 pub(crate) struct Bpe {
-    vocab: HashMap<Box<str>, u32>,
+    vocab: FxMap<Box<str>, u32>,
     vocab_r: Vec<Option<Box<str>>>,
     /// Single char tokens, which is where every word starts.
     chars: FxMap<u32, u32>,
@@ -104,9 +104,9 @@ fn pair(a: u32, b: u32) -> u64 {
 }
 
 impl Bpe {
-    pub(crate) fn new(
-        vocab: HashMap<Box<str>, u32>,
-        merges: &[(String, String)],
+    pub(crate) fn new<S: AsRef<str>>(
+        vocab: FxMap<Box<str>, u32>,
+        merges: &[(S, S)],
         unk: Option<&str>,
         byte_fallback: bool,
         fuse_unk: bool,
@@ -124,10 +124,11 @@ impl Bpe {
         let mut table = FxMap::with_capacity_and_hasher(merges.len(), Default::default());
         let mut joined = String::new();
         for (rank, (a, b)) in merges.iter().enumerate() {
-            let ia = *vocab.get(a.as_str()).ok_or_else(|| {
+            let (a, b) = (a.as_ref(), b.as_ref());
+            let ia = *vocab.get(a).ok_or_else(|| {
                 format!("merge {rank} uses {a:?}, which is not in the vocabulary")
             })?;
-            let ib = *vocab.get(b.as_str()).ok_or_else(|| {
+            let ib = *vocab.get(b).ok_or_else(|| {
                 format!("merge {rank} uses {b:?}, which is not in the vocabulary")
             })?;
             joined.clear();
