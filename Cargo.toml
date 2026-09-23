@@ -35,7 +35,7 @@ kime-tok = { version = "=0.0.1", path = "crates/kime-tok" }
 kime-train = { version = "=0.0.1", path = "crates/kime-train" }
 
 # Outside crates. Each one is here because writing it ourselves would be worse, and the list is meant to stay short enough to read.
-blake3 = "1.8.7"
+blake3 = { version = "1.8.7", features = ["rayon"] }
 half = "2.7.1"
 memmap2 = "0.9.11"
 serde = { version = "1.0.229", features = ["derive"] }

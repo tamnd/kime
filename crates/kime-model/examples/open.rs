@@ -1,5 +1,5 @@
 //! Times opening a compat model, from its Laya directory and from a `.kime` pack of it, and the
-//! `.kime` hash check. The pack is written next to the given path, so it needs that much free disk.
+//! `.kime` hash check, and building the tokenizer from the packed files. The pack is written next to the given path, so it needs that much free disk.
 //!
 //!     cargo run --release -p kime-model --example open -- <models>/laya [scratch dir]
 
@@ -34,8 +34,12 @@ fn main() {
     let pack_ms = t.elapsed().as_secs_f64() * 1e3;
     let (kime_ms, k) = best(10, || Model::open(&packed).unwrap());
     let (verify_ms, ()) = best(3, || k.verify().unwrap());
+    let (tok_ms, _) = best(3, || {
+        let json = k.file("tokenizer/tokenizer.json").unwrap();
+        kime_tok::Tokenizer::from_bytes(json, k.file("tokenizer/tokenizer_config.json")).unwrap()
+    });
     println!(
-        "{}: {} tensors, {mb:.0} MB, open dir {dir_ms:.1} ms, pack {pack_ms:.0} ms, open .kime {kime_ms:.2} ms, hash check {verify_ms:.0} ms ({:.1} GB/s)",
+        "{}: {} tensors, {mb:.0} MB, open dir {dir_ms:.1} ms, pack {pack_ms:.0} ms, open .kime {kime_ms:.2} ms, hash check {verify_ms:.0} ms ({:.1} GB/s), tokenizer {tok_ms:.0} ms",
         m.spec.id,
         m.tensors.entries().len(),
         mb / verify_ms,

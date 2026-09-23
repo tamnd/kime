@@ -225,14 +225,14 @@ fn safe_name(name: &str) -> bool {
         && name.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
-/// Hashes the data section and compares it with the index. This reads every byte, so it runs at
-/// memory or disk speed.
+/// Hashes the data section and compares it with the index. This reads every byte, on all cores, so
+/// it runs at memory or disk speed.
 ///
 /// # Errors
 ///
 /// [`Error::Format`] if the data does not match.
 pub fn verify(bytes: &[u8], index: &Index) -> Result<()> {
-    let got = blake3::hash(&bytes[index.data_start..]).to_hex();
+    let got = blake3::Hasher::new().update_rayon(&bytes[index.data_start..]).finalize().to_hex();
     if got.as_str() == index.hash {
         Ok(())
     } else {
