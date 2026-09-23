@@ -110,6 +110,160 @@ pub struct Request {
     pub kime: Option<Map<String, Value>>,
 }
 
+/// What a request asks about: text, or any JSON value, which is rendered the way the model
+/// family expects.
+#[derive(Debug, Clone, PartialEq)]
+pub struct State(pub Value);
+
+impl State {
+    /// A structured state, such as a ticket or a record.
+    #[must_use]
+    pub fn json(v: &Value) -> Self {
+        State(v.clone())
+    }
+
+    /// A plain text state.
+    #[must_use]
+    pub fn text(s: impl Into<String>) -> Self {
+        State(Value::String(s.into()))
+    }
+}
+
+impl From<&str> for State {
+    fn from(s: &str) -> Self {
+        State::text(s)
+    }
+}
+
+impl From<String> for State {
+    fn from(s: String) -> Self {
+        State::text(s)
+    }
+}
+
+impl From<Value> for State {
+    fn from(v: Value) -> Self {
+        State(v)
+    }
+}
+
+/// Building a request in code. Nothing is checked until it is answered, where it goes through
+/// the same validation as a request that came in as JSON.
+impl Request {
+    /// A request about `state` with no questions yet.
+    #[must_use]
+    pub fn new(state: impl Into<State>) -> Self {
+        Request { state: state.into().0, model: None, questions: Vec::new(), kime: None }
+    }
+
+    /// Adds a question, or replaces the one with the same id where it stands, as a repeated key
+    /// in a JSON object would.
+    #[must_use]
+    pub fn question(mut self, q: Question) -> Self {
+        match self.questions.iter_mut().find(|x| x.id == q.id) {
+            Some(old) => *old = q,
+            None => self.questions.push(q),
+        }
+        self
+    }
+
+    /// Adds a choice question, with each option given as a label and its description.
+    #[must_use]
+    pub fn choice<L: Into<String>, D: Into<String>>(
+        self,
+        id: impl Into<String>,
+        instructions: impl Into<String>,
+        options: impl IntoIterator<Item = (L, D)>,
+    ) -> Self {
+        let options = options
+            .into_iter()
+            .map(|(l, d)| ChoiceOption {
+                label: l.into(),
+                description: Some(Value::String(d.into())),
+            })
+            .collect();
+        self.question(Question {
+            id: id.into(),
+            qtype: QType::Choice,
+            instructions: Some(Value::String(instructions.into())),
+            criteria: Criteria::Choice(options),
+        })
+    }
+
+    /// Adds a score question with its levels, lowest first.
+    #[must_use]
+    pub fn score<S: Into<String>>(
+        self,
+        id: impl Into<String>,
+        instructions: impl Into<String>,
+        levels: impl IntoIterator<Item = S>,
+    ) -> Self {
+        let levels = levels.into_iter().map(|l| Value::String(l.into())).collect();
+        self.question(Question {
+            id: id.into(),
+            qtype: QType::Score,
+            instructions: Some(Value::String(instructions.into())),
+            criteria: Criteria::Score(levels),
+        })
+    }
+
+    /// Adds a noul question: is `statement` true of the state.
+    #[must_use]
+    pub fn noul(self, id: impl Into<String>, statement: impl Into<String>) -> Self {
+        self.question(Question {
+            id: id.into(),
+            qtype: QType::Noul,
+            instructions: Some(Value::String(statement.into())),
+            criteria: Criteria::Noul { when_false: None, when_true: None },
+        })
+    }
+
+    /// The request as the JSON body [`parse`] reads.
+    #[must_use]
+    pub fn to_json(&self) -> Value {
+        let mut qs = Map::new();
+        for q in &self.questions {
+            let mut o = Map::new();
+            o.insert("type".into(), q.qtype.as_str().into());
+            if let Some(i) = &q.instructions {
+                o.insert("instructions".into(), i.clone());
+            }
+            let criteria = match &q.criteria {
+                Criteria::Choice(opts) => Some(Value::Object(
+                    opts.iter()
+                        .map(|c| (c.label.clone(), c.description.clone().unwrap_or(Value::Null)))
+                        .collect(),
+                )),
+                Criteria::Score(levels) => Some(Value::Array(levels.clone())),
+                Criteria::Noul { when_false: None, when_true: None } => None,
+                Criteria::Noul { when_false, when_true } => {
+                    let mut m = Map::new();
+                    for (k, v) in [("false", when_false), ("true", when_true)] {
+                        if let Some(v) = v {
+                            m.insert(k.into(), v.clone());
+                        }
+                    }
+                    Some(Value::Object(m))
+                }
+            };
+            if let Some(c) = criteria {
+                o.insert("criteria".into(), c);
+            }
+            qs.insert(q.id.clone(), Value::Object(o));
+        }
+        let mut body = Map::new();
+        body.insert("state".into(), self.state.clone());
+        if let Some(m) = &self.model {
+            body.insert("model".into(), m.clone().into());
+        }
+        body.insert("questions".into(), Value::Object(qs));
+        if let Some(k) = &self.kime {
+            body.insert("kime".into(), Value::Object(k.clone()));
+        }
+        Value::Object(body)
+    }
+}
+
 /// The limits and the few rules where Jev and Laya disagree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
@@ -495,6 +649,18 @@ fn noul(id: &str, crit: Option<&Value>, loc: &[Loc], p: &mut Problems) -> Criter
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn built_requests_round_trip() {
+        let r = Request::new(State::json(&json!({"msg": "refund please"})))
+            .choice("dept", "Which team", [("billing", "Payment issues"), ("technical", "Bugs")])
+            .score("urgency", "How urgent", ["not urgent", "soon", "critical"])
+            .noul("churn", "The customer threatens to leave")
+            .noul("dept", "Replaced where it stood");
+        let back = parse(&r.to_json(), &Limits::JEV).unwrap();
+        assert_eq!(back, r);
+        assert_eq!(back.questions[0].qtype, QType::Noul);
+    }
 
     #[test]
     fn the_spec_example_parses() {

@@ -14,6 +14,15 @@ readme.workspace = true
 
 [dependencies]
 kime-core.workspace = true
+kime-engine.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[features]
+default = ["cuda"]
+# The CUDA backend, loaded at run time.
+cuda = ["kime-engine/cuda"]
 
 [lints]
 workspace = true
