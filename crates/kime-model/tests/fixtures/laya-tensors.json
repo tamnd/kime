@@ -1,0 +1,6850 @@
+{
+ "laya": {
+  "module": {
+   "temperature": [
+    3
+   ],
+   "encoder.embeddings.tok_embeddings.weight": [
+    50368,
+    1024
+   ],
+   "encoder.embeddings.norm.weight": [
+    1024
+   ],
+   "encoder.layers.0.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.0.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.0.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.0.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.0.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.1.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.1.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.1.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.1.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.1.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.1.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.2.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.2.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.2.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.2.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.2.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.2.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.3.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.3.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.3.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.3.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.3.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.3.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.4.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.4.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.4.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.4.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.4.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.4.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.5.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.5.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.5.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.5.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.5.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.5.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.6.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.6.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.6.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.6.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.6.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.6.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.7.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.7.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.7.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.7.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.7.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.7.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.8.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.8.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.8.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.8.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.8.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.8.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.9.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.9.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.9.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.9.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.9.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.9.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.10.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.10.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.10.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.10.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.10.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.10.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.11.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.11.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.11.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.11.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.11.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.11.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.12.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.12.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.12.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.12.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.12.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.12.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.13.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.13.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.13.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.13.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.13.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.13.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.14.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.14.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.14.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.14.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.14.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.14.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.15.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.15.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.15.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.15.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.15.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.15.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.16.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.16.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.16.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.16.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.16.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.16.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.17.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.17.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.17.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.17.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.17.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.17.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.18.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.18.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.18.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.18.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.18.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.18.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.19.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.19.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.19.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.19.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.19.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.19.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.20.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.20.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.20.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.20.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.20.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.20.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.21.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.21.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.21.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.21.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.21.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.21.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.22.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.22.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.22.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.22.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.22.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.22.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.23.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.23.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.23.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.23.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.23.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.23.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.24.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.24.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.24.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.24.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.24.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.24.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.25.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.25.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.25.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.25.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.25.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.25.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.26.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.26.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.26.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.26.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.26.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.26.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.layers.27.attn_norm.weight": [
+    1024
+   ],
+   "encoder.layers.27.attn.Wqkv.weight": [
+    3072,
+    1024
+   ],
+   "encoder.layers.27.attn.Wo.weight": [
+    1024,
+    1024
+   ],
+   "encoder.layers.27.mlp_norm.weight": [
+    1024
+   ],
+   "encoder.layers.27.mlp.Wi.weight": [
+    5248,
+    1024
+   ],
+   "encoder.layers.27.mlp.Wo.weight": [
+    1024,
+    2624
+   ],
+   "encoder.final_norm.weight": [
+    1024
+   ],
+   "head.layers.0.self_attn.in_proj_weight": [
+    3072,
+    1024
+   ],
+   "head.layers.0.self_attn.in_proj_bias": [
+    3072
+   ],
+   "head.layers.0.self_attn.out_proj.weight": [
+    1024,
+    1024
+   ],
+   "head.layers.0.self_attn.out_proj.bias": [
+    1024
+   ],
+   "head.layers.0.linear1.weight": [
+    4096,
+    1024
+   ],
+   "head.layers.0.linear1.bias": [
+    4096
+   ],
+   "head.layers.0.linear2.weight": [
+    1024,
+    4096
+   ],
+   "head.layers.0.linear2.bias": [
+    1024
+   ],
+   "head.layers.0.norm1.weight": [
+    1024
+   ],
+   "head.layers.0.norm1.bias": [
+    1024
+   ],
+   "head.layers.0.norm2.weight": [
+    1024
+   ],
+   "head.layers.0.norm2.bias": [
+    1024
+   ],
+   "head.layers.1.self_attn.in_proj_weight": [
+    3072,
+    1024
+   ],
+   "head.layers.1.self_attn.in_proj_bias": [
+    3072
+   ],
+   "head.layers.1.self_attn.out_proj.weight": [
+    1024,
+    1024
+   ],
+   "head.layers.1.self_attn.out_proj.bias": [
+    1024
+   ],
+   "head.layers.1.linear1.weight": [
+    4096,
+    1024
+   ],
+   "head.layers.1.linear1.bias": [
+    4096
+   ],
+   "head.layers.1.linear2.weight": [
+    1024,
+    4096
+   ],
+   "head.layers.1.linear2.bias": [
+    1024
+   ],
+   "head.layers.1.norm1.weight": [
+    1024
+   ],
+   "head.layers.1.norm1.bias": [
+    1024
+   ],
+   "head.layers.1.norm2.weight": [
+    1024
+   ],
+   "head.layers.1.norm2.bias": [
+    1024
+   ],
+   "type_emb.weight": [
+    3,
+    1024
+   ],
+   "scorer.0.weight": [
+    1024
+   ],
+   "scorer.0.bias": [
+    1024
+   ],
+   "scorer.1.weight": [
+    1024,
+    1024
+   ],
+   "scorer.1.bias": [
+    1024
+   ],
+   "scorer.3.weight": [
+    1,
+    1024
+   ],
+   "scorer.3.bias": [
+    1
+   ],
+   "act_head.0.weight": [
+    256,
+    1028
+   ],
+   "act_head.0.bias": [
+    256
+   ],
+   "act_head.2.weight": [
+    2,
+    256
+   ],
+   "act_head.2.bias": [
+    2
+   ]
+  },
+  "tensors": [
+   {
+    "name": "act_head.0.bias",
+    "dtype": "float16",
+    "shape": [
+     256
+    ],
+    "sum": 0.23208904266357422,
+    "first": [
+     0.0276031494140625,
+     0.005908966064453125,
+     -0.0032367706298828125,
+     -0.01336669921875
+    ]
+   },
+   {
+    "name": "act_head.0.weight",
+    "dtype": "float16",
+    "shape": [
+     256,
+     1028
+    ],
+    "sum": 18.51769185066223,
+    "first": [
+     -0.007129669189453125,
+     -0.005199432373046875,
+     0.0271453857421875,
+     -0.02313232421875
+    ]
+   },
+   {
+    "name": "act_head.2.bias",
+    "dtype": "float16",
+    "shape": [
+     2
+    ],
+    "sum": -0.045684814453125,
+    "first": [
+     -0.006988525390625,
+     -0.0386962890625
+    ]
+   },
+   {
+    "name": "act_head.2.weight",
+    "dtype": "float16",
+    "shape": [
+     2,
+     256
+    ],
+    "sum": 0.9192953109741211,
+    "first": [
+     -0.0587158203125,
+     0.051849365234375,
+     0.034881591796875,
+     -0.0082244873046875
+    ]
+   },
+   {
+    "name": "encoder.embeddings.norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 554.82817029953,
+    "first": [
+     0.6875,
+     0.51416015625,
+     0.351806640625,
+     0.426025390625
+    ]
+   },
+   {
+    "name": "encoder.embeddings.tok_embeddings.weight",
+    "dtype": "float16",
+    "shape": [
+     50368,
+     1024
+    ],
+    "sum": -275656.1905145645,
+    "first": [
+     0.0794677734375,
+     -0.019134521484375,
+     -0.00331878662109375,
+     0.054656982421875
+    ]
+   },
+   {
+    "name": "encoder.final_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 1188.626953125,
+    "first": [
+     1.095703125,
+     1.0439453125,
+     1.2373046875,
+     0.98388671875
+    ]
+   },
+   {
+    "name": "encoder.layers.0.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 8.3807412981987,
+    "first": [
+     -0.02685546875,
+     0.041107177734375,
+     0.0036029815673828125,
+     0.004901885986328125
+    ]
+   },
+   {
+    "name": "encoder.layers.0.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -163.56170010566711,
+    "first": [
+     -0.0280303955078125,
+     0.0157318115234375,
+     0.068603515625,
+     -0.0288848876953125
+    ]
+   },
+   {
+    "name": "encoder.layers.0.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -620.3985877037048,
+    "first": [
+     -0.008880615234375,
+     0.004405975341796875,
+     -0.1279296875,
+     -0.0034999847412109375
+    ]
+   },
+   {
+    "name": "encoder.layers.0.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 19.208365440368652,
+    "first": [
+     0.06060791015625,
+     -0.01538848876953125,
+     -0.03338623046875,
+     0.00015246868133544922
+    ]
+   },
+   {
+    "name": "encoder.layers.0.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 139.99757385253906,
+    "first": [
+     0.08453369140625,
+     0.1270751953125,
+     0.18359375,
+     0.12939453125
+    ]
+   },
+   {
+    "name": "encoder.layers.1.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 22.886054754257202,
+    "first": [
+     -0.00391387939453125,
+     0.0845947265625,
+     0.06060791015625,
+     0.060699462890625
+    ]
+   },
+   {
+    "name": "encoder.layers.1.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -54.42272502183914,
+    "first": [
+     0.018798828125,
+     -0.01654052734375,
+     -0.0673828125,
+     -0.03631591796875
+    ]
+   },
+   {
+    "name": "encoder.layers.1.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 315.230712890625,
+    "first": [
+     0.21142578125,
+     0.31396484375,
+     0.348388671875,
+     0.347900390625
+    ]
+   },
+   {
+    "name": "encoder.layers.1.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -1643.2202278971672,
+    "first": [
+     0.066650390625,
+     -0.0228118896484375,
+     0.041595458984375,
+     0.04840087890625
+    ]
+   },
+   {
+    "name": "encoder.layers.1.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 68.35508120059967,
+    "first": [
+     0.0386962890625,
+     0.001758575439453125,
+     -0.12469482421875,
+     0.029083251953125
+    ]
+   },
+   {
+    "name": "encoder.layers.1.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 189.97832870483398,
+    "first": [
+     0.112060546875,
+     0.144287109375,
+     0.251708984375,
+     0.18505859375
+    ]
+   },
+   {
+    "name": "encoder.layers.10.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 27.369403064250946,
+    "first": [
+     0.0243377685546875,
+     0.12548828125,
+     -0.06146240234375,
+     0.028564453125
+    ]
+   },
+   {
+    "name": "encoder.layers.10.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -152.77103275060654,
+    "first": [
+     -0.052825927734375,
+     0.0086212158203125,
+     -0.04766845703125,
+     0.037628173828125
+    ]
+   },
+   {
+    "name": "encoder.layers.10.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 460.9605712890625,
+    "first": [
+     0.352783203125,
+     0.4912109375,
+     0.515625,
+     0.4794921875
+    ]
+   },
+   {
+    "name": "encoder.layers.10.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 1621.822871208191,
+    "first": [
+     0.11419677734375,
+     -0.08209228515625,
+     0.0029430389404296875,
+     0.05194091796875
+    ]
+   },
+   {
+    "name": "encoder.layers.10.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 2.851473808288574,
+    "first": [
+     0.01216888427734375,
+     -0.026092529296875,
+     -0.01050567626953125,
+     -0.062744140625
+    ]
+   },
+   {
+    "name": "encoder.layers.10.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 323.234130859375,
+    "first": [
+     0.264892578125,
+     0.35205078125,
+     0.35693359375,
+     0.336181640625
+    ]
+   },
+   {
+    "name": "encoder.layers.11.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -6.662079095840454,
+    "first": [
+     -0.04248046875,
+     -0.0266571044921875,
+     0.0022830963134765625,
+     -0.0360107421875
+    ]
+   },
+   {
+    "name": "encoder.layers.11.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 67.23884350061417,
+    "first": [
+     0.016693115234375,
+     -0.0166473388671875,
+     0.01171875,
+     -0.034271240234375
+    ]
+   },
+   {
+    "name": "encoder.layers.11.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 473.74609375,
+    "first": [
+     0.370849609375,
+     0.452880859375,
+     0.52734375,
+     0.53173828125
+    ]
+   },
+   {
+    "name": "encoder.layers.11.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 1841.6415682435036,
+    "first": [
+     -0.001277923583984375,
+     -0.0692138671875,
+     -0.1136474609375,
+     0.01233673095703125
+    ]
+   },
+   {
+    "name": "encoder.layers.11.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -69.27306169271469,
+    "first": [
+     0.124755859375,
+     -0.056793212890625,
+     -0.013946533203125,
+     -0.0133819580078125
+    ]
+   },
+   {
+    "name": "encoder.layers.11.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 338.841796875,
+    "first": [
+     0.274169921875,
+     0.37841796875,
+     0.36181640625,
+     0.356689453125
+    ]
+   },
+   {
+    "name": "encoder.layers.12.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -7.1527498960494995,
+    "first": [
+     -0.018585205078125,
+     -0.05511474609375,
+     0.0197296142578125,
+     -0.01314544677734375
+    ]
+   },
+   {
+    "name": "encoder.layers.12.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 146.64789748191833,
+    "first": [
+     0.0024871826171875,
+     -0.0034580230712890625,
+     -0.026031494140625,
+     0.01325225830078125
+    ]
+   },
+   {
+    "name": "encoder.layers.12.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 577.379150390625,
+    "first": [
+     0.45166015625,
+     0.52783203125,
+     0.6435546875,
+     0.64013671875
+    ]
+   },
+   {
+    "name": "encoder.layers.12.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 3335.9768498539925,
+    "first": [
+     0.06298828125,
+     0.03717041015625,
+     0.05230712890625,
+     -0.07794189453125
+    ]
+   },
+   {
+    "name": "encoder.layers.12.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -58.25890350341797,
+    "first": [
+     -0.09881591796875,
+     0.012847900390625,
+     -0.12127685546875,
+     0.0692138671875
+    ]
+   },
+   {
+    "name": "encoder.layers.12.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 341.03466796875,
+    "first": [
+     0.27001953125,
+     0.376220703125,
+     0.3671875,
+     0.36328125
+    ]
+   },
+   {
+    "name": "encoder.layers.13.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -10.018406808376312,
+    "first": [
+     -0.047943115234375,
+     0.0570068359375,
+     -0.1143798828125,
+     0.02667236328125
+    ]
+   },
+   {
+    "name": "encoder.layers.13.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 88.64463531970978,
+    "first": [
+     0.131103515625,
+     0.041748046875,
+     0.16064453125,
+     -0.116943359375
+    ]
+   },
+   {
+    "name": "encoder.layers.13.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 475.12060546875,
+    "first": [
+     0.346435546875,
+     0.5,
+     0.5419921875,
+     0.51318359375
+    ]
+   },
+   {
+    "name": "encoder.layers.13.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 2282.4691821932793,
+    "first": [
+     0.0049591064453125,
+     0.08740234375,
+     -0.03546142578125,
+     0.04315185546875
+    ]
+   },
+   {
+    "name": "encoder.layers.13.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 26.52553552389145,
+    "first": [
+     -0.0289764404296875,
+     -0.04107666015625,
+     0.0484619140625,
+     0.11212158203125
+    ]
+   },
+   {
+    "name": "encoder.layers.13.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 360.88494873046875,
+    "first": [
+     0.30712890625,
+     0.39599609375,
+     0.378173828125,
+     0.37939453125
+    ]
+   },
+   {
+    "name": "encoder.layers.14.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 17.41408270597458,
+    "first": [
+     0.10894775390625,
+     0.00662994384765625,
+     0.043304443359375,
+     -0.01317596435546875
+    ]
+   },
+   {
+    "name": "encoder.layers.14.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 187.8887757062912,
+    "first": [
+     0.0295867919921875,
+     0.01910400390625,
+     -0.053802490234375,
+     0.04132080078125
+    ]
+   },
+   {
+    "name": "encoder.layers.14.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 503.20166015625,
+    "first": [
+     0.39013671875,
+     0.525390625,
+     0.56591796875,
+     0.54296875
+    ]
+   },
+   {
+    "name": "encoder.layers.14.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 1507.0177607536316,
+    "first": [
+     -0.01470947265625,
+     -0.0180511474609375,
+     0.03546142578125,
+     -0.03741455078125
+    ]
+   },
+   {
+    "name": "encoder.layers.14.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 15.987961888313293,
+    "first": [
+     -0.01873779296875,
+     0.03668212890625,
+     0.143798828125,
+     -0.073974609375
+    ]
+   },
+   {
+    "name": "encoder.layers.14.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 343.12469482421875,
+    "first": [
+     0.3017578125,
+     0.36279296875,
+     0.359375,
+     0.36181640625
+    ]
+   },
+   {
+    "name": "encoder.layers.15.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 0.19752943515777588,
+    "first": [
+     0.004161834716796875,
+     0.08892822265625,
+     0.02032470703125,
+     0.05731201171875
+    ]
+   },
+   {
+    "name": "encoder.layers.15.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -144.4970559477806,
+    "first": [
+     -0.031463623046875,
+     0.06494140625,
+     -0.046112060546875,
+     -0.07366943359375
+    ]
+   },
+   {
+    "name": "encoder.layers.15.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 610.315185546875,
+    "first": [
+     0.48828125,
+     0.5927734375,
+     0.697265625,
+     0.66552734375
+    ]
+   },
+   {
+    "name": "encoder.layers.15.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 2985.512545466423,
+    "first": [
+     -0.0245819091796875,
+     0.01085662841796875,
+     -0.0364990234375,
+     0.0113372802734375
+    ]
+   },
+   {
+    "name": "encoder.layers.15.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -13.45117074251175,
+    "first": [
+     0.0103759765625,
+     -0.09075927734375,
+     -0.02276611328125,
+     -0.1453857421875
+    ]
+   },
+   {
+    "name": "encoder.layers.15.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 371.80517578125,
+    "first": [
+     0.32275390625,
+     0.409423828125,
+     0.382568359375,
+     0.3798828125
+    ]
+   },
+   {
+    "name": "encoder.layers.16.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 0.4893801808357239,
+    "first": [
+     0.01052093505859375,
+     -0.0024623870849609375,
+     -0.069580078125,
+     -0.10791015625
+    ]
+   },
+   {
+    "name": "encoder.layers.16.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -43.6911199092865,
+    "first": [
+     -0.036041259765625,
+     0.033355712890625,
+     -0.0013790130615234375,
+     0.0517578125
+    ]
+   },
+   {
+    "name": "encoder.layers.16.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 541.9202880859375,
+    "first": [
+     0.403076171875,
+     0.57861328125,
+     0.5830078125,
+     0.5576171875
+    ]
+   },
+   {
+    "name": "encoder.layers.16.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 1213.5994471907616,
+    "first": [
+     0.0433349609375,
+     -0.00951385498046875,
+     0.0200653076171875,
+     -0.09600830078125
+    ]
+   },
+   {
+    "name": "encoder.layers.16.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -24.393269062042236,
+    "first": [
+     0.012451171875,
+     -0.051788330078125,
+     0.0123748779296875,
+     -0.08978271484375
+    ]
+   },
+   {
+    "name": "encoder.layers.16.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 413.46295166015625,
+    "first": [
+     0.368896484375,
+     0.43798828125,
+     0.444580078125,
+     0.4326171875
+    ]
+   },
+   {
+    "name": "encoder.layers.17.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 4.691343188285828,
+    "first": [
+     -0.03424072265625,
+     0.0791015625,
+     0.017486572265625,
+     -0.01544952392578125
+    ]
+   },
+   {
+    "name": "encoder.layers.17.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 17.680472314357758,
+    "first": [
+     -0.0305938720703125,
+     0.1173095703125,
+     0.0012683868408203125,
+     0.00775146484375
+    ]
+   },
+   {
+    "name": "encoder.layers.17.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 559.380859375,
+    "first": [
+     0.443603515625,
+     0.609375,
+     0.60107421875,
+     0.55517578125
+    ]
+   },
+   {
+    "name": "encoder.layers.17.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 764.1863371729851,
+    "first": [
+     -0.046051025390625,
+     -0.018798828125,
+     -0.0262451171875,
+     0.08135986328125
+    ]
+   },
+   {
+    "name": "encoder.layers.17.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -23.822453796863556,
+    "first": [
+     0.0309295654296875,
+     0.00609588623046875,
+     0.062225341796875,
+     -0.09210205078125
+    ]
+   },
+   {
+    "name": "encoder.layers.17.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 409.6304931640625,
+    "first": [
+     0.37158203125,
+     0.427490234375,
+     0.416259765625,
+     0.403564453125
+    ]
+   },
+   {
+    "name": "encoder.layers.18.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 13.144304275512695,
+    "first": [
+     -0.0026721954345703125,
+     -0.041290283203125,
+     0.0294952392578125,
+     -0.02984619140625
+    ]
+   },
+   {
+    "name": "encoder.layers.18.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 62.43067979812622,
+    "first": [
+     0.1270751953125,
+     -0.020538330078125,
+     0.020904541015625,
+     -0.038818359375
+    ]
+   },
+   {
+    "name": "encoder.layers.18.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 617.49951171875,
+    "first": [
+     0.50732421875,
+     0.6611328125,
+     0.6796875,
+     0.6298828125
+    ]
+   },
+   {
+    "name": "encoder.layers.18.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 372.39204055070877,
+    "first": [
+     -0.0159149169921875,
+     -0.055328369140625,
+     -0.01502227783203125,
+     -0.025421142578125
+    ]
+   },
+   {
+    "name": "encoder.layers.18.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 47.552106738090515,
+    "first": [
+     0.03070068359375,
+     -0.04754638671875,
+     -0.04443359375,
+     0.03875732421875
+    ]
+   },
+   {
+    "name": "encoder.layers.18.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 420.31048583984375,
+    "first": [
+     0.397216796875,
+     0.44384765625,
+     0.427734375,
+     0.410400390625
+    ]
+   },
+   {
+    "name": "encoder.layers.19.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 1.5583189129829407,
+    "first": [
+     -0.1373291015625,
+     -0.01483154296875,
+     -0.06439208984375,
+     0.04193115234375
+    ]
+   },
+   {
+    "name": "encoder.layers.19.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 90.81793743371964,
+    "first": [
+     0.08984375,
+     0.0174102783203125,
+     0.0224609375,
+     0.0124053955078125
+    ]
+   },
+   {
+    "name": "encoder.layers.19.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 679.410888671875,
+    "first": [
+     0.5908203125,
+     0.6923828125,
+     0.69921875,
+     0.689453125
+    ]
+   },
+   {
+    "name": "encoder.layers.19.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 1174.89714884758,
+    "first": [
+     -0.035675048828125,
+     0.07489013671875,
+     0.13134765625,
+     0.073974609375
+    ]
+   },
+   {
+    "name": "encoder.layers.19.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 49.52891802787781,
+    "first": [
+     0.01139068603515625,
+     -0.040740966796875,
+     -0.1197509765625,
+     0.05169677734375
+    ]
+   },
+   {
+    "name": "encoder.layers.19.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 433.6527099609375,
+    "first": [
+     0.400390625,
+     0.446533203125,
+     0.431640625,
+     0.429931640625
+    ]
+   },
+   {
+    "name": "encoder.layers.2.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -7.2809794545173645,
+    "first": [
+     0.03924560546875,
+     0.053466796875,
+     0.0139923095703125,
+     -0.122802734375
+    ]
+   },
+   {
+    "name": "encoder.layers.2.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -37.354680478572845,
+    "first": [
+     0.004573822021484375,
+     0.0596923828125,
+     -0.08795166015625,
+     -0.052581787109375
+    ]
+   },
+   {
+    "name": "encoder.layers.2.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 303.5599365234375,
+    "first": [
+     0.2142333984375,
+     0.29345703125,
+     0.3369140625,
+     0.321533203125
+    ]
+   },
+   {
+    "name": "encoder.layers.2.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -1503.799503147602,
+    "first": [
+     -0.07861328125,
+     0.0013742446899414062,
+     -0.0869140625,
+     -0.055694580078125
+    ]
+   },
+   {
+    "name": "encoder.layers.2.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 28.47948670387268,
+    "first": [
+     0.0355224609375,
+     -0.01312255859375,
+     0.084716796875,
+     -0.061737060546875
+    ]
+   },
+   {
+    "name": "encoder.layers.2.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 216.09714603424072,
+    "first": [
+     0.123779296875,
+     0.1905517578125,
+     0.272705078125,
+     0.2291259765625
+    ]
+   },
+   {
+    "name": "encoder.layers.20.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 11.103676557540894,
+    "first": [
+     -0.0472412109375,
+     0.051055908203125,
+     0.0177764892578125,
+     -0.018768310546875
+    ]
+   },
+   {
+    "name": "encoder.layers.20.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -44.2591946721077,
+    "first": [
+     -0.043365478515625,
+     -0.0672607421875,
+     -0.0482177734375,
+     0.004322052001953125
+    ]
+   },
+   {
+    "name": "encoder.layers.20.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 640.0977783203125,
+    "first": [
+     0.58837890625,
+     0.68310546875,
+     0.671875,
+     0.62890625
+    ]
+   },
+   {
+    "name": "encoder.layers.20.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 581.0818095803261,
+    "first": [
+     0.0223388671875,
+     -0.016082763671875,
+     0.048553466796875,
+     -0.0186614990234375
+    ]
+   },
+   {
+    "name": "encoder.layers.20.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -18.310237646102905,
+    "first": [
+     0.033905029296875,
+     -0.0137786865234375,
+     0.003131866455078125,
+     -0.09564208984375
+    ]
+   },
+   {
+    "name": "encoder.layers.20.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 494.177001953125,
+    "first": [
+     0.463623046875,
+     0.509765625,
+     0.51708984375,
+     0.4892578125
+    ]
+   },
+   {
+    "name": "encoder.layers.21.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -5.768882393836975,
+    "first": [
+     -0.06744384765625,
+     0.1568603515625,
+     0.0762939453125,
+     -0.0203704833984375
+    ]
+   },
+   {
+    "name": "encoder.layers.21.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 104.19979190826416,
+    "first": [
+     -0.0206451416015625,
+     0.0335693359375,
+     -0.0037670135498046875,
+     -0.0015821456909179688
+    ]
+   },
+   {
+    "name": "encoder.layers.21.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 710.59375,
+    "first": [
+     0.6455078125,
+     0.69482421875,
+     0.708984375,
+     0.697265625
+    ]
+   },
+   {
+    "name": "encoder.layers.21.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 1218.5028876662254,
+    "first": [
+     0.04266357421875,
+     -0.06170654296875,
+     -0.03790283203125,
+     -0.02923583984375
+    ]
+   },
+   {
+    "name": "encoder.layers.21.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -8.43493914604187,
+    "first": [
+     -0.039031982421875,
+     -0.04669189453125,
+     0.09759521484375,
+     -0.0222930908203125
+    ]
+   },
+   {
+    "name": "encoder.layers.21.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 514.79443359375,
+    "first": [
+     0.48974609375,
+     0.529296875,
+     0.5146484375,
+     0.4990234375
+    ]
+   },
+   {
+    "name": "encoder.layers.22.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 4.855010449886322,
+    "first": [
+     -0.0408935546875,
+     -0.151611328125,
+     0.0165863037109375,
+     0.0723876953125
+    ]
+   },
+   {
+    "name": "encoder.layers.22.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -137.42155468463898,
+    "first": [
+     -0.031280517578125,
+     0.044342041015625,
+     0.0222320556640625,
+     -0.06634521484375
+    ]
+   },
+   {
+    "name": "encoder.layers.22.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 641.19482421875,
+    "first": [
+     0.623046875,
+     0.642578125,
+     0.634765625,
+     0.615234375
+    ]
+   },
+   {
+    "name": "encoder.layers.22.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -248.43455058336258,
+    "first": [
+     0.0217132568359375,
+     -0.0010843276977539062,
+     -0.0204010009765625,
+     -0.08404541015625
+    ]
+   },
+   {
+    "name": "encoder.layers.22.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 2.1264818906784058,
+    "first": [
+     0.10125732421875,
+     -0.045562744140625,
+     -0.04119873046875,
+     0.0848388671875
+    ]
+   },
+   {
+    "name": "encoder.layers.22.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 534.8365478515625,
+    "first": [
+     0.509765625,
+     0.52587890625,
+     0.53271484375,
+     0.515625
+    ]
+   },
+   {
+    "name": "encoder.layers.23.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 2.0104490518569946,
+    "first": [
+     0.10076904296875,
+     0.029754638671875,
+     0.115478515625,
+     0.05279541015625
+    ]
+   },
+   {
+    "name": "encoder.layers.23.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -196.04283767938614,
+    "first": [
+     -0.11737060546875,
+     0.06768798828125,
+     0.035308837890625,
+     -0.0255889892578125
+    ]
+   },
+   {
+    "name": "encoder.layers.23.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 831.989501953125,
+    "first": [
+     0.84814453125,
+     0.818359375,
+     0.7958984375,
+     0.8212890625
+    ]
+   },
+   {
+    "name": "encoder.layers.23.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -578.2910682559013,
+    "first": [
+     -0.00899505615234375,
+     0.037841796875,
+     0.047210693359375,
+     -0.09869384765625
+    ]
+   },
+   {
+    "name": "encoder.layers.23.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 29.406760156154633,
+    "first": [
+     -0.08282470703125,
+     0.01092529296875,
+     -0.0567626953125,
+     -0.0199127197265625
+    ]
+   },
+   {
+    "name": "encoder.layers.23.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 591.974853515625,
+    "first": [
+     0.607421875,
+     0.599609375,
+     0.57275390625,
+     0.57861328125
+    ]
+   },
+   {
+    "name": "encoder.layers.24.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 15.46027559041977,
+    "first": [
+     -0.034942626953125,
+     0.1455078125,
+     0.0379638671875,
+     0.0195159912109375
+    ]
+   },
+   {
+    "name": "encoder.layers.24.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -78.16407775878906,
+    "first": [
+     0.0032806396484375,
+     -0.00841522216796875,
+     0.020660400390625,
+     -0.03375244140625
+    ]
+   },
+   {
+    "name": "encoder.layers.24.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 925.4462890625,
+    "first": [
+     0.93212890625,
+     0.931640625,
+     0.87255859375,
+     0.9169921875
+    ]
+   },
+   {
+    "name": "encoder.layers.24.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -1575.747733771801,
+    "first": [
+     0.11212158203125,
+     0.0850830078125,
+     -0.05596923828125,
+     0.01458740234375
+    ]
+   },
+   {
+    "name": "encoder.layers.24.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -52.92616677284241,
+    "first": [
+     -0.0682373046875,
+     -0.0133209228515625,
+     0.060302734375,
+     0.002986907958984375
+    ]
+   },
+   {
+    "name": "encoder.layers.24.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 606.568603515625,
+    "first": [
+     0.6044921875,
+     0.61279296875,
+     0.5673828125,
+     0.6025390625
+    ]
+   },
+   {
+    "name": "encoder.layers.25.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 10.312271654605865,
+    "first": [
+     -0.007175445556640625,
+     0.041778564453125,
+     -0.0985107421875,
+     -0.0794677734375
+    ]
+   },
+   {
+    "name": "encoder.layers.25.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 334.7184913158417,
+    "first": [
+     -0.05987548828125,
+     -0.004547119140625,
+     -0.0105438232421875,
+     -0.0127410888671875
+    ]
+   },
+   {
+    "name": "encoder.layers.25.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 929.47119140625,
+    "first": [
+     0.9365234375,
+     0.91943359375,
+     0.89794921875,
+     0.970703125
+    ]
+   },
+   {
+    "name": "encoder.layers.25.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -2597.965542435646,
+    "first": [
+     -0.0226287841796875,
+     -0.07769775390625,
+     0.05242919921875,
+     0.0355224609375
+    ]
+   },
+   {
+    "name": "encoder.layers.25.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -51.89559733867645,
+    "first": [
+     -0.047454833984375,
+     0.10430908203125,
+     0.058074951171875,
+     0.091796875
+    ]
+   },
+   {
+    "name": "encoder.layers.25.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 665.283203125,
+    "first": [
+     0.65771484375,
+     0.6591796875,
+     0.64892578125,
+     0.6591796875
+    ]
+   },
+   {
+    "name": "encoder.layers.26.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -0.3001963496208191,
+    "first": [
+     -0.0689697265625,
+     -0.08734130859375,
+     -0.026885986328125,
+     0.035247802734375
+    ]
+   },
+   {
+    "name": "encoder.layers.26.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 224.8084079027176,
+    "first": [
+     0.00685882568359375,
+     -0.041015625,
+     0.033843994140625,
+     0.025390625
+    ]
+   },
+   {
+    "name": "encoder.layers.26.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 899.86572265625,
+    "first": [
+     0.92822265625,
+     0.8828125,
+     0.8828125,
+     0.92431640625
+    ]
+   },
+   {
+    "name": "encoder.layers.26.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -1412.416702926159,
+    "first": [
+     -0.01062774658203125,
+     -0.06536865234375,
+     -0.048248291015625,
+     0.1090087890625
+    ]
+   },
+   {
+    "name": "encoder.layers.26.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -50.56045454740524,
+    "first": [
+     -0.138671875,
+     0.0181732177734375,
+     0.06158447265625,
+     -0.049560546875
+    ]
+   },
+   {
+    "name": "encoder.layers.26.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 628.5344848632812,
+    "first": [
+     0.611328125,
+     0.603515625,
+     0.6044921875,
+     0.603515625
+    ]
+   },
+   {
+    "name": "encoder.layers.27.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -14.102777898311615,
+    "first": [
+     -0.1068115234375,
+     0.018096923828125,
+     -0.08135986328125,
+     -0.040008544921875
+    ]
+   },
+   {
+    "name": "encoder.layers.27.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -111.10114508867264,
+    "first": [
+     -0.037017822265625,
+     -0.080322265625,
+     0.009796142578125,
+     0.0249481201171875
+    ]
+   },
+   {
+    "name": "encoder.layers.27.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 935.746337890625,
+    "first": [
+     0.9208984375,
+     0.88671875,
+     0.8232421875,
+     0.9140625
+    ]
+   },
+   {
+    "name": "encoder.layers.27.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -45.772902607917786,
+    "first": [
+     0.09918212890625,
+     0.020751953125,
+     0.01277923583984375,
+     -0.003376007080078125
+    ]
+   },
+   {
+    "name": "encoder.layers.27.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 5.136075496673584,
+    "first": [
+     -0.029571533203125,
+     0.1541748046875,
+     0.0200958251953125,
+     -0.08929443359375
+    ]
+   },
+   {
+    "name": "encoder.layers.27.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 562.6572265625,
+    "first": [
+     0.53076171875,
+     0.5263671875,
+     0.5283203125,
+     0.50341796875
+    ]
+   },
+   {
+    "name": "encoder.layers.3.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -2.659643530845642,
+    "first": [
+     0.00803375244140625,
+     0.1507568359375,
+     -0.005023956298828125,
+     -0.028472900390625
+    ]
+   },
+   {
+    "name": "encoder.layers.3.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -56.91640067100525,
+    "first": [
+     -0.0272216796875,
+     -0.0180206298828125,
+     -0.01213836669921875,
+     -0.1888427734375
+    ]
+   },
+   {
+    "name": "encoder.layers.3.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 343.82098388671875,
+    "first": [
+     0.272216796875,
+     0.29833984375,
+     0.4228515625,
+     0.38916015625
+    ]
+   },
+   {
+    "name": "encoder.layers.3.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -1076.828324019909,
+    "first": [
+     -0.020294189453125,
+     -0.06927490234375,
+     -0.09808349609375,
+     -0.04498291015625
+    ]
+   },
+   {
+    "name": "encoder.layers.3.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": 6.3774078488349915,
+    "first": [
+     0.0797119140625,
+     -0.0032176971435546875,
+     0.0020046234130859375,
+     -0.057861328125
+    ]
+   },
+   {
+    "name": "encoder.layers.3.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 227.06131839752197,
+    "first": [
+     0.1517333984375,
+     0.230712890625,
+     0.298828125,
+     0.2220458984375
+    ]
+   },
+   {
+    "name": "encoder.layers.4.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 5.509764075279236,
+    "first": [
+     0.10174560546875,
+     -0.01015472412109375,
+     0.050506591796875,
+     0.02130126953125
+    ]
+   },
+   {
+    "name": "encoder.layers.4.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -220.28169983625412,
+    "first": [
+     -0.01381683349609375,
+     -0.1153564453125,
+     0.025482177734375,
+     0.0142669677734375
+    ]
+   },
+   {
+    "name": "encoder.layers.4.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 392.04595947265625,
+    "first": [
+     0.302490234375,
+     0.3662109375,
+     0.457275390625,
+     0.402099609375
+    ]
+   },
+   {
+    "name": "encoder.layers.4.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -1392.1609800457954,
+    "first": [
+     0.039703369140625,
+     -0.002796173095703125,
+     -0.08831787109375,
+     0.002635955810546875
+    ]
+   },
+   {
+    "name": "encoder.layers.4.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -46.170902729034424,
+    "first": [
+     0.007171630859375,
+     0.2044677734375,
+     0.00888824462890625,
+     0.04150390625
+    ]
+   },
+   {
+    "name": "encoder.layers.4.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 257.2255697250366,
+    "first": [
+     0.1976318359375,
+     0.2548828125,
+     0.287109375,
+     0.267333984375
+    ]
+   },
+   {
+    "name": "encoder.layers.5.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -5.130852818489075,
+    "first": [
+     0.03173828125,
+     -0.02301025390625,
+     -0.007232666015625,
+     -0.0445556640625
+    ]
+   },
+   {
+    "name": "encoder.layers.5.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -68.81309419870377,
+    "first": [
+     0.0633544921875,
+     -0.0272216796875,
+     -0.01244354248046875,
+     -0.1644287109375
+    ]
+   },
+   {
+    "name": "encoder.layers.5.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 362.34234619140625,
+    "first": [
+     0.270263671875,
+     0.368408203125,
+     0.3798828125,
+     0.3955078125
+    ]
+   },
+   {
+    "name": "encoder.layers.5.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": -1518.5333352684975,
+    "first": [
+     0.08233642578125,
+     0.0352783203125,
+     -0.046539306640625,
+     0.0102691650390625
+    ]
+   },
+   {
+    "name": "encoder.layers.5.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -11.028440773487091,
+    "first": [
+     -0.0210113525390625,
+     -0.0135498046875,
+     -0.004917144775390625,
+     -0.041534423828125
+    ]
+   },
+   {
+    "name": "encoder.layers.5.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 281.92945098876953,
+    "first": [
+     0.21630859375,
+     0.29736328125,
+     0.307373046875,
+     0.28466796875
+    ]
+   },
+   {
+    "name": "encoder.layers.6.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -0.4136819839477539,
+    "first": [
+     0.01233673095703125,
+     -0.0810546875,
+     -0.019683837890625,
+     -0.06683349609375
+    ]
+   },
+   {
+    "name": "encoder.layers.6.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": -107.29180616140366,
+    "first": [
+     0.0242919921875,
+     0.05029296875,
+     -0.055633544921875,
+     0.059722900390625
+    ]
+   },
+   {
+    "name": "encoder.layers.6.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 391.898193359375,
+    "first": [
+     0.280029296875,
+     0.40185546875,
+     0.433349609375,
+     0.4189453125
+    ]
+   },
+   {
+    "name": "encoder.layers.6.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 1268.462416768074,
+    "first": [
+     -0.036224365234375,
+     -0.043853759765625,
+     0.04144287109375,
+     -0.021209716796875
+    ]
+   },
+   {
+    "name": "encoder.layers.6.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -69.04924315214157,
+    "first": [
+     0.03814697265625,
+     -0.05108642578125,
+     -0.05291748046875,
+     0.00714874267578125
+    ]
+   },
+   {
+    "name": "encoder.layers.6.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 279.89642333984375,
+    "first": [
+     0.2412109375,
+     0.290283203125,
+     0.29833984375,
+     0.291748046875
+    ]
+   },
+   {
+    "name": "encoder.layers.7.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -17.161400616168976,
+    "first": [
+     0.002857208251953125,
+     -0.048583984375,
+     -0.01172637939453125,
+     -0.0260772705078125
+    ]
+   },
+   {
+    "name": "encoder.layers.7.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 53.66812056303024,
+    "first": [
+     0.00461578369140625,
+     -0.023834228515625,
+     0.0313720703125,
+     0.048736572265625
+    ]
+   },
+   {
+    "name": "encoder.layers.7.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 435.9530029296875,
+    "first": [
+     0.343505859375,
+     0.438232421875,
+     0.47265625,
+     0.474365234375
+    ]
+   },
+   {
+    "name": "encoder.layers.7.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 1933.6498960852623,
+    "first": [
+     -0.039947509765625,
+     -0.023712158203125,
+     0.060943603515625,
+     0.051513671875
+    ]
+   },
+   {
+    "name": "encoder.layers.7.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -34.826187908649445,
+    "first": [
+     -0.111083984375,
+     -0.050323486328125,
+     -0.090576171875,
+     -0.09674072265625
+    ]
+   },
+   {
+    "name": "encoder.layers.7.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 299.96923828125,
+    "first": [
+     0.23486328125,
+     0.32177734375,
+     0.321044921875,
+     0.30908203125
+    ]
+   },
+   {
+    "name": "encoder.layers.8.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": -14.239106237888336,
+    "first": [
+     0.135009765625,
+     -0.043426513671875,
+     -0.0091552734375,
+     0.0092926025390625
+    ]
+   },
+   {
+    "name": "encoder.layers.8.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 146.4276626110077,
+    "first": [
+     -0.02093505859375,
+     0.042388916015625,
+     -0.046051025390625,
+     0.0958251953125
+    ]
+   },
+   {
+    "name": "encoder.layers.8.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 433.95947265625,
+    "first": [
+     0.3232421875,
+     0.457275390625,
+     0.461181640625,
+     0.469970703125
+    ]
+   },
+   {
+    "name": "encoder.layers.8.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 2168.5105707645416,
+    "first": [
+     0.0826416015625,
+     -0.06878662109375,
+     -0.0235595703125,
+     0.043731689453125
+    ]
+   },
+   {
+    "name": "encoder.layers.8.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -36.267758786678314,
+    "first": [
+     -0.0968017578125,
+     0.07373046875,
+     0.0926513671875,
+     0.0902099609375
+    ]
+   },
+   {
+    "name": "encoder.layers.8.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 302.2230224609375,
+    "first": [
+     0.2509765625,
+     0.328125,
+     0.322998046875,
+     0.307861328125
+    ]
+   },
+   {
+    "name": "encoder.layers.9.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 3.585990071296692,
+    "first": [
+     -0.05316162109375,
+     0.0012254714965820312,
+     0.0034885406494140625,
+     -0.1114501953125
+    ]
+   },
+   {
+    "name": "encoder.layers.9.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 147.11295104026794,
+    "first": [
+     0.0679931640625,
+     -0.03131103515625,
+     -0.045928955078125,
+     0.0242462158203125
+    ]
+   },
+   {
+    "name": "encoder.layers.9.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 413.7242431640625,
+    "first": [
+     0.33544921875,
+     0.449951171875,
+     0.422607421875,
+     0.4267578125
+    ]
+   },
+   {
+    "name": "encoder.layers.9.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     5248,
+     1024
+    ],
+    "sum": 2950.7583972215652,
+    "first": [
+     0.04144287109375,
+     0.006519317626953125,
+     -0.021026611328125,
+     -0.00420379638671875
+    ]
+   },
+   {
+    "name": "encoder.layers.9.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     2624
+    ],
+    "sum": -1.6711314916610718,
+    "first": [
+     0.06134033203125,
+     0.10125732421875,
+     0.070068359375,
+     -0.083984375
+    ]
+   },
+   {
+    "name": "encoder.layers.9.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 324.07611083984375,
+    "first": [
+     0.280517578125,
+     0.3408203125,
+     0.343505859375,
+     0.3369140625
+    ]
+   },
+   {
+    "name": "head.layers.0.linear1.bias",
+    "dtype": "float16",
+    "shape": [
+     4096
+    ],
+    "sum": 42.54244017601013,
+    "first": [
+     -0.028961181640625,
+     0.0203857421875,
+     0.0511474609375,
+     0.040863037109375
+    ]
+   },
+   {
+    "name": "head.layers.0.linear1.weight",
+    "dtype": "float16",
+    "shape": [
+     4096,
+     1024
+    ],
+    "sum": -152.4714371562004,
+    "first": [
+     -0.01157379150390625,
+     0.00839996337890625,
+     0.00807952880859375,
+     -0.03082275390625
+    ]
+   },
+   {
+    "name": "head.layers.0.linear2.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 0.32718420028686523,
+    "first": [
+     -0.0018510818481445312,
+     -0.0019989013671875,
+     -0.0193634033203125,
+     0.01062774658203125
+    ]
+   },
+   {
+    "name": "head.layers.0.linear2.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     4096
+    ],
+    "sum": -49.83968895673752,
+    "first": [
+     -0.0118408203125,
+     0.0313720703125,
+     0.0672607421875,
+     0.01407623291015625
+    ]
+   },
+   {
+    "name": "head.layers.0.norm1.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": -1.599845051765442,
+    "first": [
+     0.044403076171875,
+     0.2078857421875,
+     0.1483154296875,
+     0.1619873046875
+    ]
+   },
+   {
+    "name": "head.layers.0.norm1.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 810.27734375,
+    "first": [
+     0.841796875,
+     0.7919921875,
+     0.76708984375,
+     0.7470703125
+    ]
+   },
+   {
+    "name": "head.layers.0.norm2.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": -2.439948856830597,
+    "first": [
+     -0.043182373046875,
+     -0.037872314453125,
+     -0.0399169921875,
+     -0.005828857421875
+    ]
+   },
+   {
+    "name": "head.layers.0.norm2.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 869.30615234375,
+    "first": [
+     0.8515625,
+     0.8203125,
+     0.94921875,
+     0.85498046875
+    ]
+   },
+   {
+    "name": "head.layers.0.self_attn.in_proj_bias",
+    "dtype": "float16",
+    "shape": [
+     3072
+    ],
+    "sum": -3.7973033785820007,
+    "first": [
+     -0.0011081695556640625,
+     -0.03033447265625,
+     0.01033782958984375,
+     -0.0025043487548828125
+    ]
+   },
+   {
+    "name": "head.layers.0.self_attn.in_proj_weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 104.86038762331009,
+    "first": [
+     0.004093170166015625,
+     -0.00739288330078125,
+     -0.037689208984375,
+     -0.040740966796875
+    ]
+   },
+   {
+    "name": "head.layers.0.self_attn.out_proj.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": -2.722836136817932,
+    "first": [
+     -0.0303802490234375,
+     -0.056915283203125,
+     -0.11669921875,
+     -0.053863525390625
+    ]
+   },
+   {
+    "name": "head.layers.0.self_attn.out_proj.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 26.52441245317459,
+    "first": [
+     -0.00978851318359375,
+     -0.0226898193359375,
+     0.016265869140625,
+     -0.0273590087890625
+    ]
+   },
+   {
+    "name": "head.layers.1.linear1.bias",
+    "dtype": "float16",
+    "shape": [
+     4096
+    ],
+    "sum": 5.219980895519257,
+    "first": [
+     -0.015106201171875,
+     0.01195526123046875,
+     0.0023212432861328125,
+     -0.0098724365234375
+    ]
+   },
+   {
+    "name": "head.layers.1.linear1.weight",
+    "dtype": "float16",
+    "shape": [
+     4096,
+     1024
+    ],
+    "sum": -37.06696617603302,
+    "first": [
+     -0.0223236083984375,
+     -0.003818511962890625,
+     0.0007987022399902344,
+     -0.00885772705078125
+    ]
+   },
+   {
+    "name": "head.layers.1.linear2.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 0.25870728492736816,
+    "first": [
+     -0.0004963874816894531,
+     0.004306793212890625,
+     -0.0205841064453125,
+     -0.00133514404296875
+    ]
+   },
+   {
+    "name": "head.layers.1.linear2.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     4096
+    ],
+    "sum": -26.59491616487503,
+    "first": [
+     0.001056671142578125,
+     0.015594482421875,
+     0.01033782958984375,
+     0.01409912109375
+    ]
+   },
+   {
+    "name": "head.layers.1.norm1.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 1.053428590297699,
+    "first": [
+     -0.049957275390625,
+     -0.0026798248291015625,
+     0.011260986328125,
+     0.01335906982421875
+    ]
+   },
+   {
+    "name": "head.layers.1.norm1.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 951.435546875,
+    "first": [
+     0.95458984375,
+     0.97265625,
+     0.97509765625,
+     0.951171875
+    ]
+   },
+   {
+    "name": "head.layers.1.norm2.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": -0.5149486064910889,
+    "first": [
+     -0.019927978515625,
+     -0.0308685302734375,
+     0.04180908203125,
+     0.0015649795532226562
+    ]
+   },
+   {
+    "name": "head.layers.1.norm2.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 919.69921875,
+    "first": [
+     0.8916015625,
+     0.8955078125,
+     0.87353515625,
+     0.88720703125
+    ]
+   },
+   {
+    "name": "head.layers.1.self_attn.in_proj_bias",
+    "dtype": "float16",
+    "shape": [
+     3072
+    ],
+    "sum": 0.39548665285110474,
+    "first": [
+     0.0044708251953125,
+     -0.0168609619140625,
+     -0.006381988525390625,
+     -0.007007598876953125
+    ]
+   },
+   {
+    "name": "head.layers.1.self_attn.in_proj_weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     1024
+    ],
+    "sum": 79.36387848854065,
+    "first": [
+     0.043701171875,
+     -0.0181884765625,
+     -0.01971435546875,
+     -0.043426513671875
+    ]
+   },
+   {
+    "name": "head.layers.1.self_attn.out_proj.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 0.05177837610244751,
+    "first": [
+     0.01100921630859375,
+     0.0016508102416992188,
+     -0.0065460205078125,
+     -0.0062408447265625
+    ]
+   },
+   {
+    "name": "head.layers.1.self_attn.out_proj.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 11.820703029632568,
+    "first": [
+     -0.0305938720703125,
+     -0.0028858184814453125,
+     0.0174407958984375,
+     -0.0222625732421875
+    ]
+   },
+   {
+    "name": "scorer.0.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 0.20709478855133057,
+    "first": [
+     0.0155792236328125,
+     0.06634521484375,
+     -0.07635498046875,
+     0.0027008056640625
+    ]
+   },
+   {
+    "name": "scorer.0.weight",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": 926.15966796875,
+    "first": [
+     0.88916015625,
+     0.888671875,
+     0.8818359375,
+     0.86767578125
+    ]
+   },
+   {
+    "name": "scorer.1.bias",
+    "dtype": "float16",
+    "shape": [
+     1024
+    ],
+    "sum": -2.698869466781616,
+    "first": [
+     0.05126953125,
+     0.0645751953125,
+     -0.00688934326171875,
+     -0.0290374755859375
+    ]
+   },
+   {
+    "name": "scorer.1.weight",
+    "dtype": "float16",
+    "shape": [
+     1024,
+     1024
+    ],
+    "sum": 9.244081735610962,
+    "first": [
+     0.00269317626953125,
+     0.05999755859375,
+     0.00772857666015625,
+     0.01708984375
+    ]
+   },
+   {
+    "name": "scorer.3.bias",
+    "dtype": "float16",
+    "shape": [
+     1
+    ],
+    "sum": -0.03582763671875,
+    "first": [
+     -0.03582763671875
+    ]
+   },
+   {
+    "name": "scorer.3.weight",
+    "dtype": "float16",
+    "shape": [
+     1,
+     1024
+    ],
+    "sum": 5.179973006248474,
+    "first": [
+     -0.00014770030975341797,
+     0.0011415481567382812,
+     0.006832122802734375,
+     0.007411956787109375
+    ]
+   },
+   {
+    "name": "temperature",
+    "dtype": "float32",
+    "shape": [
+     3
+    ],
+    "sum": 3.0,
+    "first": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   },
+   {
+    "name": "type_emb.weight",
+    "dtype": "float16",
+    "shape": [
+     3,
+     1024
+    ],
+    "sum": 38.470264315605164,
+    "first": [
+     -1.42578125,
+     -0.2257080078125,
+     0.233154296875,
+     -1.34375
+    ]
+   }
+  ]
+ },
+ "laya-multilingual": {
+  "module": {
+   "temperature": [
+    3
+   ],
+   "encoder.embeddings.tok_embeddings.weight": [
+    256000,
+    768
+   ],
+   "encoder.embeddings.norm.weight": [
+    768
+   ],
+   "encoder.layers.0.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.0.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.0.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.0.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.0.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.1.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.1.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.1.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.1.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.1.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.1.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.2.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.2.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.2.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.2.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.2.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.2.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.3.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.3.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.3.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.3.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.3.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.3.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.4.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.4.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.4.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.4.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.4.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.4.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.5.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.5.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.5.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.5.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.5.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.5.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.6.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.6.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.6.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.6.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.6.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.6.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.7.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.7.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.7.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.7.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.7.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.7.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.8.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.8.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.8.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.8.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.8.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.8.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.9.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.9.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.9.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.9.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.9.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.9.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.10.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.10.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.10.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.10.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.10.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.10.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.11.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.11.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.11.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.11.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.11.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.11.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.12.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.12.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.12.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.12.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.12.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.12.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.13.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.13.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.13.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.13.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.13.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.13.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.14.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.14.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.14.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.14.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.14.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.14.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.15.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.15.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.15.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.15.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.15.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.15.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.16.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.16.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.16.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.16.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.16.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.16.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.17.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.17.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.17.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.17.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.17.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.17.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.18.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.18.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.18.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.18.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.18.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.18.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.19.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.19.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.19.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.19.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.19.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.19.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.20.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.20.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.20.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.20.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.20.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.20.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.layers.21.attn_norm.weight": [
+    768
+   ],
+   "encoder.layers.21.attn.Wqkv.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.21.attn.Wo.weight": [
+    768,
+    768
+   ],
+   "encoder.layers.21.mlp_norm.weight": [
+    768
+   ],
+   "encoder.layers.21.mlp.Wi.weight": [
+    2304,
+    768
+   ],
+   "encoder.layers.21.mlp.Wo.weight": [
+    768,
+    1152
+   ],
+   "encoder.final_norm.weight": [
+    768
+   ],
+   "head.layers.0.self_attn.in_proj_weight": [
+    2304,
+    768
+   ],
+   "head.layers.0.self_attn.in_proj_bias": [
+    2304
+   ],
+   "head.layers.0.self_attn.out_proj.weight": [
+    768,
+    768
+   ],
+   "head.layers.0.self_attn.out_proj.bias": [
+    768
+   ],
+   "head.layers.0.linear1.weight": [
+    3072,
+    768
+   ],
+   "head.layers.0.linear1.bias": [
+    3072
+   ],
+   "head.layers.0.linear2.weight": [
+    768,
+    3072
+   ],
+   "head.layers.0.linear2.bias": [
+    768
+   ],
+   "head.layers.0.norm1.weight": [
+    768
+   ],
+   "head.layers.0.norm1.bias": [
+    768
+   ],
+   "head.layers.0.norm2.weight": [
+    768
+   ],
+   "head.layers.0.norm2.bias": [
+    768
+   ],
+   "head.layers.1.self_attn.in_proj_weight": [
+    2304,
+    768
+   ],
+   "head.layers.1.self_attn.in_proj_bias": [
+    2304
+   ],
+   "head.layers.1.self_attn.out_proj.weight": [
+    768,
+    768
+   ],
+   "head.layers.1.self_attn.out_proj.bias": [
+    768
+   ],
+   "head.layers.1.linear1.weight": [
+    3072,
+    768
+   ],
+   "head.layers.1.linear1.bias": [
+    3072
+   ],
+   "head.layers.1.linear2.weight": [
+    768,
+    3072
+   ],
+   "head.layers.1.linear2.bias": [
+    768
+   ],
+   "head.layers.1.norm1.weight": [
+    768
+   ],
+   "head.layers.1.norm1.bias": [
+    768
+   ],
+   "head.layers.1.norm2.weight": [
+    768
+   ],
+   "head.layers.1.norm2.bias": [
+    768
+   ],
+   "type_emb.weight": [
+    3,
+    768
+   ],
+   "scorer.0.weight": [
+    768
+   ],
+   "scorer.0.bias": [
+    768
+   ],
+   "scorer.1.weight": [
+    768,
+    768
+   ],
+   "scorer.1.bias": [
+    768
+   ],
+   "scorer.3.weight": [
+    1,
+    768
+   ],
+   "scorer.3.bias": [
+    1
+   ],
+   "act_head.0.weight": [
+    256,
+    772
+   ],
+   "act_head.0.bias": [
+    256
+   ],
+   "act_head.2.weight": [
+    2,
+    256
+   ],
+   "act_head.2.bias": [
+    2
+   ]
+  },
+  "tensors": [
+   {
+    "name": "act_head.0.bias",
+    "dtype": "float16",
+    "shape": [
+     256
+    ],
+    "sum": -0.04472833871841431,
+    "first": [
+     -0.0005021095275878906,
+     -0.02191162109375,
+     0.01335906982421875,
+     0.0076446533203125
+    ]
+   },
+   {
+    "name": "act_head.0.weight",
+    "dtype": "float16",
+    "shape": [
+     256,
+     772
+    ],
+    "sum": 12.647959351539612,
+    "first": [
+     0.005626678466796875,
+     0.01123809814453125,
+     -0.0110321044921875,
+     0.00969696044921875
+    ]
+   },
+   {
+    "name": "act_head.2.bias",
+    "dtype": "float16",
+    "shape": [
+     2
+    ],
+    "sum": 0.0030364990234375,
+    "first": [
+     0.023529052734375,
+     -0.0204925537109375
+    ]
+   },
+   {
+    "name": "act_head.2.weight",
+    "dtype": "float16",
+    "shape": [
+     2,
+     256
+    ],
+    "sum": -1.2340322136878967,
+    "first": [
+     -0.043914794921875,
+     -0.00792694091796875,
+     -0.015869140625,
+     -0.026123046875
+    ]
+   },
+   {
+    "name": "encoder.embeddings.norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 564.8867961168289,
+    "first": [
+     1.548828125,
+     0.466796875,
+     0.50537109375,
+     0.5048828125
+    ]
+   },
+   {
+    "name": "encoder.embeddings.tok_embeddings.weight",
+    "dtype": "float16",
+    "shape": [
+     256000,
+     768
+    ],
+    "sum": 900945.7997503877,
+    "first": [
+     0.004268646240234375,
+     -0.0012149810791015625,
+     0.0031948089599609375,
+     0.0031070709228515625
+    ]
+   },
+   {
+    "name": "encoder.final_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 1313.3525390625,
+    "first": [
+     2.484375,
+     1.39453125,
+     1.5869140625,
+     1.5166015625
+    ]
+   },
+   {
+    "name": "encoder.layers.0.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 24.876805543899536,
+    "first": [
+     -0.005573272705078125,
+     0.0136260986328125,
+     -0.0059051513671875,
+     -0.0005960464477539062
+    ]
+   },
+   {
+    "name": "encoder.layers.0.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 32.42468082904816,
+    "first": [
+     0.06768798828125,
+     0.0531005859375,
+     -0.01055908203125,
+     0.01251220703125
+    ]
+   },
+   {
+    "name": "encoder.layers.0.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 446.74606442451477,
+    "first": [
+     0.052978515625,
+     -0.04718017578125,
+     0.0850830078125,
+     -0.07232666015625
+    ]
+   },
+   {
+    "name": "encoder.layers.0.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -8.122198343276978,
+    "first": [
+     -0.044036865234375,
+     0.1329345703125,
+     0.09271240234375,
+     0.0012102127075195312
+    ]
+   },
+   {
+    "name": "encoder.layers.0.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 373.51812744140625,
+    "first": [
+     0.0924072265625,
+     0.498046875,
+     0.344482421875,
+     0.337890625
+    ]
+   },
+   {
+    "name": "encoder.layers.1.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 25.94519954919815,
+    "first": [
+     -0.04290771484375,
+     0.0158843994140625,
+     -0.06939697265625,
+     0.020355224609375
+    ]
+   },
+   {
+    "name": "encoder.layers.1.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 51.640994131565094,
+    "first": [
+     0.0848388671875,
+     -0.037506103515625,
+     0.137939453125,
+     0.00209808349609375
+    ]
+   },
+   {
+    "name": "encoder.layers.1.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 616.1639404296875,
+    "first": [
+     0.41748046875,
+     1.00390625,
+     0.724609375,
+     0.88916015625
+    ]
+   },
+   {
+    "name": "encoder.layers.1.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 195.19475388526917,
+    "first": [
+     -0.08392333984375,
+     -0.02252197265625,
+     -0.0013294219970703125,
+     -0.003124237060546875
+    ]
+   },
+   {
+    "name": "encoder.layers.1.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -16.1899573802948,
+    "first": [
+     0.004207611083984375,
+     -0.109619140625,
+     -0.1436767578125,
+     0.01500701904296875
+    ]
+   },
+   {
+    "name": "encoder.layers.1.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 384.7808837890625,
+    "first": [
+     0.1407470703125,
+     0.66796875,
+     0.509765625,
+     0.54150390625
+    ]
+   },
+   {
+    "name": "encoder.layers.10.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 5.6285645961761475,
+    "first": [
+     0.016815185546875,
+     -0.005054473876953125,
+     -0.0007734298706054688,
+     -0.006988525390625
+    ]
+   },
+   {
+    "name": "encoder.layers.10.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -38.88612240552902,
+    "first": [
+     -0.060638427734375,
+     -0.0032176971435546875,
+     -0.0096435546875,
+     0.048614501953125
+    ]
+   },
+   {
+    "name": "encoder.layers.10.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 519.8058471679688,
+    "first": [
+     0.1346435546875,
+     0.92626953125,
+     0.787109375,
+     0.828125
+    ]
+   },
+   {
+    "name": "encoder.layers.10.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 228.88359332084656,
+    "first": [
+     -0.0204315185546875,
+     0.0228118896484375,
+     0.05010986328125,
+     0.0015716552734375
+    ]
+   },
+   {
+    "name": "encoder.layers.10.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -22.107753694057465,
+    "first": [
+     0.03509521484375,
+     -0.005489349365234375,
+     -0.06268310546875,
+     0.0223541259765625
+    ]
+   },
+   {
+    "name": "encoder.layers.10.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 545.0224609375,
+    "first": [
+     0.171142578125,
+     0.8671875,
+     0.83544921875,
+     0.8994140625
+    ]
+   },
+   {
+    "name": "encoder.layers.11.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 7.057817578315735,
+    "first": [
+     -0.018951416015625,
+     -0.020751953125,
+     0.03369140625,
+     -0.01546478271484375
+    ]
+   },
+   {
+    "name": "encoder.layers.11.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 179.08773881196976,
+    "first": [
+     -0.00960540771484375,
+     -0.0011129379272460938,
+     0.0506591796875,
+     -0.0023326873779296875
+    ]
+   },
+   {
+    "name": "encoder.layers.11.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 582.37158203125,
+    "first": [
+     0.1483154296875,
+     1.0029296875,
+     0.92236328125,
+     0.97705078125
+    ]
+   },
+   {
+    "name": "encoder.layers.11.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -166.81038969755173,
+    "first": [
+     0.0111236572265625,
+     -0.0218963623046875,
+     -0.0152740478515625,
+     0.0161285400390625
+    ]
+   },
+   {
+    "name": "encoder.layers.11.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 22.45086830854416,
+    "first": [
+     -0.016082763671875,
+     -0.005710601806640625,
+     0.0560302734375,
+     0.11920166015625
+    ]
+   },
+   {
+    "name": "encoder.layers.11.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 533.85107421875,
+    "first": [
+     0.167724609375,
+     0.80517578125,
+     0.82177734375,
+     0.8486328125
+    ]
+   },
+   {
+    "name": "encoder.layers.12.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 17.959701895713806,
+    "first": [
+     -0.0003261566162109375,
+     -0.0041656494140625,
+     0.00746917724609375,
+     -0.024658203125
+    ]
+   },
+   {
+    "name": "encoder.layers.12.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 83.93460524082184,
+    "first": [
+     0.0303955078125,
+     -0.0269622802734375,
+     -0.0251312255859375,
+     0.01149749755859375
+    ]
+   },
+   {
+    "name": "encoder.layers.12.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 924.38818359375,
+    "first": [
+     0.2744140625,
+     1.4951171875,
+     1.4638671875,
+     1.39453125
+    ]
+   },
+   {
+    "name": "encoder.layers.12.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 100.34691137075424,
+    "first": [
+     0.0218658447265625,
+     -0.01410675048828125,
+     -0.00728607177734375,
+     0.0022830963134765625
+    ]
+   },
+   {
+    "name": "encoder.layers.12.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 22.076953411102295,
+    "first": [
+     0.0149078369140625,
+     0.01273345947265625,
+     -0.004802703857421875,
+     0.00457000732421875
+    ]
+   },
+   {
+    "name": "encoder.layers.12.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 570.9031982421875,
+    "first": [
+     0.2396240234375,
+     0.83984375,
+     0.85400390625,
+     0.86279296875
+    ]
+   },
+   {
+    "name": "encoder.layers.13.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": -5.034680783748627,
+    "first": [
+     -0.006488800048828125,
+     0.0301055908203125,
+     0.02294921875,
+     -0.0172576904296875
+    ]
+   },
+   {
+    "name": "encoder.layers.13.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -29.243479013442993,
+    "first": [
+     -0.03765869140625,
+     -0.006763458251953125,
+     -0.0285797119140625,
+     -0.004222869873046875
+    ]
+   },
+   {
+    "name": "encoder.layers.13.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 673.1710205078125,
+    "first": [
+     0.18505859375,
+     1.015625,
+     1.0673828125,
+     1.060546875
+    ]
+   },
+   {
+    "name": "encoder.layers.13.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 82.64632952213287,
+    "first": [
+     -0.074951171875,
+     0.017913818359375,
+     -0.0849609375,
+     0.02874755859375
+    ]
+   },
+   {
+    "name": "encoder.layers.13.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -0.7652062773704529,
+    "first": [
+     0.0024890899658203125,
+     0.042877197265625,
+     0.004474639892578125,
+     -0.03204345703125
+    ]
+   },
+   {
+    "name": "encoder.layers.13.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 576.6168212890625,
+    "first": [
+     0.318603515625,
+     0.853515625,
+     0.8779296875,
+     0.90380859375
+    ]
+   },
+   {
+    "name": "encoder.layers.14.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 14.80927836894989,
+    "first": [
+     0.00102996826171875,
+     -0.05206298828125,
+     -0.0179443359375,
+     0.025115966796875
+    ]
+   },
+   {
+    "name": "encoder.layers.14.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 36.45780336856842,
+    "first": [
+     -0.0421142578125,
+     -0.00345611572265625,
+     0.00283050537109375,
+     -0.0245819091796875
+    ]
+   },
+   {
+    "name": "encoder.layers.14.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 689.8845825195312,
+    "first": [
+     0.1651611328125,
+     1.1142578125,
+     0.99072265625,
+     1.087890625
+    ]
+   },
+   {
+    "name": "encoder.layers.14.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -263.7987483739853,
+    "first": [
+     -0.0034847259521484375,
+     -0.01483917236328125,
+     -0.013336181640625,
+     -0.046630859375
+    ]
+   },
+   {
+    "name": "encoder.layers.14.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -14.69231629371643,
+    "first": [
+     0.01068878173828125,
+     -0.0357666015625,
+     0.06365966796875,
+     0.00432586669921875
+    ]
+   },
+   {
+    "name": "encoder.layers.14.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 528.17431640625,
+    "first": [
+     0.307373046875,
+     0.755859375,
+     0.73486328125,
+     0.86181640625
+    ]
+   },
+   {
+    "name": "encoder.layers.15.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 2.733190357685089,
+    "first": [
+     0.002063751220703125,
+     0.01258087158203125,
+     0.0231781005859375,
+     -0.011871337890625
+    ]
+   },
+   {
+    "name": "encoder.layers.15.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 117.13224762678146,
+    "first": [
+     -0.0008416175842285156,
+     0.01523590087890625,
+     -0.0229034423828125,
+     0.0172271728515625
+    ]
+   },
+   {
+    "name": "encoder.layers.15.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 970.006103515625,
+    "first": [
+     0.47509765625,
+     1.48828125,
+     1.57421875,
+     1.59375
+    ]
+   },
+   {
+    "name": "encoder.layers.15.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 51.76241314411163,
+    "first": [
+     -0.07220458984375,
+     -0.023162841796875,
+     -0.01137542724609375,
+     -0.027496337890625
+    ]
+   },
+   {
+    "name": "encoder.layers.15.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 9.884947896003723,
+    "first": [
+     -0.005077362060546875,
+     -0.03912353515625,
+     -0.00458526611328125,
+     0.0204010009765625
+    ]
+   },
+   {
+    "name": "encoder.layers.15.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 598.345703125,
+    "first": [
+     0.268310546875,
+     0.845703125,
+     0.80859375,
+     0.9130859375
+    ]
+   },
+   {
+    "name": "encoder.layers.16.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": -13.603514671325684,
+    "first": [
+     0.02490234375,
+     0.0518798828125,
+     0.0022716522216796875,
+     0.0016679763793945312
+    ]
+   },
+   {
+    "name": "encoder.layers.16.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -85.9066554903984,
+    "first": [
+     -0.11651611328125,
+     -0.0210723876953125,
+     -0.0098114013671875,
+     -0.00177764892578125
+    ]
+   },
+   {
+    "name": "encoder.layers.16.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 726.9920654296875,
+    "first": [
+     0.2337646484375,
+     1.1416015625,
+     0.9794921875,
+     1.0830078125
+    ]
+   },
+   {
+    "name": "encoder.layers.16.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 149.47702151536942,
+    "first": [
+     0.008544921875,
+     -0.037200927734375,
+     -0.006618499755859375,
+     0.056304931640625
+    ]
+   },
+   {
+    "name": "encoder.layers.16.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -2.9164496064186096,
+    "first": [
+     -0.01540374755859375,
+     0.01227569580078125,
+     -0.035736083984375,
+     0.0036220550537109375
+    ]
+   },
+   {
+    "name": "encoder.layers.16.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 662.353271484375,
+    "first": [
+     0.397216796875,
+     0.89990234375,
+     0.82470703125,
+     0.97412109375
+    ]
+   },
+   {
+    "name": "encoder.layers.17.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": -7.004333436489105,
+    "first": [
+     -0.005466461181640625,
+     0.00881195068359375,
+     -0.0261383056640625,
+     -0.037445068359375
+    ]
+   },
+   {
+    "name": "encoder.layers.17.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -77.9445550441742,
+    "first": [
+     0.0215911865234375,
+     0.0305633544921875,
+     0.029632568359375,
+     -0.042022705078125
+    ]
+   },
+   {
+    "name": "encoder.layers.17.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 727.91162109375,
+    "first": [
+     0.31787109375,
+     1.05859375,
+     0.994140625,
+     1.154296875
+    ]
+   },
+   {
+    "name": "encoder.layers.17.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -289.49065858125687,
+    "first": [
+     -0.0355224609375,
+     0.01448822021484375,
+     0.0014600753784179688,
+     -0.0218048095703125
+    ]
+   },
+   {
+    "name": "encoder.layers.17.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 4.088373005390167,
+    "first": [
+     -0.0086212158203125,
+     -0.0152587890625,
+     0.0032024383544921875,
+     -0.00804901123046875
+    ]
+   },
+   {
+    "name": "encoder.layers.17.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 636.076904296875,
+    "first": [
+     0.42431640625,
+     0.8740234375,
+     0.81005859375,
+     0.8974609375
+    ]
+   },
+   {
+    "name": "encoder.layers.18.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 12.721413612365723,
+    "first": [
+     0.030487060546875,
+     -0.01033782958984375,
+     0.0031909942626953125,
+     -0.01142120361328125
+    ]
+   },
+   {
+    "name": "encoder.layers.18.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -40.948236763477325,
+    "first": [
+     0.00604248046875,
+     0.00894927978515625,
+     -0.047698974609375,
+     -0.0009794235229492188
+    ]
+   },
+   {
+    "name": "encoder.layers.18.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 906.3916015625,
+    "first": [
+     0.90380859375,
+     1.2548828125,
+     1.2041015625,
+     1.1572265625
+    ]
+   },
+   {
+    "name": "encoder.layers.18.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -25.449227154254913,
+    "first": [
+     0.0684814453125,
+     5.9723854064941406e-05,
+     0.003742218017578125,
+     0.039459228515625
+    ]
+   },
+   {
+    "name": "encoder.layers.18.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 4.077877521514893,
+    "first": [
+     0.0181732177734375,
+     0.0024738311767578125,
+     0.023040771484375,
+     -0.00024700164794921875
+    ]
+   },
+   {
+    "name": "encoder.layers.18.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 653.684814453125,
+    "first": [
+     0.6455078125,
+     0.84375,
+     0.81298828125,
+     0.79833984375
+    ]
+   },
+   {
+    "name": "encoder.layers.19.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 6.035143136978149,
+    "first": [
+     0.0175628662109375,
+     -0.045135498046875,
+     -0.0088348388671875,
+     -0.01419830322265625
+    ]
+   },
+   {
+    "name": "encoder.layers.19.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 79.43466520309448,
+    "first": [
+     -0.017578125,
+     0.055511474609375,
+     -0.01422119140625,
+     0.0185546875
+    ]
+   },
+   {
+    "name": "encoder.layers.19.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 851.5029296875,
+    "first": [
+     1.103515625,
+     1.1806640625,
+     1.1123046875,
+     1.0478515625
+    ]
+   },
+   {
+    "name": "encoder.layers.19.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -455.7942641377449,
+    "first": [
+     -0.0284576416015625,
+     0.09698486328125,
+     -0.01284027099609375,
+     0.0333251953125
+    ]
+   },
+   {
+    "name": "encoder.layers.19.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -15.193138897418976,
+    "first": [
+     0.043243408203125,
+     0.05419921875,
+     -0.035430908203125,
+     -0.032196044921875
+    ]
+   },
+   {
+    "name": "encoder.layers.19.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 629.506498336792,
+    "first": [
+     0.70361328125,
+     0.80615234375,
+     0.802734375,
+     0.8193359375
+    ]
+   },
+   {
+    "name": "encoder.layers.2.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": -0.7732059955596924,
+    "first": [
+     -0.01352691650390625,
+     0.034637451171875,
+     0.0335693359375,
+     -0.004505157470703125
+    ]
+   },
+   {
+    "name": "encoder.layers.2.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -46.77408891916275,
+    "first": [
+     -0.00304412841796875,
+     0.02545166015625,
+     0.0200042724609375,
+     -0.056182861328125
+    ]
+   },
+   {
+    "name": "encoder.layers.2.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 543.0345458984375,
+    "first": [
+     0.317626953125,
+     0.84130859375,
+     0.72412109375,
+     0.736328125
+    ]
+   },
+   {
+    "name": "encoder.layers.2.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -113.02226448059082,
+    "first": [
+     0.0257568359375,
+     -0.085205078125,
+     -0.02679443359375,
+     0.059478759765625
+    ]
+   },
+   {
+    "name": "encoder.layers.2.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 3.9923077821731567,
+    "first": [
+     0.034637451171875,
+     -0.024139404296875,
+     -0.1231689453125,
+     -0.036407470703125
+    ]
+   },
+   {
+    "name": "encoder.layers.2.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 404.8685302734375,
+    "first": [
+     0.18505859375,
+     0.6806640625,
+     0.5546875,
+     0.62158203125
+    ]
+   },
+   {
+    "name": "encoder.layers.20.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": -4.679756939411163,
+    "first": [
+     -0.042999267578125,
+     -0.051788330078125,
+     0.033233642578125,
+     -0.046661376953125
+    ]
+   },
+   {
+    "name": "encoder.layers.20.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -45.35089468955994,
+    "first": [
+     0.042388916015625,
+     -0.061004638671875,
+     0.0072021484375,
+     -0.006458282470703125
+    ]
+   },
+   {
+    "name": "encoder.layers.20.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 816.27001953125,
+    "first": [
+     1.361328125,
+     0.9599609375,
+     0.9365234375,
+     0.99072265625
+    ]
+   },
+   {
+    "name": "encoder.layers.20.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -15.00385195016861,
+    "first": [
+     -0.04742431640625,
+     -0.004093170166015625,
+     -0.004726409912109375,
+     0.09259033203125
+    ]
+   },
+   {
+    "name": "encoder.layers.20.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 11.489363253116608,
+    "first": [
+     -0.00531005859375,
+     -0.055328369140625,
+     -0.0164947509765625,
+     0.0125885009765625
+    ]
+   },
+   {
+    "name": "encoder.layers.20.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 629.8138427734375,
+    "first": [
+     0.79248046875,
+     0.77392578125,
+     0.85107421875,
+     0.82080078125
+    ]
+   },
+   {
+    "name": "encoder.layers.21.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 16.97622948884964,
+    "first": [
+     -0.03759765625,
+     0.1273193359375,
+     0.059051513671875,
+     -0.07159423828125
+    ]
+   },
+   {
+    "name": "encoder.layers.21.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 78.52137607336044,
+    "first": [
+     -0.0266571044921875,
+     -0.0218353271484375,
+     -0.0044097900390625,
+     -0.019989013671875
+    ]
+   },
+   {
+    "name": "encoder.layers.21.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 886.08154296875,
+    "first": [
+     1.6630859375,
+     0.9501953125,
+     1.126953125,
+     1.0556640625
+    ]
+   },
+   {
+    "name": "encoder.layers.21.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -185.6833701133728,
+    "first": [
+     -0.0232391357421875,
+     0.03118896484375,
+     -0.040313720703125,
+     -0.045074462890625
+    ]
+   },
+   {
+    "name": "encoder.layers.21.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -0.9583714604377747,
+    "first": [
+     -0.0255889892578125,
+     -0.041351318359375,
+     -0.02227783203125,
+     0.0256805419921875
+    ]
+   },
+   {
+    "name": "encoder.layers.21.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 670.2321166992188,
+    "first": [
+     0.89501953125,
+     0.80419921875,
+     0.9501953125,
+     0.8193359375
+    ]
+   },
+   {
+    "name": "encoder.layers.3.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 16.434273719787598,
+    "first": [
+     0.038787841796875,
+     0.0830078125,
+     0.0141448974609375,
+     -0.0019407272338867188
+    ]
+   },
+   {
+    "name": "encoder.layers.3.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 39.20242828130722,
+    "first": [
+     -0.004627227783203125,
+     0.017913818359375,
+     -0.076904296875,
+     -0.003696441650390625
+    ]
+   },
+   {
+    "name": "encoder.layers.3.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 662.39453125,
+    "first": [
+     0.385986328125,
+     1.15625,
+     0.88232421875,
+     0.81982421875
+    ]
+   },
+   {
+    "name": "encoder.layers.3.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -404.2840275168419,
+    "first": [
+     0.07086181640625,
+     0.0233001708984375,
+     0.05096435546875,
+     0.042938232421875
+    ]
+   },
+   {
+    "name": "encoder.layers.3.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 4.959777295589447,
+    "first": [
+     -0.1513671875,
+     -0.0469970703125,
+     -0.037384033203125,
+     0.08148193359375
+    ]
+   },
+   {
+    "name": "encoder.layers.3.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 395.7283935546875,
+    "first": [
+     0.208251953125,
+     0.6640625,
+     0.5556640625,
+     0.57080078125
+    ]
+   },
+   {
+    "name": "encoder.layers.4.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 15.656692385673523,
+    "first": [
+     0.032745361328125,
+     -0.0033397674560546875,
+     -0.01180267333984375,
+     0.0158538818359375
+    ]
+   },
+   {
+    "name": "encoder.layers.4.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 24.955652177333832,
+    "first": [
+     0.018707275390625,
+     -0.0364990234375,
+     -0.04449462890625,
+     0.0291595458984375
+    ]
+   },
+   {
+    "name": "encoder.layers.4.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 580.558349609375,
+    "first": [
+     0.52001953125,
+     0.8466796875,
+     0.8095703125,
+     0.771484375
+    ]
+   },
+   {
+    "name": "encoder.layers.4.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -735.2867869734764,
+    "first": [
+     -0.048828125,
+     0.11376953125,
+     0.04058837890625,
+     0.05926513671875
+    ]
+   },
+   {
+    "name": "encoder.layers.4.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 2.0217363238334656,
+    "first": [
+     -0.011138916015625,
+     0.0165863037109375,
+     -0.004970550537109375,
+     0.193115234375
+    ]
+   },
+   {
+    "name": "encoder.layers.4.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 428.289306640625,
+    "first": [
+     0.2431640625,
+     0.71240234375,
+     0.63134765625,
+     0.6416015625
+    ]
+   },
+   {
+    "name": "encoder.layers.5.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 8.991941034793854,
+    "first": [
+     0.0243072509765625,
+     0.017730712890625,
+     0.0107879638671875,
+     0.003849029541015625
+    ]
+   },
+   {
+    "name": "encoder.layers.5.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 15.272678315639496,
+    "first": [
+     -0.049713134765625,
+     -0.08056640625,
+     0.00876617431640625,
+     -0.0452880859375
+    ]
+   },
+   {
+    "name": "encoder.layers.5.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 478.1715087890625,
+    "first": [
+     0.2646484375,
+     0.85498046875,
+     0.70703125,
+     0.708984375
+    ]
+   },
+   {
+    "name": "encoder.layers.5.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -577.9406509399414,
+    "first": [
+     -0.005680084228515625,
+     -0.075927734375,
+     0.036468505859375,
+     -0.02471923828125
+    ]
+   },
+   {
+    "name": "encoder.layers.5.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 9.058919727802277,
+    "first": [
+     -0.06500244140625,
+     0.02252197265625,
+     0.07818603515625,
+     -0.032012939453125
+    ]
+   },
+   {
+    "name": "encoder.layers.5.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 427.8126220703125,
+    "first": [
+     0.2022705078125,
+     0.7060546875,
+     0.65625,
+     0.67626953125
+    ]
+   },
+   {
+    "name": "encoder.layers.6.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": -5.3890146017074585,
+    "first": [
+     -0.034759521484375,
+     0.00402069091796875,
+     0.016387939453125,
+     0.01404571533203125
+    ]
+   },
+   {
+    "name": "encoder.layers.6.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -33.25789552927017,
+    "first": [
+     -0.005313873291015625,
+     -0.006229400634765625,
+     -0.0799560546875,
+     0.0970458984375
+    ]
+   },
+   {
+    "name": "encoder.layers.6.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 692.47265625,
+    "first": [
+     0.338623046875,
+     1.1826171875,
+     0.9912109375,
+     0.92431640625
+    ]
+   },
+   {
+    "name": "encoder.layers.6.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -114.29697495698929,
+    "first": [
+     -0.0655517578125,
+     0.0291748046875,
+     7.140636444091797e-05,
+     -0.064453125
+    ]
+   },
+   {
+    "name": "encoder.layers.6.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 19.75793331861496,
+    "first": [
+     -0.09161376953125,
+     -0.0070953369140625,
+     -0.047088623046875,
+     -0.01861572265625
+    ]
+   },
+   {
+    "name": "encoder.layers.6.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 474.6153564453125,
+    "first": [
+     0.1728515625,
+     0.79052734375,
+     0.748046875,
+     0.78955078125
+    ]
+   },
+   {
+    "name": "encoder.layers.7.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 1.707482933998108,
+    "first": [
+     -0.0227203369140625,
+     -0.01334381103515625,
+     -0.03436279296875,
+     0.020111083984375
+    ]
+   },
+   {
+    "name": "encoder.layers.7.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 35.263757944107056,
+    "first": [
+     -0.04931640625,
+     -0.00974273681640625,
+     0.10009765625,
+     0.00396728515625
+    ]
+   },
+   {
+    "name": "encoder.layers.7.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 516.685791015625,
+    "first": [
+     0.1790771484375,
+     0.873046875,
+     0.84521484375,
+     0.8369140625
+    ]
+   },
+   {
+    "name": "encoder.layers.7.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 230.41102343797684,
+    "first": [
+     0.0322265625,
+     -0.00139617919921875,
+     -0.038970947265625,
+     -0.05975341796875
+    ]
+   },
+   {
+    "name": "encoder.layers.7.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -5.810638129711151,
+    "first": [
+     0.0643310546875,
+     0.00803375244140625,
+     -0.010986328125,
+     -0.025421142578125
+    ]
+   },
+   {
+    "name": "encoder.layers.7.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 496.175048828125,
+    "first": [
+     0.1533203125,
+     0.79736328125,
+     0.79931640625,
+     0.80078125
+    ]
+   },
+   {
+    "name": "encoder.layers.8.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": -0.1534847617149353,
+    "first": [
+     -0.0186920166015625,
+     0.0084686279296875,
+     -0.0024509429931640625,
+     -0.0159149169921875
+    ]
+   },
+   {
+    "name": "encoder.layers.8.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 1.9368200302124023,
+    "first": [
+     0.04278564453125,
+     -0.0310211181640625,
+     0.03521728515625,
+     0.023834228515625
+    ]
+   },
+   {
+    "name": "encoder.layers.8.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 504.17181396484375,
+    "first": [
+     0.136962890625,
+     0.92822265625,
+     0.7998046875,
+     0.873046875
+    ]
+   },
+   {
+    "name": "encoder.layers.8.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 137.83375227451324,
+    "first": [
+     -0.0767822265625,
+     -0.055908203125,
+     0.061981201171875,
+     0.0897216796875
+    ]
+   },
+   {
+    "name": "encoder.layers.8.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": -12.060872614383698,
+    "first": [
+     0.0648193359375,
+     -0.0207366943359375,
+     0.02880859375,
+     -0.06365966796875
+    ]
+   },
+   {
+    "name": "encoder.layers.8.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 497.81329345703125,
+    "first": [
+     0.1539306640625,
+     0.8056640625,
+     0.82763671875,
+     0.8251953125
+    ]
+   },
+   {
+    "name": "encoder.layers.9.attn.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 3.7735431790351868,
+    "first": [
+     0.0031223297119140625,
+     -0.005207061767578125,
+     -0.0270843505859375,
+     0.00039315223693847656
+    ]
+   },
+   {
+    "name": "encoder.layers.9.attn.Wqkv.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": -74.61706525087357,
+    "first": [
+     -0.05743408203125,
+     -0.01311492919921875,
+     -0.0206451416015625,
+     0.0235137939453125
+    ]
+   },
+   {
+    "name": "encoder.layers.9.attn_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 746.4600830078125,
+    "first": [
+     0.27099609375,
+     1.3505859375,
+     1.181640625,
+     1.2646484375
+    ]
+   },
+   {
+    "name": "encoder.layers.9.mlp.Wi.weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 448.7559891343117,
+    "first": [
+     -0.0711669921875,
+     0.06610107421875,
+     0.08551025390625,
+     -0.0191192626953125
+    ]
+   },
+   {
+    "name": "encoder.layers.9.mlp.Wo.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     1152
+    ],
+    "sum": 14.187226295471191,
+    "first": [
+     -0.01219940185546875,
+     -0.0066986083984375,
+     0.00913238525390625,
+     -0.0239410400390625
+    ]
+   },
+   {
+    "name": "encoder.layers.9.mlp_norm.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 524.5130615234375,
+    "first": [
+     0.16455078125,
+     0.81103515625,
+     0.84033203125,
+     0.87744140625
+    ]
+   },
+   {
+    "name": "head.layers.0.linear1.bias",
+    "dtype": "float16",
+    "shape": [
+     3072
+    ],
+    "sum": 21.09359622001648,
+    "first": [
+     0.0186920166015625,
+     0.0298309326171875,
+     -0.0119781494140625,
+     0.034820556640625
+    ]
+   },
+   {
+    "name": "head.layers.0.linear1.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     768
+    ],
+    "sum": 24.471321761608124,
+    "first": [
+     -0.028045654296875,
+     -0.02020263671875,
+     0.045196533203125,
+     0.06854248046875
+    ]
+   },
+   {
+    "name": "head.layers.0.linear2.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 0.014261305332183838,
+    "first": [
+     0.017547607421875,
+     -0.0222625732421875,
+     0.03045654296875,
+     -0.02044677734375
+    ]
+   },
+   {
+    "name": "head.layers.0.linear2.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     3072
+    ],
+    "sum": 274.03210985660553,
+    "first": [
+     -0.02667236328125,
+     0.00124359130859375,
+     -0.002956390380859375,
+     -0.0007772445678710938
+    ]
+   },
+   {
+    "name": "head.layers.0.norm1.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": -1.0300418138504028,
+    "first": [
+     -0.005939483642578125,
+     0.00981903076171875,
+     -0.1348876953125,
+     -0.1556396484375
+    ]
+   },
+   {
+    "name": "head.layers.0.norm1.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 592.0712890625,
+    "first": [
+     0.7421875,
+     0.73681640625,
+     0.82080078125,
+     0.63427734375
+    ]
+   },
+   {
+    "name": "head.layers.0.norm2.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": -0.9498741626739502,
+    "first": [
+     -0.041351318359375,
+     0.0328369140625,
+     -0.0135040283203125,
+     -0.004085540771484375
+    ]
+   },
+   {
+    "name": "head.layers.0.norm2.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 668.986328125,
+    "first": [
+     0.9716796875,
+     0.82958984375,
+     0.8310546875,
+     0.8818359375
+    ]
+   },
+   {
+    "name": "head.layers.0.self_attn.in_proj_bias",
+    "dtype": "float16",
+    "shape": [
+     2304
+    ],
+    "sum": 1.1931551098823547,
+    "first": [
+     -0.040618896484375,
+     0.004375457763671875,
+     0.01184844970703125,
+     -0.034210205078125
+    ]
+   },
+   {
+    "name": "head.layers.0.self_attn.in_proj_weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 35.61357617378235,
+    "first": [
+     -0.02783203125,
+     -0.0621337890625,
+     -0.033843994140625,
+     -0.00833892822265625
+    ]
+   },
+   {
+    "name": "head.layers.0.self_attn.out_proj.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": -0.6436077356338501,
+    "first": [
+     -0.015899658203125,
+     0.0303955078125,
+     0.01287078857421875,
+     0.0010471343994140625
+    ]
+   },
+   {
+    "name": "head.layers.0.self_attn.out_proj.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 5.267878532409668,
+    "first": [
+     -0.0194549560546875,
+     0.00807952880859375,
+     0.01340484619140625,
+     -0.005550384521484375
+    ]
+   },
+   {
+    "name": "head.layers.1.linear1.bias",
+    "dtype": "float16",
+    "shape": [
+     3072
+    ],
+    "sum": -6.085821092128754,
+    "first": [
+     -0.017486572265625,
+     0.0238189697265625,
+     -0.01190185546875,
+     0.0482177734375
+    ]
+   },
+   {
+    "name": "head.layers.1.linear1.weight",
+    "dtype": "float16",
+    "shape": [
+     3072,
+     768
+    ],
+    "sum": 107.63259708881378,
+    "first": [
+     0.0180816650390625,
+     -0.0037403106689453125,
+     0.025634765625,
+     -0.01190185546875
+    ]
+   },
+   {
+    "name": "head.layers.1.linear2.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 0.1699371337890625,
+    "first": [
+     0.002223968505859375,
+     -0.012481689453125,
+     0.031463623046875,
+     -0.0304412841796875
+    ]
+   },
+   {
+    "name": "head.layers.1.linear2.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     3072
+    ],
+    "sum": 357.29173213243484,
+    "first": [
+     0.003513336181640625,
+     -0.002941131591796875,
+     0.0022029876708984375,
+     -0.049560546875
+    ]
+   },
+   {
+    "name": "head.layers.1.norm1.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": -0.3130272626876831,
+    "first": [
+     -0.021514892578125,
+     0.031463623046875,
+     -0.05511474609375,
+     -0.0011539459228515625
+    ]
+   },
+   {
+    "name": "head.layers.1.norm1.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 712.4365234375,
+    "first": [
+     0.95849609375,
+     0.90380859375,
+     0.90673828125,
+     0.90771484375
+    ]
+   },
+   {
+    "name": "head.layers.1.norm2.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": -0.08188706636428833,
+    "first": [
+     -0.00566864013671875,
+     0.026153564453125,
+     -0.0201416015625,
+     0.040802001953125
+    ]
+   },
+   {
+    "name": "head.layers.1.norm2.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 688.4150390625,
+    "first": [
+     0.86181640625,
+     0.87060546875,
+     0.9013671875,
+     0.861328125
+    ]
+   },
+   {
+    "name": "head.layers.1.self_attn.in_proj_bias",
+    "dtype": "float16",
+    "shape": [
+     2304
+    ],
+    "sum": 0.6679280996322632,
+    "first": [
+     -0.0004420280456542969,
+     0.00589752197265625,
+     0.00142669677734375,
+     -0.003208160400390625
+    ]
+   },
+   {
+    "name": "head.layers.1.self_attn.in_proj_weight",
+    "dtype": "float16",
+    "shape": [
+     2304,
+     768
+    ],
+    "sum": 39.523463666439056,
+    "first": [
+     -0.0268096923828125,
+     0.00415802001953125,
+     0.0005698204040527344,
+     0.006473541259765625
+    ]
+   },
+   {
+    "name": "head.layers.1.self_attn.out_proj.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 0.3555830121040344,
+    "first": [
+     0.0007882118225097656,
+     -0.0058746337890625,
+     0.0230712890625,
+     -0.026947021484375
+    ]
+   },
+   {
+    "name": "head.layers.1.self_attn.out_proj.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": -11.397793769836426,
+    "first": [
+     -0.0038318634033203125,
+     -0.003032684326171875,
+     -0.00287628173828125,
+     -0.0260009765625
+    ]
+   },
+   {
+    "name": "scorer.0.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": -0.35865211486816406,
+    "first": [
+     -0.01065826416015625,
+     -0.00933074951171875,
+     0.08837890625,
+     -0.08929443359375
+    ]
+   },
+   {
+    "name": "scorer.0.weight",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": 700.29248046875,
+    "first": [
+     0.94140625,
+     0.9208984375,
+     0.9072265625,
+     0.89404296875
+    ]
+   },
+   {
+    "name": "scorer.1.bias",
+    "dtype": "float16",
+    "shape": [
+     768
+    ],
+    "sum": -2.4040631651878357,
+    "first": [
+     0.0341796875,
+     0.0517578125,
+     0.0243377685546875,
+     -0.02679443359375
+    ]
+   },
+   {
+    "name": "scorer.1.weight",
+    "dtype": "float16",
+    "shape": [
+     768,
+     768
+    ],
+    "sum": 27.48493093252182,
+    "first": [
+     -0.0382080078125,
+     0.035400390625,
+     0.0162353515625,
+     0.006145477294921875
+    ]
+   },
+   {
+    "name": "scorer.3.bias",
+    "dtype": "float16",
+    "shape": [
+     1
+    ],
+    "sum": 0.019744873046875,
+    "first": [
+     0.019744873046875
+    ]
+   },
+   {
+    "name": "scorer.3.weight",
+    "dtype": "float16",
+    "shape": [
+     1,
+     768
+    ],
+    "sum": -4.408125817775726,
+    "first": [
+     -0.0014171600341796875,
+     -0.0033111572265625,
+     -0.0038356781005859375,
+     0.0028438568115234375
+    ]
+   },
+   {
+    "name": "temperature",
+    "dtype": "float32",
+    "shape": [
+     3
+    ],
+    "sum": 3.0,
+    "first": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   },
+   {
+    "name": "type_emb.weight",
+    "dtype": "float16",
+    "shape": [
+     3,
+     768
+    ],
+    "sum": 13.154478073120117,
+    "first": [
+     -0.4453125,
+     -0.466064453125,
+     0.36279296875,
+     1.955078125
+    ]
+   }
+  ]
+ }
+}

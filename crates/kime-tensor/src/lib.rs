@@ -2,3 +2,9 @@
 //!
 //! One of the six crates where `unsafe` is allowed. Every block carries a `// SAFETY:` comment
 //! that names the invariant which makes it sound.
+
+pub mod blob;
+pub mod dtype;
+
+pub use blob::Blob;
+pub use dtype::DType;

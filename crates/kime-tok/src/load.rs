@@ -1,14 +1,16 @@
 //! Reading `tokenizer.json` and `tokenizer_config.json`.
 
-use std::collections::HashMap;
+use std::borrow::Cow;
 use std::fmt;
 use std::path::PathBuf;
 
 use serde::Deserialize;
+use serde::de::{self, Deserializer, SeqAccess, Visitor};
 use serde_json::Value;
 
 use crate::added::{Added, AddedToken};
 use crate::bpe::Bpe;
+use crate::hash::FxMap;
 use crate::{Decoder, Normalizer, PreTokenizer, Specials, Tokenizer};
 
 /// Why a tokenizer failed to load.
@@ -40,12 +42,13 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 #[derive(Deserialize)]
-struct File {
+struct File<'a> {
     added_tokens: Vec<AddedJson>,
     normalizer: Option<Value>,
     pre_tokenizer: Option<Value>,
     decoder: Option<Value>,
-    model: ModelJson,
+    #[serde(borrow)]
+    model: ModelJson<'a>,
 }
 
 #[derive(Deserialize)]
@@ -69,11 +72,12 @@ fn yes() -> bool {
 }
 
 #[derive(Deserialize)]
-struct ModelJson {
+struct ModelJson<'a> {
     #[serde(rename = "type")]
     kind: String,
-    vocab: HashMap<Box<str>, u32>,
-    merges: Merges,
+    vocab: FxMap<Box<str>, u32>,
+    #[serde(borrow)]
+    merges: Vec<Merge<'a>>,
     #[serde(default)]
     unk_token: Option<String>,
     #[serde(default)]
@@ -90,12 +94,68 @@ struct ModelJson {
     ignore_merges: bool,
 }
 
-/// Newer files write each merge as a pair and older ones as one string with a space in it.
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum Merges {
-    Pairs(Vec<(String, String)>),
-    Strings(Vec<String>),
+/// One merge. Newer files write it as a pair and older ones as one string with a space in it.
+/// The halves borrow from the file when they have no escapes, and the list is read without
+/// buffering, which an untagged enum would do for all 580k merges of a Gemma vocabulary.
+struct Merge<'a>(Cow<'a, str>, Cow<'a, str>);
+
+struct Str<'a>(Cow<'a, str>);
+
+impl<'de: 'a, 'a> Deserialize<'de> for Str<'a> {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = Str<'de>;
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a string")
+            }
+            fn visit_borrowed_str<E: de::Error>(self, v: &'de str) -> Result<Self::Value, E> {
+                Ok(Str(Cow::Borrowed(v)))
+            }
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(Str(Cow::Owned(v.to_string())))
+            }
+            fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(Str(Cow::Owned(v)))
+            }
+        }
+        d.deserialize_str(V)
+    }
+}
+
+impl<'de: 'a, 'a> Deserialize<'de> for Merge<'a> {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = Merge<'de>;
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a merge, as \"a b\" or [\"a\", \"b\"]")
+            }
+            fn visit_borrowed_str<E: de::Error>(self, v: &'de str) -> Result<Self::Value, E> {
+                let (a, b) = split(v)?;
+                Ok(Merge(Cow::Borrowed(a), Cow::Borrowed(b)))
+            }
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                let (a, b) = split(v)?;
+                Ok(Merge(Cow::Owned(a.to_string()), Cow::Owned(b.to_string())))
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let a: Str<'de> =
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let b: Str<'de> =
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                if seq.next_element::<de::IgnoredAny>()?.is_some() {
+                    return Err(de::Error::invalid_length(3, &self));
+                }
+                Ok(Merge(a.0, b.0))
+            }
+        }
+        d.deserialize_any(V)
+    }
+}
+
+fn split<E: de::Error>(line: &str) -> Result<(&str, &str), E> {
+    line.split_once(' ').ok_or_else(|| E::custom(format!("merge {line:?} has no space")))
 }
 
 fn kind(v: &Value) -> &str {
@@ -205,7 +265,7 @@ fn config_token(config: &Value, key: &str) -> Option<String> {
 }
 
 pub(crate) fn load(json: &[u8], config: Option<&[u8]>) -> Result<Tokenizer, Error> {
-    let file: File = serde_json::from_slice(json).map_err(|e| Error::Json(e.to_string()))?;
+    let file: File<'_> = serde_json::from_slice(json).map_err(|e| Error::Json(e.to_string()))?;
     let m = file.model;
     if m.kind != "BPE" {
         return Err(Error::Unsupported(format!("the {:?} model", m.kind)));
@@ -219,16 +279,8 @@ pub(crate) fn load(json: &[u8], config: Option<&[u8]>) -> Result<Tokenizer, Erro
     if m.ignore_merges {
         return Err(Error::Unsupported("BPE ignore_merges".into()));
     }
-    let merges: Vec<(String, String)> = match m.merges {
-        Merges::Pairs(p) => p,
-        Merges::Strings(s) => s
-            .into_iter()
-            .map(|line| match line.split_once(' ') {
-                Some((a, b)) => Ok((a.to_string(), b.to_string())),
-                None => Err(Error::Invalid(format!("merge {line:?} has no space"))),
-            })
-            .collect::<Result<_, _>>()?,
-    };
+    let merges: Vec<(Cow<'_, str>, Cow<'_, str>)> =
+        m.merges.into_iter().map(|Merge(a, b)| (a, b)).collect();
     let bpe = Bpe::new(m.vocab, &merges, m.unk_token.as_deref(), m.byte_fallback, m.fuse_unk)
         .map_err(Error::Invalid)?;
 

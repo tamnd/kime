@@ -13,6 +13,8 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+half.workspace = true
+memmap2.workspace = true
 
 [lints]
 workspace = true

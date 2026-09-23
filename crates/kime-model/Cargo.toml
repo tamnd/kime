@@ -1,6 +1,7 @@
 [package]
 name = "kime-model"
 description = "Model specs, checkpoint loading, the .kime format and graph builders for kime."
+exclude = ["fuzz"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,7 +14,13 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+blake3.workspace = true
 kime-core.workspace = true
+kime-tensor.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+kime-tok.workspace = true
 
 [lints]
 workspace = true

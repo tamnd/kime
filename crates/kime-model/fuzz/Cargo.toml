@@ -1,0 +1,38 @@
+[package]
+name = "kime-model-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+blake3 = "1.8.7"
+kime-model = { path = ".." }
+kime-tensor = { path = "../../kime-tensor" }
+libfuzzer-sys = "0.4.13"
+
+# Not part of the main workspace, because it builds only on nightly with cargo fuzz.
+[workspace]
+
+[[bin]]
+name = "safetensors"
+path = "fuzz_targets/safetensors.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "kime_file"
+path = "fuzz_targets/kime_file.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "kime_index"
+path = "fuzz_targets/kime_index.rs"
+test = false
+doc = false
+bench = false
