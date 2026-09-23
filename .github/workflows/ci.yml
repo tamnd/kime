@@ -137,6 +137,35 @@ jobs:
           KIME_REQUIRE_MODELS: "1"
         run: cargo test --release -p kime-tok -p kime-eval
 
+  # The checkpoint parsers read untrusted files (SECURITY.md). A minute per target on every change
+  # keeps the targets building and catches the easy crashes. The long runs happen on a workstation
+  # before a parser change lands.
+  fuzz:
+    name: fuzz the checkpoint parsers
+    needs: quick
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install nightly --profile minimal
+      - uses: taiki-e/install-action@7623a79cdfecb99d681017af368ca353d9f49bb5 # v2.87.19
+        with:
+          tool: cargo-fuzz
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: fuzz
+          workspaces: crates/kime-model/fuzz
+      - name: seeds
+        run: cargo run -q -p kime-model --example fuzz_seeds -- crates/kime-model/fuzz/corpus
+      - name: cargo fuzz
+        working-directory: crates/kime-model/fuzz
+        run: |
+          set -euo pipefail
+          for t in safetensors kime_file kime_index; do
+            cargo +nightly fuzz run -O "$t" "corpus/$t" -- -max_total_time=60
+          done
+
   docs:
     name: documentation
     needs: quick
@@ -222,7 +251,7 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [quick, test, tokenizers, docs, msrv, audit, workflows]
+    needs: [quick, test, tokenizers, fuzz, docs, msrv, audit, workflows]
     runs-on: ubuntu-24.04
     steps:
       - name: fail if anything upstream failed

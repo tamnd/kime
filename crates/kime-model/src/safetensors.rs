@@ -140,6 +140,14 @@ pub fn load(blob: Blob) -> Result<(Tensors, Option<Map<String, Value>>)> {
 
 /// Writes tensors as a safetensors file, in the given order, the way the reference implementation
 /// lays them out: compact JSON, padded with spaces to a multiple of 8, then the data in order.
+///
+/// # Errors
+///
+/// Any error from `out`.
+///
+/// # Panics
+///
+/// Never. The header holds only strings and numbers, which always serialize.
 pub fn write(
     tensors: &Tensors,
     metadata: Option<&Map<String, Value>>,

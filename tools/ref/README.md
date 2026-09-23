@@ -8,6 +8,8 @@ These scripts produce the numbers kime is checked against. They need PyTorch and
 
 `laya_ref.py` runs every case through Laya's own `Agent.system_one` and writes one line per case to `crates/kime-eval/fixtures/parity/<model>.jsonl`. Each question records the strings Laya tokenizes and their ids before truncation, the final ids and marker positions, the option logits and act probabilities taken from a hook on the model's forward, and the whole answer Laya returned.
 
+`laya_tensors.py` builds Laya's `DecisionModel` from each checkpoint's own configs, the way `laya.Agent` does, and writes every parameter name and shape to `crates/kime-model/tests/fixtures/laya-tensors.json`, along with each tensor's dtype, sum and first four values as the safetensors library reads them. The loader test in `kime-model` checks its graph and its f16 reading against that file. The script also times `laya.Agent` loading on the CPU, best of three: 0.27 seconds for English and 1.57 seconds for multilingual on the i9-13900K.
+
 ## Regenerating
 
 ```
@@ -16,6 +18,7 @@ VIRTUAL_ENV=venv uv pip install laya==0.3.7 torch transformers safetensors token
 python tools/ref/make_cases.py
 python tools/ref/laya_ref.py --model <dir>/laya --name laya --device cpu
 python tools/ref/laya_ref.py --model <dir>/laya/multilingual --name laya-multilingual --device cpu
+python tools/ref/laya_tensors.py <dir>/laya crates/kime-model/tests/fixtures/laya-tensors.json
 ```
 
 `<dir>/laya` is a download of `convaiinnovations/laya` from Hugging Face. The English model is the repository root and the multilingual one is its `multilingual` folder.

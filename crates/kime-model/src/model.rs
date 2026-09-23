@@ -134,6 +134,10 @@ impl Model {
     /// # Errors
     ///
     /// Any error from `out`.
+    ///
+    /// # Panics
+    ///
+    /// Never. Every name comes from the model's own file list.
     pub fn pack(&self, out: &mut impl std::io::Write) -> Result<String> {
         let mut extra = Map::new();
         if let Some(m) = &self.metadata {
@@ -159,6 +163,10 @@ impl Model {
     /// # Errors
     ///
     /// [`Error::Io`] on any write failure or an existing checkpoint.
+    ///
+    /// # Panics
+    ///
+    /// Never. Every name comes from the model's own file list.
     pub fn unpack(&self, dir: &Path) -> Result<()> {
         let io = |p: PathBuf| move |e| Error::Io(p, e);
         let st = dir.join("model.safetensors");

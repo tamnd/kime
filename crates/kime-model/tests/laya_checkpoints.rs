@@ -57,7 +57,7 @@ fn check(name: &str, sub: &str) {
         assert_eq!(dtype, t["dtype"].as_str().unwrap(), "{n}");
         let x = v.to_f32();
         for (i, f) in t["first"].as_array().unwrap().iter().enumerate() {
-            assert_eq!(x[i], f.as_f64().unwrap() as f32, "{n}[{i}]");
+            assert_eq!(x[i].to_bits(), (f.as_f64().unwrap() as f32).to_bits(), "{n}[{i}]");
         }
         let sum: f64 = x.iter().map(|&f| f64::from(f)).sum();
         let want = t["sum"].as_f64().unwrap();

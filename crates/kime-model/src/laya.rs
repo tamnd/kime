@@ -355,6 +355,10 @@ impl LayaGraph {
     ///
     /// [`Error::Mismatch`] listing every missing tensor, extra tensor, wrong shape and non float
     /// dtype, in that order.
+    ///
+    /// # Panics
+    ///
+    /// Never. Binding looks up only names the check above has found.
     pub fn bind(spec: &LayaSpec, tensors: &Tensors) -> Result<Self> {
         let expected = spec.expected();
         let mut problems = Vec::new();

@@ -119,8 +119,8 @@ mod tests {
     #[test]
     fn reads_halves() {
         let one = half::f16::from_f32(1.5).to_le_bytes();
-        assert_eq!(DType::F16.read_f32(&one, 0), 1.5);
+        assert_eq!(DType::F16.read_f32(&one, 0).to_bits(), 1.5f32.to_bits());
         let two = half::bf16::from_f32(-2.0).to_le_bytes();
-        assert_eq!(DType::BF16.read_f32(&two, 0), -2.0);
+        assert_eq!(DType::BF16.read_f32(&two, 0).to_bits(), (-2.0f32).to_bits());
     }
 }

@@ -85,6 +85,10 @@ pub fn is_kime(bytes: &[u8]) -> bool {
 /// # Errors
 ///
 /// [`Error::Format`] naming the first problem found.
+///
+/// # Panics
+///
+/// Never. Fixed header fields are read only after the length check.
 pub fn parse(bytes: &[u8]) -> Result<Index> {
     let bad = |msg: String| Error::Format(format!(".kime: {msg}"));
     if bytes.len() < ALIGN {
@@ -106,7 +110,7 @@ pub fn parse(bytes: &[u8]) -> Result<Index> {
         return Err(bad(format!("index of {json_len} bytes is over the limit")));
     }
     let json_end = ALIGN + json_len as usize;
-    if data_start % ALIGN as u64 != 0
+    if !data_start.is_multiple_of(ALIGN as u64)
         || data_start < json_end as u64
         || data_start.checked_add(data_len) != Some(bytes.len() as u64)
     {
@@ -175,7 +179,7 @@ pub fn parse(bytes: &[u8]) -> Result<Index> {
             })
             .ok_or_else(|| bad(format!("{what}: shape must be a list of non negative integers")))?;
         let (start, end) = range(t, &what)?;
-        if (start - data_start) % ALIGN != 0 {
+        if !(start - data_start).is_multiple_of(ALIGN) {
             return Err(bad(format!("{what}: offset is not aligned to {ALIGN}")));
         }
         let want =
@@ -260,6 +264,10 @@ pub struct Contents<'a> {
 /// # Errors
 ///
 /// Any error from `out`, or [`Error::Format`] for a file name that could escape its directory.
+///
+/// # Panics
+///
+/// Never. The index holds only strings and numbers, which always serialize.
 pub fn write(c: &Contents<'_>, out: &mut impl Write) -> Result<String> {
     let io = |e: std::io::Error| Error::Io("<output>".into(), e);
     for (name, _) in &c.files {
