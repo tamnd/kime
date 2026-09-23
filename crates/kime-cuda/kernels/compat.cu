@@ -159,8 +159,9 @@ __device__ void rope(T* qkv, const float* cosv, const float* sinv, const unsigne
 extern "C" __global__ void rope_f16(half_t* x, const float* c, const float* s, const unsigned* p, const unsigned* n, int h) { rope(x, c, s, p, n, h); }
 extern "C" __global__ void rope_f32(float* x, const float* c, const float* s, const unsigned* p, const unsigned* n, int h) { rope(x, c, s, p, n, h); }
 
-// Attention over [q | k | v] rows of heads of 64, within each sequence and, when window >= 0, only
-// to keys at most `window` positions away. One block per ATT_Q query rows and one head, and each
+// Attention over [q | k | v] rows of heads of 64, with q and k rotated as they are loaded when rope
+// tables are given, within each sequence and, when window >= 0, only to keys at most `window`
+// positions away. One block per ATT_Q query rows and one head, and each
 // of the ATT_W warps keeps an online softmax for ATT_R of the rows. The keys any of the rows can
 // see are walked 32 at a time, each tile of k and v staged in shared memory once for the block,
 // with the next tile read into registers while the current one is scored. A lane scores one key
@@ -176,19 +177,33 @@ extern "C" __global__ void rope_f32(float* x, const float* c, const float* s, co
 #define ATT_QE (ATT_Q * 64 / (32 * ATT_W))
 #define ATT_KS 68
 
+// Rotary embedding of the pair (x[c], x[c + 32]) of a head, from tables [pos, 32].
+__device__ __forceinline__ void rotate(float& a, float& b, const float* cosv, const float* sinv, unsigned p, int c) {
+    float cs = cosv[p * 32 + c], sn = sinv[p * 32 + c], x = a;
+    a = x * cs - b * sn;
+    b = b * cs + x * sn;
+}
+
+// A thread moves elements lane and lane + 32 of rows wid, wid + ATT_W and so on, so it holds both
+// halves of each rotary pair it loads. With tables given, k is rotated as it is loaded.
 template <typename T>
-__device__ __forceinline__ void att_load(float (&kr)[ATT_E], float (&vr)[ATT_E], const T* qkv, int j0, int b, size_t stride, int col) {
+__device__ __forceinline__ void att_load(float (&kr)[ATT_E], float (&vr)[ATT_E], const T* qkv, int j0, int b, size_t stride, int col, const float* cosv, const float* sinv, const unsigned* pos) {
+    int wid = threadIdx.x / 32, lane = threadIdx.x % 32;
 #pragma unroll
-    for (int u = 0; u < ATT_E; u++) {
-        int e = threadIdx.x + u * 32 * ATT_W, j = j0 + e / 64;
-        size_t at = (size_t)j * stride + col + e % 64;
-        kr[u] = j < b ? ld(qkv, at) : 0.0f;
-        vr[u] = j < b ? ld(qkv, at + stride / 3) : 0.0f;
+    for (int u = 0; u < ATT_E; u += 2) {
+        int j = j0 + wid + ATT_W * (u / 2);
+        size_t at = (size_t)j * stride + col + lane;
+        bool in = j < b;
+        kr[u] = in ? ld(qkv, at) : 0.0f;
+        kr[u + 1] = in ? ld(qkv, at + 32) : 0.0f;
+        vr[u] = in ? ld(qkv, at + stride / 3) : 0.0f;
+        vr[u + 1] = in ? ld(qkv, at + stride / 3 + 32) : 0.0f;
+        if (cosv) rotate(kr[u], kr[u + 1], cosv, sinv, in ? pos[j] : 0, lane);
     }
 }
 
 template <typename T, typename TO>
-__device__ void attention(TO* out, const T* qkv, const unsigned* seq, const unsigned* cu, const unsigned* n, int heads, int window) {
+__device__ void attention(TO* out, const T* qkv, const float* cosv, const float* sinv, const unsigned* pos, const unsigned* seq, const unsigned* cu, const unsigned* n, int heads, int window) {
     __shared__ __align__(16) float qs[ATT_Q][64];
     __shared__ __align__(16) float ks[32][ATT_KS];
     __shared__ __align__(16) float vs[32][64];
@@ -228,17 +243,18 @@ __device__ void attention(TO* out, const T* qkv, const unsigned* seq, const unsi
     // is not shared memory, so a store between two loads would make the second wait on the first.
     float qr[ATT_QE];
 #pragma unroll
-    for (int u = 0; u < ATT_QE; u++) {
-        int e = threadIdx.x + u * 32 * ATT_W, r = e / 64;
-        qr[u] = i0 + r < nt ? ld(qkv, (size_t)(i0 + r) * stride + h * 64 + e % 64) * 0.125f : 0.0f;
+    for (int u = 0; u < ATT_QE; u += 2) {
+        int i = i0 + wid + ATT_W * (u / 2);
+        size_t at = (size_t)i * stride + h * 64 + lane;
+        bool in = i < nt;
+        qr[u] = in ? ld(qkv, at) : 0.0f;
+        qr[u + 1] = in ? ld(qkv, at + 32) : 0.0f;
+        if (cosv) rotate(qr[u], qr[u + 1], cosv, sinv, in ? pos[i] : 0, lane);
     }
     float kr[ATT_E], vr[ATT_E];
-    att_load(kr, vr, qkv, a, b, stride, d + h * 64);
+    att_load(kr, vr, qkv, a, b, stride, d + h * 64, cosv, sinv, pos);
 #pragma unroll
-    for (int u = 0; u < ATT_QE; u++) {
-        int e = threadIdx.x + u * 32 * ATT_W;
-        qs[e / 64][e % 64] = qr[u];
-    }
+    for (int u = 0; u < ATT_QE; u++) qs[wid + ATT_W * (u / 2)][lane + 32 * (u % 2)] = qr[u] * 0.125f;
     float m[ATT_R], l[ATT_R], acc0[ATT_R], acc1[ATT_R];
 #pragma unroll
     for (int k = 0; k < ATT_R; k++) {
@@ -249,12 +265,12 @@ __device__ void attention(TO* out, const T* qkv, const unsigned* seq, const unsi
         if (j0 > a) __syncthreads();
 #pragma unroll
         for (int u = 0; u < ATT_E; u++) {
-            int e = threadIdx.x + u * 32 * ATT_W;
-            ks[e / 64][e % 64] = kr[u];
-            vs[e / 64][e % 64] = vr[u];
+            int r = wid + ATT_W * (u / 2), c = lane + 32 * (u % 2);
+            ks[r][c] = kr[u];
+            vs[r][c] = vr[u];
         }
         __syncthreads();
-        if (j0 + 32 < b) att_load(kr, vr, qkv, j0 + 32, b, stride, d + h * 64);
+        if (j0 + 32 < b) att_load(kr, vr, qkv, j0 + 32, b, stride, d + h * 64, cosv, sinv, pos);
         float s[ATT_R][4];
 #pragma unroll
         for (int k = 0; k < ATT_R; k++) s[k][0] = s[k][1] = s[k][2] = s[k][3] = 0.0f;
@@ -330,10 +346,10 @@ __device__ void attention(TO* out, const T* qkv, const unsigned* seq, const unsi
     }
 }
 
-extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f32(float* o, const float* x, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, s, cu, n, h, w); }
-extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f16(half_t* o, const float* x, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, s, cu, n, h, w); }
-extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f32(float* o, const half_t* x, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, s, cu, n, h, w); }
-extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f16(half_t* o, const half_t* x, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, s, cu, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f32(float* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f16(half_t* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f32(float* o, const half_t* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f16(half_t* o, const half_t* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, n, h, w); }
 
 // out = gelu(x[:, ..inter]) * x[:, inter..], one block per token row.
 template <typename T, typename TO>

@@ -95,8 +95,11 @@ enum Step {
         cos: u64,
         sin: u64,
     },
+    /// Attention, with rope applied to q and k as they are loaded when the tables are not null.
     Attention {
         qkv: Loc,
+        cos: u64,
+        sin: u64,
         window: i32,
         out: Loc,
     },
@@ -436,12 +439,13 @@ impl CudaBackend {
                 // SAFETY: see above.
                 unsafe { l.launch(rows(b.tokens, 256)) }.map_err(dev)?;
             }
-            Step::Attention { qkv, window, out } => {
+            Step::Attention { qkv, cos, sin, window, out } => {
                 let heads = (out.width / HEAD) as i32;
                 let mut l = s.launch_builder(
                     &self.k.attention[2 * usize::from(qkv.half()) + usize::from(out.half())],
                 );
-                l.arg(&out.ptr).arg(&qkv.ptr).arg(&seq).arg(&cu).arg(&n);
+                l.arg(&out.ptr).arg(&qkv.ptr).arg(&cos).arg(&sin).arg(&pos);
+                l.arg(&seq).arg(&cu).arg(&n);
                 l.arg(&heads).arg(&window);
                 let cfg = LaunchConfig {
                     grid_dim: (b.tokens.div_ceil(ATT_Q) as u32, heads as u32, 1),
@@ -592,6 +596,7 @@ impl Backend for CudaBackend {
         let stage_base = stage.device_ptr(&self.stream).0;
         let (mut gemms, mut keys) = (Vec::new(), Vec::new());
         let mut steps = Vec::with_capacity(graph.ops.len());
+        let mut fused = None;
         for (i, op) in graph.ops.iter().enumerate() {
             let step = match *op {
                 Op::Embed { table, out } => {
@@ -677,6 +682,13 @@ impl Backend for CudaBackend {
                     };
                     let cos = ropes[at].1.device_ptr(&self.stream).0;
                     let sin = ropes[at].2.device_ptr(&self.stream).0;
+                    // Attention right after on the same rows rotates as it loads, which saves
+                    // writing q and k back and reading them again.
+                    if matches!(graph.ops.get(i + 1), Some(Op::Attention { qkv: v, .. }) if loc(*v).ptr == qkv.ptr)
+                    {
+                        fused = Some((qkv.ptr, cos, sin));
+                        continue;
+                    }
                     Step::Rope { qkv, cos, sin }
                 }
                 Op::Attention { qkv, window, out } => {
@@ -691,7 +703,11 @@ impl Backend for CudaBackend {
                     let window = window.map_or(Ok(-1), |w| {
                         i32::try_from(w).map_err(|_| Error::Unsupported(format!("op {i}: window")))
                     })?;
-                    Step::Attention { qkv, window, out }
+                    let (cos, sin) = match fused.take() {
+                        Some((p, cos, sin)) if p == qkv.ptr => (cos, sin),
+                        _ => (0, 0),
+                    };
+                    Step::Attention { qkv, cos, sin, window, out }
                 }
                 Op::GeGlu { x, out } => {
                     let (x, out) = (loc(x), loc(out));

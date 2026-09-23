@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime-cuda` fuses rope into attention. When attention directly follows rope on the same rows, it rotates q and k in registers as it loads them, so q and k are no longer written back and read again. On an RTX 4090 an 80 token question spends 195 us in attention against 225 us in attention and rope before, and batches of 16 went from 1.23 to 1.20 ms per question in FP16.
+
 ## 0.0.4
 
 The CUDA path is 10x Laya. Each plan is captured as one CUDA graph, the kernels were rewritten, and GEMMs run the cuBLASLt algorithm tuned for their shape. On an RTX 4090 one question takes 1.72 ms at p50 in FP16 against 17.2 ms for Laya on the same card, with the same answers on every English parity question.
