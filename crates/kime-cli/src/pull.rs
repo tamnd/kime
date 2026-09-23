@@ -7,7 +7,7 @@
 //! line. LFS files are named by their SHA-256 and are checked against it before they are kept.
 
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, ExitCode, Stdio};
 use std::time::Instant;
 
@@ -191,7 +191,7 @@ fn link(blob: &Path, dst: &Path, depth: usize) -> Result<(), String> {
     let _ = std::fs::remove_file(dst);
     #[cfg(unix)]
     {
-        let mut rel = PathBuf::new();
+        let mut rel = std::path::PathBuf::new();
         for _ in 0..depth + 2 {
             rel.push("..");
         }
