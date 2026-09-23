@@ -19,11 +19,11 @@ use crate::{CudaBackend, Precision, WORKSPACE, dev};
 const HEAD: usize = 64;
 
 /// Query rows and warps per attention block, `ATT_Q` and `ATT_W` in the kernels.
-const ATT_Q: usize = 16;
-const ATT_W: u32 = 8;
+pub(crate) const ATT_Q: usize = 16;
+pub(crate) const ATT_W: u32 = 8;
 
 /// Rows per layer norm block, one warp each, `LN_ROWS` in the kernels.
-const LN_ROWS: usize = 4;
+pub(crate) const LN_ROWS: usize = 4;
 
 /// A weight on the device in FP32, with an FP16 copy made the first time a plan needs one.
 struct Tensor {
@@ -850,7 +850,7 @@ impl Backend for CudaBackend {
 }
 
 /// cos and sin tables `[len, 32]` for heads of 64, computed as the CPU backend does.
-fn rope_tables(theta: f64, len: usize) -> (Vec<f32>, Vec<f32>) {
+pub(crate) fn rope_tables(theta: f64, len: usize) -> (Vec<f32>, Vec<f32>) {
     let half = HEAD / 2;
     let inv: Vec<f32> = (0..half)
         .map(|i| {

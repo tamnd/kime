@@ -4,6 +4,10 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime-cuda` has a test for each kernel on its own against a naive f64 version on the host, with the real row counts below the launched ones and the padding rows checked to stay untouched. Attention is checked against dense attention with the mask built as a matrix, with and without rope and a window, and agrees to 4.2e-7 in FP32 on an RTX 4090. A second test counts host allocations and finds none once a CUDA plan is warm, in FP32 and FP16.
+- `CudaBackend::new` returns an error when the CUDA driver, NVRTC or cuBLASLt is not installed, where before cudarc panicked. This is what failed the 0.0.4 release run, which has no GPU.
+- The allocation counting tests run without libtest's harness, whose 60 second warning allocated inside the counted window on slow debug runs.
+
 - `kime-cuda` fuses rope into attention. When attention directly follows rope on the same rows, it rotates q and k in registers as it loads them, so q and k are no longer written back and read again. On an RTX 4090 an 80 token question spends 195 us in attention against 225 us in attention and rope before, and batches of 16 went from 1.23 to 1.20 ms per question in FP16.
 
 ## 0.0.4
