@@ -42,6 +42,8 @@ half = "2.7.1"
 libm = "0.2.16"
 memmap2 = "0.9.11"
 serde = { version = "1.0.229", features = ["derive"] }
+# SHA-256 for checking downloaded weights against the hub.
+sha2 = "0.11.0"
 serde_json = { version = "1.0.151", features = ["preserve_order", "float_roundtrip"] }
 unicode-normalization = "0.1.25"
 unicode-properties = { version = "0.1.4", default-features = false, features = ["general-category"] }
