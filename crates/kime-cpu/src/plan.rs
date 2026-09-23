@@ -17,7 +17,7 @@ use kime_tensor::plan::{Epilogue, Graph, Op, Rows, Val, layout};
 use kime_tensor::{Backend, Batch, Bucket, Caps, Error, HostTensor, Outputs, Result};
 
 use crate::attention::{self, HEAD, QB};
-use crate::gemm::Gemm;
+use crate::gemm::{self, Gemm};
 use crate::ops::{Rope, geglu, layer_norm};
 use crate::par::{self, Shared};
 use crate::pool::Pool;
@@ -27,8 +27,10 @@ use crate::pool::Pool;
 pub struct Tensor {
     /// Shape.
     pub shape: Vec<usize>,
-    /// Row major values.
+    /// Row major values, empty for a weight only GEMMs read.
     pub data: Vec<f32>,
+    /// The values as [`gemm::pack`] lays them out, for a weight GEMMs read, and empty otherwise.
+    pub packed: Vec<f32>,
 }
 
 /// Every weight of a checkpoint, shared by all the plans built from it.
@@ -213,7 +215,35 @@ impl Backend for CpuBackend {
         Caps { name: "cpu", threads: self.threads(), graphs: false, unified_memory: true }
     }
 
-    fn upload(&self, tensors: &[HostTensor<'_>]) -> Result<Weights> {
+    fn upload(&self, tensors: &[HostTensor<'_>], graph: &Graph) -> Result<Weights> {
+        // Weights the GEMMs read are packed once here, and kept row major only if something else
+        // reads them too.
+        let (mut gemm, mut other) = (vec![false; tensors.len()], vec![false; tensors.len()]);
+        let mark = |flags: &mut Vec<bool>, w: Option<usize>| {
+            if let Some(f) = w.and_then(|w| flags.get_mut(w)) {
+                *f = true;
+            }
+        };
+        for op in &graph.ops {
+            match *op {
+                Op::Gemm { w, b, .. } => {
+                    mark(&mut gemm, Some(w));
+                    mark(&mut other, b);
+                }
+                Op::Embed { table, .. } | Op::AddType { table, .. } => {
+                    mark(&mut other, Some(table))
+                }
+                Op::LayerNorm { w, b, .. } => {
+                    mark(&mut other, Some(w));
+                    mark(&mut other, b);
+                }
+                Op::Rope { .. }
+                | Op::Attention { .. }
+                | Op::GeGlu { .. }
+                | Op::GatherMarkers { .. }
+                | Op::ActFeatures { .. } => {}
+            }
+        }
         let t = par::map(tensors.len(), self.threads(), |i| {
             let h = &tensors[i];
             let n = h.bytes.len() / h.dtype.size();
@@ -223,8 +253,13 @@ impl Backend for CpuBackend {
                     h.shape
                 )));
             }
-            let data = (0..n).map(|j| h.dtype.read_f32(h.bytes, j)).collect();
-            Ok(Tensor { shape: h.shape.to_vec(), data })
+            let data: Vec<f32> = (0..n).map(|j| h.dtype.read_f32(h.bytes, j)).collect();
+            let packed = match (gemm[i], h.shape) {
+                (true, &[rows, cols]) => gemm::pack(&data, rows, cols),
+                _ => Vec::new(),
+            };
+            let data = if gemm[i] && !other[i] && !packed.is_empty() { Vec::new() } else { data };
+            Ok(Tensor { shape: h.shape.to_vec(), data, packed })
         });
         Ok(Weights(t.into_iter().collect::<Result<Vec<_>>>()?.into()))
     }
@@ -271,6 +306,9 @@ impl Backend for CpuBackend {
                         && a.rows == out.rows;
                     if !ok {
                         return bad(format!("op {i}: gemm shapes do not match"));
+                    }
+                    if w.0[gw].packed.is_empty() && a.width * out.width > 0 {
+                        return bad(format!("op {i}: gemm weight {gw} was not packed"));
                     }
                     Step::Gemm { a, w: gw, b, ep: epilogue, out }
                 }
@@ -507,7 +545,7 @@ impl Ctx<'_> {
                     x,
                     m: rows,
                     k: a.width,
-                    w: self.w(w),
+                    w: &self.w[w].packed,
                     n: out.width,
                     b: b.map(|b| self.w(b)),
                     ep,
