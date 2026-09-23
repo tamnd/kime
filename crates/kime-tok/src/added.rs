@@ -24,42 +24,80 @@ pub(crate) enum Piece<'a> {
     Token(u32),
 }
 
-/// Patterns bucketed by first byte, longest first within a bucket, so the first pattern that
-/// matches at a position is the longest one there.
+/// A byte trie over the patterns. Walking it from a position and keeping the last node that ends
+/// a pattern gives the longest match there, in time bounded by the length of that match. The root
+/// is a full table because it is visited at every byte, and inner nodes keep a short sorted list.
 #[derive(Debug, Default)]
 struct Matcher {
-    patterns: Vec<(Box<[u8]>, usize)>,
-    by_first: Vec<Vec<usize>>,
+    root: Vec<u32>,
+    nodes: Vec<Node>,
+}
+
+#[derive(Debug, Default)]
+struct Node {
+    children: Vec<(u8, u32)>,
+    /// The token index of the pattern that ends here.
+    token: Option<usize>,
 }
 
 impl Matcher {
     fn new(patterns: Vec<(Box<[u8]>, usize)>) -> Matcher {
-        let mut by_first = vec![Vec::new(); 256];
-        for (i, (p, _)) in patterns.iter().enumerate() {
-            if let Some(&b) = p.first() {
-                by_first[usize::from(b)].push(i);
+        if patterns.is_empty() {
+            return Matcher::default();
+        }
+        // Node 0 is a placeholder so that 0 can mean no child in the root table.
+        let mut m = Matcher { root: vec![0; 256], nodes: vec![Node::default()] };
+        for (p, tok) in patterns {
+            let Some((&first, rest)) = p.split_first() else { continue };
+            let mut at = m.root[usize::from(first)];
+            if at == 0 {
+                at = m.nodes.len() as u32;
+                m.nodes.push(Node::default());
+                m.root[usize::from(first)] = at;
             }
+            for &b in rest {
+                at = match m.nodes[at as usize].children.binary_search_by_key(&b, |c| c.0) {
+                    Ok(i) => m.nodes[at as usize].children[i].1,
+                    Err(i) => {
+                        let id = m.nodes.len() as u32;
+                        m.nodes.push(Node::default());
+                        m.nodes[at as usize].children.insert(i, (b, id));
+                        id
+                    }
+                };
+            }
+            // Two tokens with the same pattern: the first one listed wins.
+            m.nodes[at as usize].token.get_or_insert(tok);
         }
-        for bucket in &mut by_first {
-            bucket.sort_by_key(|&i| std::cmp::Reverse(patterns[i].0.len()));
-        }
-        Matcher { patterns, by_first }
+        m
     }
 
     fn is_empty(&self) -> bool {
-        self.patterns.is_empty()
+        self.root.is_empty()
     }
 
     /// The longest pattern that matches at `pos`, as (length, token index).
+    #[inline]
     fn at(&self, hay: &[u8], pos: usize) -> Option<(usize, usize)> {
-        let rest = &hay[pos..];
-        for &i in &self.by_first[usize::from(rest[0])] {
-            let (p, tok) = &self.patterns[i];
-            if rest.starts_with(p) {
-                return Some((p.len(), *tok));
-            }
+        let mut at = self.root[usize::from(hay[pos])];
+        if at == 0 {
+            return None;
         }
-        None
+        let mut best = None;
+        let mut len = 1;
+        loop {
+            let node = &self.nodes[at as usize];
+            if let Some(tok) = node.token {
+                best = Some((len, tok));
+            }
+            let Some(&b) = hay.get(pos + len) else { break };
+            match node.children.iter().find(|c| c.0 == b) {
+                Some(&(_, next)) => at = next,
+                None => break,
+            }
+            len += 1;
+        }
+        best
     }
 }
 
