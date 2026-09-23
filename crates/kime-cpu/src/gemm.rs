@@ -1,11 +1,16 @@
 //! FP32 matrix products in the layout of a PyTorch `Linear`: `y = x wᵀ + b`, with `x` as `[m, k]`
 //! and `w` as `[n, k]`, both row major.
 //!
-//! Every output is one dot product, and it is computed the same way wherever it lands: eight
-//! running sums over `k` in steps of eight with fused multiply adds, the eight added in a fixed
-//! tree, then the leftover `k % 8` terms in order, then the bias. Tiling and threading only decide
-//! which dots run side by side, so the result is the same bit for bit for any thread count and
-//! any split, and the same on x86 with FMA as on ARM.
+//! The weights are packed once into panels of 16 rows, `[n / 16][k][16]` with the last panel
+//! padded with zeros, and a micro kernel keeps a 6 by 16 block of outputs in registers while it
+//! walks `k`, one broadcast of `x` and two vector loads of the panel per step. Every output is
+//! summed the same way wherever it lands: in order over `k` with fused multiply adds in f32,
+//! moved to an f64 sum every 64 steps, then rounded to f32 and given its bias. Tiling and threading
+//! only decide which outputs run side by side, so the result is the same bit for bit for any
+//! thread count and any split, and the same on x86 with FMA as on ARM.
+//!
+//! [`dot`], which attention uses for its scores, sums in eight lanes instead and is not meant to
+//! match the GEMM bit for bit.
 
 use kime_tensor::Epilogue;
 
@@ -16,13 +21,13 @@ const LANES: usize = 8;
 /// Elements of `k` summed in f32 before the running sums move to f64.
 const BLOCK: usize = 64;
 /// Rows of `x` per micro tile.
-const MR: usize = 4;
-/// Rows of `w` per micro tile.
-const NR: usize = 3;
-/// Rows of `w` per task, a multiple of NR sized so a task's weights stay in L2.
-const NB: usize = 48;
-/// Rows of `x` per task.
-const MB: usize = 128;
+const MR: usize = 6;
+/// Rows of `w` per panel, two vectors.
+pub const NR: usize = 16;
+/// Rows of `w` per task, a multiple of NR sized so a task's panels stay in L2.
+const NB: usize = 4 * NR;
+/// Rows of `x` per task, a multiple of MR.
+const MB: usize = 24 * MR;
 
 /// `dot(a, b)` in the order described in the module docs.
 ///
@@ -33,20 +38,20 @@ const MB: usize = 128;
 pub fn dot(a: &[f32], b: &[f32]) -> f32 {
     assert_eq!(a.len(), b.len());
     #[cfg(target_arch = "aarch64")]
-    return tile::<neon::Neon, 1, 1>([a], [b])[0][0];
+    return dot_v::<neon::Neon>(a, b);
     #[cfg(target_arch = "x86_64")]
     if has_fma() {
         // SAFETY: the features dot_fma enables were detected on this machine.
         return unsafe { dot_fma(a, b) };
     }
     #[allow(unreachable_code)]
-    tile::<[f32; LANES], 1, 1>([a], [b])[0][0]
+    dot_v::<[f32; LANES]>(a, b)
 }
 
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2,fma")]
 fn dot_fma(a: &[f32], b: &[f32]) -> f32 {
-    tile::<avx::Avx, 1, 1>([a], [b])[0][0]
+    dot_v::<avx::Avx>(a, b)
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -55,10 +60,11 @@ fn has_fma() -> bool {
     std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
 }
 
-/// Eight f32 lanes with a fused multiply add, the one vector op the dots need. Each lane is its
-/// own running sum, so every implementation gives the same bits.
+/// Eight f32 lanes with a fused multiply add, the one vector op the kernels need. Each lane is
+/// its own running sum, so every implementation gives the same bits.
 trait V8: Copy {
     fn zero() -> Self;
+    fn splat(v: f32) -> Self;
     fn load(s: &[f32; LANES]) -> Self;
     /// `self + a * b`, rounded once.
     fn fma(self, a: Self, b: Self) -> Self;
@@ -69,6 +75,10 @@ impl V8 for [f32; LANES] {
     #[inline(always)]
     fn zero() -> Self {
         [0.0; LANES]
+    }
+    #[inline(always)]
+    fn splat(v: f32) -> Self {
+        [v; LANES]
     }
     #[inline(always)]
     fn load(s: &[f32; LANES]) -> Self {
@@ -100,6 +110,11 @@ mod neon {
             unsafe { Self(vdupq_n_f32(0.0), vdupq_n_f32(0.0)) }
         }
         #[inline(always)]
+        fn splat(v: f32) -> Self {
+            // SAFETY: NEON is part of the aarch64 baseline.
+            unsafe { Self(vdupq_n_f32(v), vdupq_n_f32(v)) }
+        }
+        #[inline(always)]
         fn load(s: &[f32; LANES]) -> Self {
             // SAFETY: both loads read four floats inside the eight the reference covers.
             unsafe { Self(vld1q_f32(s.as_ptr()), vld1q_f32(s.as_ptr().add(4))) }
@@ -125,7 +140,8 @@ mod neon {
 #[cfg(target_arch = "x86_64")]
 mod avx {
     use std::arch::x86_64::{
-        __m256, _mm256_fmadd_ps, _mm256_loadu_ps, _mm256_setzero_ps, _mm256_storeu_ps,
+        __m256, _mm256_fmadd_ps, _mm256_loadu_ps, _mm256_set1_ps, _mm256_setzero_ps,
+        _mm256_storeu_ps,
     };
 
     use super::{LANES, V8};
@@ -139,6 +155,11 @@ mod avx {
         fn zero() -> Self {
             // SAFETY: Avx values only exist on machines where AVX was detected.
             unsafe { Self(_mm256_setzero_ps()) }
+        }
+        #[inline(always)]
+        fn splat(v: f32) -> Self {
+            // SAFETY: Avx values only exist on machines where AVX was detected.
+            unsafe { Self(_mm256_set1_ps(v)) }
         }
         #[inline(always)]
         fn load(s: &[f32; LANES]) -> Self {
@@ -160,49 +181,107 @@ mod avx {
     }
 }
 
-/// The dots of `R` rows of x against `C` rows of w, all of the same length.
+/// `a · b` in eight lanes: running sums over `k` in steps of eight with fused multiply adds, moved
+/// to f64 every 64 elements, the eight added in a fixed tree, then the leftover `k % 8` terms in
+/// order.
 #[inline(always)]
-fn tile<V: V8, const R: usize, const C: usize>(x: [&[f32]; R], w: [&[f32]; C]) -> [[f32; C]; R] {
-    let k = w[0].len();
+fn dot_v<V: V8>(a: &[f32], b: &[f32]) -> f32 {
+    let k = a.len();
     let body = k - k % LANES;
-    let mut wide = [[[0f64; LANES]; C]; R];
+    let mut wide = [0f64; LANES];
     let mut p = 0;
     while p < body {
         let end = (p + BLOCK).min(body);
-        let mut acc = [[V::zero(); C]; R];
+        let mut acc = V::zero();
         while p < end {
-            let xv: [V; R] =
-                std::array::from_fn(|r| V::load(x[r][p..p + LANES].try_into().unwrap()));
-            let wv: [V; C] =
-                std::array::from_fn(|c| V::load(w[c][p..p + LANES].try_into().unwrap()));
-            for r in 0..R {
-                for c in 0..C {
-                    acc[r][c] = acc[r][c].fma(xv[r], wv[c]);
-                }
-            }
+            acc = acc.fma(
+                V::load(a[p..p + LANES].try_into().unwrap()),
+                V::load(b[p..p + LANES].try_into().unwrap()),
+            );
             p += LANES;
         }
-        for r in 0..R {
-            for c in 0..C {
-                let l = acc[r][c].lanes();
-                for i in 0..LANES {
-                    wide[r][c][i] += f64::from(l[i]);
-                }
-            }
+        for (w, l) in wide.iter_mut().zip(acc.lanes()) {
+            *w += f64::from(l);
         }
     }
-    let mut out = [[0f32; C]; R];
-    for r in 0..R {
-        for c in 0..C {
-            let v = wide[r][c];
-            let mut s = ((v[0] + v[4]) + (v[2] + v[6])) + ((v[1] + v[5]) + (v[3] + v[7]));
-            for q in body..k {
-                s = f64::from(x[r][q]).mul_add(f64::from(w[c][q]), s);
+    let v = wide;
+    let mut s = ((v[0] + v[4]) + (v[2] + v[6])) + ((v[1] + v[5]) + (v[3] + v[7]));
+    for q in body..k {
+        s = f64::from(a[q]).mul_add(f64::from(b[q]), s);
+    }
+    s as f32
+}
+
+/// Packs `w`, `[n, k]` row major, into the panels [`Gemm`] reads: `[n.div_ceil(16)][k][16]`,
+/// with the rows past `n` zero.
+///
+/// # Panics
+///
+/// If `w` is not `[n, k]`.
+#[must_use]
+pub fn pack(w: &[f32], n: usize, k: usize) -> Vec<f32> {
+    assert_eq!(w.len(), n * k, "w is not [n, k]");
+    let panels = n.div_ceil(NR);
+    let mut out = vec![0f32; panels * k * NR];
+    if k == 0 {
+        return out;
+    }
+    for (p, panel) in out.chunks_exact_mut(k * NR).enumerate() {
+        for c in 0..NR.min(n - p * NR) {
+            let row = &w[(p * NR + c) * k..][..k];
+            for (q, &v) in row.iter().enumerate() {
+                panel[q * NR + c] = v;
             }
-            out[r][c] = s as f32;
         }
     }
     out
+}
+
+/// Rows `i..i + R` of `x` against one panel, the sums before the bias.
+///
+/// # Safety
+///
+/// Rows `i..i + R` must be in `x`, which is `[_, k]`, and `panel` must hold `k * NR` values.
+#[inline(always)]
+unsafe fn kernel<V: V8, const R: usize>(
+    x: &[f32],
+    k: usize,
+    i: usize,
+    panel: &[f32],
+) -> [[f32; NR]; R] {
+    let xs: [*const f32; R] = std::array::from_fn(|r| x.as_ptr().wrapping_add((i + r) * k));
+    let pw = panel.as_ptr();
+    let mut wide = [[0f64; NR]; R];
+    let mut q = 0;
+    while q < k {
+        let end = (q + BLOCK).min(k);
+        let mut acc = [[V::zero(); 2]; R];
+        while q < end {
+            // SAFETY: q < k, so the 16 values of step q are in the panel and x[i + r][q] in x.
+            let (w0, w1) = unsafe {
+                let at = pw.add(q * NR);
+                (
+                    V::load(&*at.cast::<[f32; LANES]>()),
+                    V::load(&*at.add(LANES).cast::<[f32; LANES]>()),
+                )
+            };
+            for r in 0..R {
+                // SAFETY: as above.
+                let xv = V::splat(unsafe { *xs[r].add(q) });
+                acc[r][0] = acc[r][0].fma(xv, w0);
+                acc[r][1] = acc[r][1].fma(xv, w1);
+            }
+            q += 1;
+        }
+        for r in 0..R {
+            for h in 0..2 {
+                for (w, l) in wide[r][h * LANES..][..LANES].iter_mut().zip(acc[r][h].lanes()) {
+                    *w += f64::from(l);
+                }
+            }
+        }
+    }
+    wide.map(|row| row.map(|v| v as f32))
 }
 
 struct Args<'a> {
@@ -217,14 +296,15 @@ struct Args<'a> {
 
 impl Args<'_> {
     #[inline(always)]
-    fn run<V: V8, const R: usize, const C: usize>(&self, i: usize, j: usize) {
+    fn run<V: V8, const R: usize>(&self, i: usize, p: usize) {
         let k = self.k;
-        let xs = std::array::from_fn(|r| &self.x[(i + r) * k..(i + r + 1) * k]);
-        let ws = std::array::from_fn(|c| &self.w[(j + c) * k..(j + c + 1) * k]);
-        let out = tile::<V, R, C>(xs, ws);
+        let panel = &self.w[p * k * NR..][..k * NR];
+        // SAFETY: the caller keeps i + R within m, and the panel was sliced to k * NR.
+        let out = unsafe { kernel::<V, R>(self.x, k, i, panel) };
+        let cols = NR.min(self.n - p * NR);
         for (r, row) in out.iter().enumerate() {
-            for (c, &v) in row.iter().enumerate() {
-                self.put(i + r, j + c, v);
+            for (c, &v) in row[..cols].iter().enumerate() {
+                self.put(i + r, p * NR + c, v);
             }
         }
     }
@@ -248,56 +328,49 @@ impl Args<'_> {
         unsafe { self.y.set(at, v) };
     }
 
+    /// Rows `rows` against the panels `panels`.
     #[inline(always)]
-    fn block<V: V8>(&self, rows: (usize, usize), cols: (usize, usize)) {
-        let mut j = cols.0;
-        while j < cols.1 {
-            let wide = cols.1 - j >= NR;
+    fn block<V: V8>(&self, rows: (usize, usize), panels: (usize, usize)) {
+        for p in panels.0..panels.1 {
             let mut i = rows.0;
             while i + MR <= rows.1 {
-                if wide {
-                    self.run::<V, MR, NR>(i, j);
-                } else {
-                    for c in j..cols.1 {
-                        self.run::<V, MR, 1>(i, c);
-                    }
-                }
+                self.run::<V, MR>(i, p);
                 i += MR;
             }
-            for r in i..rows.1 {
-                if wide {
-                    self.run::<V, 1, NR>(r, j);
-                } else {
-                    for c in j..cols.1 {
-                        self.run::<V, 1, 1>(r, c);
-                    }
-                }
+            match rows.1 - i {
+                0 => {}
+                1 => self.run::<V, 1>(i, p),
+                2 => self.run::<V, 2>(i, p),
+                3 => self.run::<V, 3>(i, p),
+                4 => self.run::<V, 4>(i, p),
+                _ => self.run::<V, 5>(i, p),
             }
-            j += NR;
         }
     }
 
-    fn block_dispatch(&self, rows: (usize, usize), cols: (usize, usize)) {
+    fn block_dispatch(&self, rows: (usize, usize), panels: (usize, usize)) {
         #[cfg(target_arch = "aarch64")]
-        return self.block::<neon::Neon>(rows, cols);
+        return self.block::<neon::Neon>(rows, panels);
         #[cfg(target_arch = "x86_64")]
         if has_fma() {
             // SAFETY: the features block_fma enables were detected on this machine.
-            unsafe { self.block_fma(rows, cols) };
+            unsafe { self.block_fma(rows, panels) };
             return;
         }
         #[allow(unreachable_code)]
-        self.block::<[f32; LANES]>(rows, cols);
+        self.block::<[f32; LANES]>(rows, panels);
     }
 
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2,fma")]
-    fn block_fma(&self, rows: (usize, usize), cols: (usize, usize)) {
-        self.block::<avx::Avx>(rows, cols);
+    fn block_fma(&self, rows: (usize, usize), panels: (usize, usize)) {
+        self.block::<avx::Avx>(rows, panels);
     }
 }
 
-/// `y = x wᵀ + b` with `x` as `[m, k]`, `w` as `[n, k]`, `b` as `[n]` and `y` as `[m, n]`.
+/// `y = x wᵀ + b` with `x` as `[m, k]`, `w` as `[n, k]`, `b` as `[n]` and `y` as `[m, n]`. This
+/// packs `w` on every call, so a caller with a fixed weight should [`pack`] it once and run a
+/// [`Gemm`].
 ///
 /// # Panics
 ///
@@ -313,7 +386,8 @@ pub fn linear(
     y: &mut [f32],
     threads: usize,
 ) {
-    let g = Gemm { x, m, k, w, n, b, ep: Epilogue::None };
+    let w = pack(w, n, k);
+    let g = Gemm { x, m, k, w: &w, n, b, ep: Epilogue::None };
     g.run(y, threads, |tasks, f| par::for_each(tasks, threads, f));
 }
 
@@ -328,7 +402,7 @@ pub struct Gemm<'a> {
     pub m: usize,
     /// The reduction length.
     pub k: usize,
-    /// `[n, k]`.
+    /// `[n, k]` as [`pack`] lays it out.
     pub w: &'a [f32],
     /// Columns of `y`.
     pub n: usize,
@@ -342,10 +416,10 @@ impl Gemm<'_> {
     /// Rows per task: the largest block that still gives every thread a few tasks.
     fn row_block(&self, threads: usize) -> usize {
         let nt = self.n.div_ceil(NB);
-        [MB, 64, 32, 16]
+        [MB, 12 * MR, 6 * MR, 3 * MR]
             .into_iter()
             .find(|&mb| self.m.div_ceil(mb) * nt >= 3 * threads)
-            .unwrap_or(16)
+            .unwrap_or(MR)
     }
 
     /// Runs the GEMM into `y`, handing `spawn` a task count and the task body to run for each.
@@ -361,7 +435,7 @@ impl Gemm<'_> {
     ) {
         let Self { x, m, k, w, n, b, ep } = *self;
         assert_eq!(x.len(), m * k, "x is not [m, k]");
-        assert_eq!(w.len(), n * k, "w is not [n, k]");
+        assert_eq!(w.len(), n.div_ceil(NR) * NR * k, "w is not [n, k] packed");
         assert_eq!(y.len(), m * n, "y is not [m, n]");
         if let Some(b) = b {
             assert_eq!(b.len(), n, "b is not [n]");
@@ -381,12 +455,12 @@ impl Gemm<'_> {
         }
         let mb = self.row_block(threads);
         let mt = m.div_ceil(mb);
-        let nt = n.div_ceil(NB);
+        let (panels, per) = (n.div_ceil(NR), NB / NR);
+        let nt = panels.div_ceil(per);
         spawn(mt * nt, &|t| {
             let (bi, bj) = (t % mt, t / mt);
             let rows = (bi * mb, ((bi + 1) * mb).min(m));
-            let cols = (bj * NB, ((bj + 1) * NB).min(n));
-            args.block_dispatch(rows, cols);
+            args.block_dispatch(rows, (bj * per, ((bj + 1) * per).min(panels)));
         });
     }
 }
@@ -450,12 +524,21 @@ mod tests {
             linear(&x, m, k, &w, n, None, &mut y, threads);
             assert!(y.iter().zip(&one).all(|(a, b)| a.to_bits() == b.to_bits()));
         }
-        // And the same bits as a single dot on the row.
-        for i in [0, 36] {
-            for j in [0, 50, 100] {
-                let d = dot(&x[i * k..(i + 1) * k], &w[j * k..(j + 1) * k]);
-                assert_eq!(d.to_bits(), one[i * n + j].to_bits());
-            }
+        // And the same bits for a row wherever it sits in the batch.
+        for i in [0, 5, 36] {
+            let mut row = vec![0f32; n];
+            linear(&x[i * k..(i + 1) * k], 1, k, &w, n, None, &mut row, 1);
+            assert!(row.iter().zip(&one[i * n..]).all(|(a, b)| a.to_bits() == b.to_bits()));
+        }
+    }
+
+    #[test]
+    fn dot_matches_naive() {
+        let mut rng = Rng(3);
+        for k in [0, 1, 7, 8, 64, 65, 200] {
+            let (a, b) = (rng.vec(k), rng.vec(k));
+            let want = naive(&a, 1, k, &b, 1, None);
+            close(&[dot(&a, &b)], &want, 1e-5, &format!("dot {k}"));
         }
     }
 }

@@ -543,7 +543,7 @@ impl Backend for CudaBackend {
         Caps { name: "cuda", threads: 1, graphs: true, unified_memory: false }
     }
 
-    fn upload(&self, tensors: &[HostTensor<'_>]) -> Result<Weights> {
+    fn upload(&self, tensors: &[HostTensor<'_>], _graph: &Graph) -> Result<Weights> {
         let mut out = Vec::with_capacity(tensors.len());
         let mut host = Vec::new();
         for (i, h) in tensors.iter().enumerate() {

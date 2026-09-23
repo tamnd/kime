@@ -161,7 +161,7 @@ pub trait Backend: Send + Sync {
     /// # Errors
     ///
     /// When a tensor cannot be converted.
-    fn upload(&self, tensors: &[HostTensor<'_>]) -> Result<Self::Weights>;
+    fn upload(&self, tensors: &[HostTensor<'_>], graph: &Graph) -> Result<Self::Weights>;
 
     /// Lowers a graph for one bucket. This is where memory is allocated.
     ///
@@ -207,7 +207,7 @@ impl<B: Backend> Executor<B> {
         vocab: usize,
         types: usize,
     ) -> Result<Self> {
-        let weights = backend.upload(tensors)?;
+        let weights = backend.upload(tensors, &graph)?;
         Ok(Self {
             backend,
             weights,
