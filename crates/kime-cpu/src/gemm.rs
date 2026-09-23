@@ -10,6 +10,8 @@
 use crate::par::{self, Shared};
 
 const LANES: usize = 8;
+/// Elements of `k` summed in f32 before the running sums move to f64.
+const BLOCK: usize = 64;
 /// Rows of `x` per micro tile.
 const MR: usize = 4;
 /// Rows of `w` per micro tile.
@@ -48,11 +50,6 @@ fn dot_fma(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 fn has_fma() -> bool {
     std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
-}
-
-#[inline(always)]
-fn reduce(v: [f32; LANES]) -> f32 {
-    ((v[0] + v[4]) + (v[2] + v[6])) + ((v[1] + v[5]) + (v[3] + v[7]))
 }
 
 /// Eight f32 lanes with a fused multiply add, the one vector op the dots need. Each lane is its
@@ -165,26 +162,39 @@ mod avx {
 fn tile<V: V8, const R: usize, const C: usize>(x: [&[f32]; R], w: [&[f32]; C]) -> [[f32; C]; R] {
     let k = w[0].len();
     let body = k - k % LANES;
-    let mut acc = [[V::zero(); C]; R];
+    let mut wide = [[[0f64; LANES]; C]; R];
     let mut p = 0;
     while p < body {
-        let xv: [V; R] = std::array::from_fn(|r| V::load(x[r][p..p + LANES].try_into().unwrap()));
-        let wv: [V; C] = std::array::from_fn(|c| V::load(w[c][p..p + LANES].try_into().unwrap()));
+        let end = (p + BLOCK).min(body);
+        let mut acc = [[V::zero(); C]; R];
+        while p < end {
+            let xv: [V; R] = std::array::from_fn(|r| V::load(x[r][p..p + LANES].try_into().unwrap()));
+            let wv: [V; C] = std::array::from_fn(|c| V::load(w[c][p..p + LANES].try_into().unwrap()));
+            for r in 0..R {
+                for c in 0..C {
+                    acc[r][c] = acc[r][c].fma(xv[r], wv[c]);
+                }
+            }
+            p += LANES;
+        }
         for r in 0..R {
             for c in 0..C {
-                acc[r][c] = acc[r][c].fma(xv[r], wv[c]);
+                let l = acc[r][c].lanes();
+                for i in 0..LANES {
+                    wide[r][c][i] += f64::from(l[i]);
+                }
             }
         }
-        p += LANES;
     }
     let mut out = [[0f32; C]; R];
     for r in 0..R {
         for c in 0..C {
-            let mut s = reduce(acc[r][c].lanes());
+            let v = wide[r][c];
+            let mut s = ((v[0] + v[4]) + (v[2] + v[6])) + ((v[1] + v[5]) + (v[3] + v[7]));
             for q in body..k {
-                s = x[r][q].mul_add(w[c][q], s);
+                s = f64::from(x[r][q]).mul_add(f64::from(w[c][q]), s);
             }
-            out[r][c] = s;
+            out[r][c] = s as f32;
         }
     }
     out
