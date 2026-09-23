@@ -12,6 +12,7 @@ use kime_tensor::plan::{Epilogue, Graph, Op, Rows, Val, layout};
 use kime_tensor::{Backend, Batch, Bucket, Caps, Error, HostTensor, Outputs, Result};
 
 use crate::lt::{self, Ty};
+use crate::tune::{self, Key};
 use crate::{CudaBackend, Precision, WORKSPACE, dev};
 
 /// Width of one attention head.
@@ -19,7 +20,10 @@ const HEAD: usize = 64;
 
 /// Query rows and warps per attention block, `ATT_Q` and `ATT_W` in the kernels.
 const ATT_Q: usize = 16;
-const ATT_W: u32 = 16;
+const ATT_W: u32 = 8;
+
+/// Rows per layer norm block, one warp each, `LN_ROWS` in the kernels.
+const LN_ROWS: usize = 4;
 
 /// A weight on the device in FP32, with an FP16 copy made the first time a plan needs one.
 struct Tensor {
@@ -392,8 +396,13 @@ impl CudaBackend {
                 let (k, d) = (kind(x.rows), x.width as i32);
                 let mut l = s.launch_builder(f);
                 l.arg(&out.ptr).arg(&x.ptr).arg(&w).arg(&bias).arg(&n).arg(&k).arg(&d).arg(&eps);
+                let cfg = LaunchConfig {
+                    grid_dim: (b.rows(x.rows).div_ceil(LN_ROWS) as u32, 1, 1),
+                    block_dim: (32 * LN_ROWS as u32, 1, 1),
+                    shared_mem_bytes: 0,
+                };
                 // SAFETY: see above.
-                unsafe { l.launch(rows(b.rows(x.rows), 128)) }.map_err(dev)?;
+                unsafe { l.launch(cfg) }.map_err(dev)?;
             }
             Step::ToHalf { x, len } => {
                 let blocks = len.div_ceil(256).min(65_535) as u32;
@@ -581,7 +590,7 @@ impl Backend for CudaBackend {
             .unwrap_or(0);
         let stage = self.stream.alloc_zeros::<u16>(stage_len.max(1)).map_err(dev)?;
         let stage_base = stage.device_ptr(&self.stream).0;
-        let mut gemms = Vec::new();
+        let (mut gemms, mut keys) = (Vec::new(), Vec::new());
         let mut steps = Vec::with_capacity(graph.ops.len());
         for (i, op) in graph.ops.iter().enumerate() {
             let step = match *op {
@@ -636,16 +645,19 @@ impl Backend for CudaBackend {
                         Epilogue::Relu => (2, false),
                         Epilogue::Accumulate => (0, true),
                     };
+                    let key = Key { dims: (m, a.width, out.width), ab, c: out.ty, acc };
                     let g = lt::Gemm::new(
                         &self.lt,
-                        (m, a.width, out.width),
+                        key.dims,
                         ab,
                         out.ty,
                         acc,
                         WORKSPACE,
                         (wp, x, out.ptr),
+                        self.picks.get(&key),
                     )?;
                     gemms.push(g);
+                    keys.push(key);
                     Step::Gemm { gemm: gemms.len() - 1, b: bias(b)?, act, out }
                 }
                 Op::Rope { qkv, theta } => {
@@ -766,6 +778,10 @@ impl Backend for CudaBackend {
             profile: None,
             profiled: 0,
         };
+        if tune::enabled() {
+            let ws = self.workspace_ptr();
+            tune::tune(&self.lt, &self.stream, ws, &mut plan.gemms, &keys, &self.name)?;
+        }
         plan.graph = Some(self.capture(&mut plan)?);
         Ok(plan)
     }

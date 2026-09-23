@@ -40,7 +40,7 @@ impl Drop for Handle {
 }
 
 /// Element types a GEMM can take.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum Ty {
     F16,
     F32,
@@ -55,13 +55,18 @@ impl Ty {
     }
 }
 
-/// One GEMM with its descriptors and the algorithm cuBLASLt picked for its shape.
+/// How many of cuBLASLt's ranked algorithms a GEMM keeps to choose from.
+pub(crate) const CANDIDATES: usize = 8;
+
+/// One GEMM with its descriptors, the algorithms cuBLASLt ranks for its shape, and the one it runs.
 pub(crate) struct Gemm {
     desc: sys::cublasLtMatmulDesc_t,
     a: sys::cublasLtMatrixLayout_t,
     b: sys::cublasLtMatrixLayout_t,
     c: sys::cublasLtMatrixLayout_t,
-    algo: sys::cublasLtMatmulAlgo_t,
+    algos: Vec<sys::cublasLtMatmulAlgo_t>,
+    /// Index into `algos` of the one that runs.
+    pub(crate) pick: usize,
     beta: f32,
     /// Rows, inner size and columns.
     pub(crate) dims: (usize, usize, usize),
@@ -77,7 +82,8 @@ unsafe impl Send for Gemm {}
 
 impl Gemm {
     /// Sets up `y = x wᵀ` (plus `y` when `accumulate`) for `m` rows, with `w` and `x` of type
-    /// `ab` and `y` of type `c`.
+    /// `ab` and `y` of type `c`, running the algorithm cuBLASLt ranks `pick`th (0 is its first
+    /// choice) or its first when it offers fewer.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         h: &Handle,
@@ -87,6 +93,7 @@ impl Gemm {
         accumulate: bool,
         workspace: usize,
         (w, x, y): (u64, u64, u64),
+        pick: usize,
     ) -> Result<Self> {
         let desc =
             lt::create_matmul_desc(sys::cublasComputeType_t::CUBLAS_COMPUTE_32F, Ty::F32.cuda())
@@ -96,8 +103,8 @@ impl Gemm {
             a: std::ptr::null_mut(),
             b: std::ptr::null_mut(),
             c: std::ptr::null_mut(),
-            // SAFETY: an all zero algo is a valid value to overwrite below.
-            algo: unsafe { std::mem::zeroed() },
+            algos: Vec::new(),
+            pick: 0,
             beta: if accumulate { 1.0 } else { 0.0 },
             dims: (m, k, n),
             w,
@@ -122,22 +129,51 @@ impl Gemm {
         g.c = lt::create_matrix_layout(c.cuda(), n, m, n as i64).map_err(err)?;
         let pref = lt::create_matmul_pref().map_err(err)?;
         let ws = workspace as u64;
-        // SAFETY: every descriptor is live, and the attribute buffer is one u64.
-        let found = unsafe {
+        // SAFETY: an all zero result is a valid value for cuBLASLt to overwrite.
+        let mut found: [sys::cublasLtMatmulHeuristicResult_t; CANDIDATES] =
+            unsafe { std::mem::zeroed() };
+        let mut count = 0;
+        // SAFETY: every descriptor is live, the attribute buffer is one u64, and `found` has room
+        // for the CANDIDATES results asked for.
+        let status = unsafe {
             let set = lt::set_matmul_pref_attribute(
                 pref,
                 sys::cublasLtMatmulPreferenceAttributes_t::CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
                 (&raw const ws).cast::<c_void>(),
                 size_of::<u64>(),
             );
-            let found = set.and_then(|()| {
-                lt::get_matmul_algo_heuristic(h.0, g.desc, g.a, g.b, g.c, g.c, pref)
+            let status = set.and_then(|()| {
+                sys::cublasLtMatmulAlgoGetHeuristic(
+                    h.0,
+                    g.desc,
+                    g.a,
+                    g.b,
+                    g.c,
+                    g.c,
+                    pref,
+                    CANDIDATES as i32,
+                    found.as_mut_ptr(),
+                    &raw mut count,
+                )
+                .result()
             });
             let _ = lt::destroy_matmul_pref(pref);
-            found
+            status
         };
-        g.algo = found.map_err(err)?.algo;
+        status.map_err(err)?;
+        let ok = sys::cublasStatus_t::CUBLAS_STATUS_SUCCESS;
+        let n = usize::try_from(count).unwrap_or(0).min(CANDIDATES);
+        g.algos = found[..n].iter().filter(|r| r.state == ok).map(|r| r.algo).collect();
+        if g.algos.is_empty() {
+            return Err(err(lt::CublasError(sys::cublasStatus_t::CUBLAS_STATUS_NOT_SUPPORTED)));
+        }
+        g.pick = if pick < g.algos.len() { pick } else { 0 };
         Ok(g)
+    }
+
+    /// How many algorithms there are to pick from.
+    pub(crate) fn candidates(&self) -> usize {
+        self.algos.len()
     }
 
     /// Enqueues the GEMM on `stream`.
@@ -169,7 +205,7 @@ impl Gemm {
                 self.c,
                 self.y as *mut c_void,
                 self.c,
-                &raw const self.algo,
+                &raw const self.algos[self.pick],
                 workspace as *mut c_void,
                 size,
                 stream,
