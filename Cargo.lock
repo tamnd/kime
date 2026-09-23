@@ -54,6 +54,9 @@ dependencies = [
 [[package]]
 name = "kime-core"
 version = "0.0.1"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "kime-cpu"
@@ -83,6 +86,8 @@ name = "kime-eval"
 version = "0.0.1"
 dependencies = [
  "kime-core",
+ "kime-tok",
+ "serde_json",
 ]
 
 [[package]]

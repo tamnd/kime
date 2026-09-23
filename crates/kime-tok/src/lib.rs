@@ -11,6 +11,7 @@ mod added;
 mod bpe;
 mod bytelevel;
 mod hash;
+pub mod layout;
 mod load;
 mod metaspace;
 

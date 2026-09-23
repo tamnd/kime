@@ -13,6 +13,7 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+serde_json.workspace = true
 
 [lints]
 workspace = true

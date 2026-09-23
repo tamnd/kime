@@ -15,5 +15,9 @@ readme.workspace = true
 [dependencies]
 kime-core.workspace = true
 
+[dev-dependencies]
+kime-tok.workspace = true
+serde_json.workspace = true
+
 [lints]
 workspace = true
