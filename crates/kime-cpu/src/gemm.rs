@@ -7,6 +7,9 @@
 //! which dots run side by side, so the result is the same bit for bit for any thread count and
 //! any split, and the same on x86 with FMA as on ARM.
 
+use kime_tensor::Epilogue;
+
+use crate::ops::gelu;
 use crate::par::{self, Shared};
 
 const LANES: usize = 8;
@@ -206,6 +209,7 @@ struct Args<'a> {
     x: &'a [f32],
     w: &'a [f32],
     b: Option<&'a [f32]>,
+    ep: Epilogue,
     k: usize,
     n: usize,
     y: &'a Shared<'a>,
@@ -220,14 +224,28 @@ impl Args<'_> {
         let out = tile::<V, R, C>(xs, ws);
         for (r, row) in out.iter().enumerate() {
             for (c, &v) in row.iter().enumerate() {
-                let v = match self.b {
-                    Some(b) => v + b[j + c],
-                    None => v,
-                };
-                // SAFETY: each (i, j) pair belongs to exactly one task and one tile within it.
-                unsafe { self.y.set((i + r) * self.n + j + c, v) };
+                self.put(i + r, j + c, v);
             }
         }
+    }
+
+    /// Adds the bias, applies the epilogue and stores element `(i, j)`.
+    #[inline(always)]
+    fn put(&self, i: usize, j: usize, v: f32) {
+        let v = match self.b {
+            Some(b) => v + b[j],
+            None => v,
+        };
+        let at = i * self.n + j;
+        let v = match self.ep {
+            Epilogue::None => v,
+            Epilogue::Gelu => gelu(v),
+            Epilogue::Relu => v.max(0.0),
+            // SAFETY: each (i, j) pair belongs to exactly one task and one tile within it.
+            Epilogue::Accumulate => v + unsafe { self.y.get(at) },
+        };
+        // SAFETY: as above.
+        unsafe { self.y.set(at, v) };
     }
 
     #[inline(always)]
@@ -295,34 +313,82 @@ pub fn linear(
     y: &mut [f32],
     threads: usize,
 ) {
-    assert_eq!(x.len(), m * k, "x is not [m, k]");
-    assert_eq!(w.len(), n * k, "w is not [n, k]");
-    assert_eq!(y.len(), m * n, "y is not [m, n]");
-    if let Some(b) = b {
-        assert_eq!(b.len(), n, "b is not [n]");
+    let g = Gemm { x, m, k, w, n, b, ep: Epilogue::None };
+    g.run(y, threads, |tasks, f| par::for_each(tasks, threads, f));
+}
+
+/// One GEMM with its epilogue, `y = ep(x wᵀ + b)`, split into tiles that any thread may run.
+/// Every output element is computed the same way whatever the split, so the split is free to
+/// follow the thread count.
+#[derive(Debug, Clone, Copy)]
+pub struct Gemm<'a> {
+    /// `[m, k]`.
+    pub x: &'a [f32],
+    /// Rows of `x` and `y`.
+    pub m: usize,
+    /// The reduction length.
+    pub k: usize,
+    /// `[n, k]`.
+    pub w: &'a [f32],
+    /// Columns of `y`.
+    pub n: usize,
+    /// `[n]`.
+    pub b: Option<&'a [f32]>,
+    /// What happens to each result.
+    pub ep: Epilogue,
+}
+
+impl Gemm<'_> {
+    /// Rows per task: the largest block that still gives every thread a few tasks.
+    fn row_block(&self, threads: usize) -> usize {
+        let nt = self.n.div_ceil(NB);
+        [MB, 64, 32, 16]
+            .into_iter()
+            .find(|&mb| self.m.div_ceil(mb) * nt >= 3 * threads)
+            .unwrap_or(16)
     }
-    if m == 0 || n == 0 {
-        return;
-    }
-    if k == 0 {
-        for row in y.chunks_exact_mut(n) {
-            match b {
-                Some(b) => row.copy_from_slice(b),
-                None => row.fill(0.0),
-            }
+
+    /// Runs the GEMM into `y`, handing `spawn` a task count and the task body to run for each.
+    ///
+    /// # Panics
+    ///
+    /// If a length does not match the shape.
+    pub fn run(
+        &self,
+        y: &mut [f32],
+        threads: usize,
+        spawn: impl FnOnce(usize, &(dyn Fn(usize) + Sync)),
+    ) {
+        let Self { x, m, k, w, n, b, ep } = *self;
+        assert_eq!(x.len(), m * k, "x is not [m, k]");
+        assert_eq!(w.len(), n * k, "w is not [n, k]");
+        assert_eq!(y.len(), m * n, "y is not [m, n]");
+        if let Some(b) = b {
+            assert_eq!(b.len(), n, "b is not [n]");
         }
-        return;
+        if m == 0 || n == 0 {
+            return;
+        }
+        let shared = Shared::new(y);
+        let args = Args { x, w, b, ep, k, n, y: &shared };
+        if k == 0 {
+            for i in 0..m {
+                for j in 0..n {
+                    args.put(i, j, 0.0);
+                }
+            }
+            return;
+        }
+        let mb = self.row_block(threads);
+        let mt = m.div_ceil(mb);
+        let nt = n.div_ceil(NB);
+        spawn(mt * nt, &|t| {
+            let (bi, bj) = (t % mt, t / mt);
+            let rows = (bi * mb, ((bi + 1) * mb).min(m));
+            let cols = (bj * NB, ((bj + 1) * NB).min(n));
+            args.block_dispatch(rows, cols);
+        });
     }
-    let shared = Shared::new(y);
-    let args = Args { x, w, b, k, n, y: &shared };
-    let mt = m.div_ceil(MB);
-    let nt = n.div_ceil(NB);
-    par::for_each(mt * nt, threads, |t| {
-        let (bi, bj) = (t % mt, t / mt);
-        let rows = (bi * MB, ((bi + 1) * MB).min(m));
-        let cols = (bj * NB, ((bj + 1) * NB).min(n));
-        args.block_dispatch(rows, cols);
-    });
 }
 
 #[cfg(test)]

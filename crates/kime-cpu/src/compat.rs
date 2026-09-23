@@ -6,16 +6,46 @@
 //! weights to f32 once at load, which costs 1.7 GB for Laya English. The fast paths are checked
 //! against it.
 
-use kime_model::Model;
-use kime_model::laya::{Affine, LayaGraph, LayaSpec};
+use kime_model::laya::{Affine, LayaGraph, LayaSpec, TORCH_EPS};
+use kime_model::{Model, Tensors};
+use kime_tensor::{Buckets, Executor, HostTensor};
 
 use crate::attention::{HEAD, attention};
 use crate::gemm::linear;
 use crate::ops::{Rope, add, geglu, gelu, layer_norm};
 use crate::par;
+use crate::plan::CpuBackend;
 
-/// PyTorch's LayerNorm default, which the head and scorer use.
-const TORCH_EPS: f64 = 1e-5;
+/// The compat graph of `model` on the plan executor with the default bucket table, on `threads`
+/// threads. This is the fast path, and [`Compat`] is what it is checked against.
+///
+/// # Errors
+///
+/// When the graph does not lower, which for a checkpoint that loaded means a bug.
+pub fn executor(model: &Model, threads: usize) -> kime_tensor::Result<Executor<CpuBackend>> {
+    executor_from(&model.spec, &model.graph, &model.tensors, threads)
+}
+
+/// [`executor`] from the pieces of a model.
+///
+/// # Errors
+///
+/// As [`executor`].
+pub fn executor_from(
+    spec: &LayaSpec,
+    graph: &LayaGraph,
+    tensors: &Tensors,
+    threads: usize,
+) -> kime_tensor::Result<Executor<CpuBackend>> {
+    let host: Vec<HostTensor<'_>> = (0..tensors.entries().len())
+        .map(|i| {
+            let v = tensors.view(i);
+            HostTensor { dtype: v.dtype, shape: v.shape, bytes: v.bytes }
+        })
+        .collect();
+    let (plan, vocab) = (graph.plan(spec), spec.encoder.vocab);
+    Executor::new(CpuBackend::new(threads), &host, plan, &Buckets::default(), "compat", vocab, 3)
+}
 
 /// One question, laid out as Laya lays it out.
 #[derive(Debug, Clone, Copy)]
@@ -51,9 +81,14 @@ impl Compat {
     /// too.
     #[must_use]
     pub fn new(model: &Model, threads: usize) -> Self {
-        let t = &model.tensors;
+        Self::from_parts(&model.spec, &model.graph, &model.tensors, threads)
+    }
+
+    /// [`Compat::new`] from the pieces of a model.
+    #[must_use]
+    pub fn from_parts(spec: &LayaSpec, graph: &LayaGraph, t: &Tensors, threads: usize) -> Self {
         let w = par::map(t.entries().len(), threads, |i| t.view(i).to_f32());
-        Self { spec: model.spec.clone(), graph: model.graph.clone(), w, threads: threads.max(1) }
+        Self { spec: spec.clone(), graph: graph.clone(), w, threads: threads.max(1) }
     }
 
     /// Changes the number of threads the forward pass uses. The results do not change with it.

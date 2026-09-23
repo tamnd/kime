@@ -16,7 +16,7 @@ use crate::par::{self, Shared};
 /// Width of one head. Every model kime runs uses 64.
 pub const HEAD: usize = 64;
 /// Query rows per task.
-const QB: usize = 32;
+pub const QB: usize = 32;
 
 /// Attention for all heads of all sequences. `qkv` is `[t, 3 heads HEAD]` and `out` is
 /// `[t, heads HEAD]`.
@@ -53,41 +53,64 @@ pub fn attention(
             }
         }
     }
-    let scale = 1.0 / (HEAD as f32).sqrt();
     let shared = Shared::new(out);
     par::for_each(tasks.len(), threads, |task| {
         let (s, h, q0) = tasks[task];
-        let (lo, hi) = (cu[s], cu[s + 1]);
-        let mut p = Vec::new();
-        let mut acc = [0f64; HEAD];
-        for i in q0..(q0 + QB).min(hi) {
-            let (a, b) = match window {
-                Some(w) => (i.saturating_sub(w).max(lo), (i + w + 1).min(hi)),
-                None => (lo, hi),
-            };
-            let q = &qkv[i * stride + h * HEAD..][..HEAD];
-            p.clear();
-            p.extend((a..b).map(|j| dot(q, &qkv[j * stride + d + h * HEAD..][..HEAD]) * scale));
-            let mx = p.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-            let mut sum = 0f64;
-            for x in &mut p {
-                *x = (*x - mx).exp();
-                sum += f64::from(*x);
-            }
-            acc.fill(0.0);
-            for (j, &e) in (a..b).zip(&p) {
-                let pj = f64::from(e) / sum;
-                let v = &qkv[j * stride + 2 * d + h * HEAD..][..HEAD];
-                for c in 0..HEAD {
-                    acc[c] = pj.mul_add(f64::from(v[c]), acc[c]);
-                }
-            }
-            for (c, &v) in acc.iter().enumerate() {
-                // SAFETY: row i, head h belongs to this task alone.
-                unsafe { shared.set(i * d + h * HEAD + c, v as f32) };
+        // SAFETY: rows q0 to q0 + QB of head h belong to this task alone.
+        unsafe { block(qkv, heads, (cu[s], cu[s + 1]), q0, h, window, &mut Vec::new(), &shared) };
+    });
+}
+
+/// Attention for query rows `q0..q0 + QB` of head `h` of the sequence in rows `lo..hi`, with `p`
+/// as scratch for the scores. This is one task of [`attention`], exposed so a plan can run it
+/// with scratch it owns.
+///
+/// # Safety
+///
+/// No other thread may touch those rows of head `h` in `out` meanwhile.
+#[allow(clippy::too_many_arguments)]
+#[inline]
+pub unsafe fn block(
+    qkv: &[f32],
+    heads: usize,
+    (lo, hi): (usize, usize),
+    q0: usize,
+    h: usize,
+    window: Option<usize>,
+    p: &mut Vec<f32>,
+    out: &Shared<'_>,
+) {
+    let d = heads * HEAD;
+    let stride = 3 * d;
+    let scale = 1.0 / (HEAD as f32).sqrt();
+    let mut acc = [0f64; HEAD];
+    for i in q0..(q0 + QB).min(hi) {
+        let (a, b) = match window {
+            Some(w) => (i.saturating_sub(w).max(lo), (i + w + 1).min(hi)),
+            None => (lo, hi),
+        };
+        let q = &qkv[i * stride + h * HEAD..][..HEAD];
+        p.clear();
+        p.extend((a..b).map(|j| dot(q, &qkv[j * stride + d + h * HEAD..][..HEAD]) * scale));
+        let mx = p.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let mut sum = 0f64;
+        for x in p.iter_mut() {
+            *x = (*x - mx).exp();
+            sum += f64::from(*x);
+        }
+        acc.fill(0.0);
+        for (j, &e) in (a..b).zip(p.iter()) {
+            let pj = f64::from(e) / sum;
+            let v = &qkv[j * stride + 2 * d + h * HEAD..][..HEAD];
+            for c in 0..HEAD {
+                acc[c] = pj.mul_add(f64::from(v[c]), acc[c]);
             }
         }
-    });
+        for (c, &v) in acc.iter().enumerate() {
+            // SAFETY: the caller owns row i of head h.
+            unsafe { out.set(i * d + h * HEAD + c, v as f32) };
+        }
+    }
 }
 
 #[cfg(test)]

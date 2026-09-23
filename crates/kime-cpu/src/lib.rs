@@ -8,7 +8,10 @@ pub mod compat;
 pub mod gemm;
 pub mod ops;
 pub mod par;
+pub mod plan;
+pub mod pool;
 #[cfg(test)]
 mod testing;
 
-pub use compat::{Compat, Input, Output};
+pub use compat::{Compat, Input, Output, executor, executor_from};
+pub use plan::{CpuBackend, CpuPlan};
