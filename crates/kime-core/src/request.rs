@@ -128,12 +128,22 @@ pub struct Limits {
 
 impl Limits {
     /// The defaults from spec/03-api.md.
-    pub const JEV: Limits =
-        Limits { max_questions: 256, max_options: 255, min_levels: 2, max_levels: 32, allow_no_questions: false };
+    pub const JEV: Limits = Limits {
+        max_questions: 256,
+        max_options: 255,
+        min_levels: 2,
+        max_levels: 32,
+        allow_no_questions: false,
+    };
 
     /// What Laya accepts, for requests to a compat model that did not send a `kime` object.
-    pub const LAYA: Limits =
-        Limits { max_questions: 256, max_options: 255, min_levels: 1, max_levels: 32, allow_no_questions: true };
+    pub const LAYA: Limits = Limits {
+        max_questions: 256,
+        max_options: 255,
+        min_levels: 1,
+        max_levels: 32,
+        allow_no_questions: true,
+    };
 }
 
 impl Default for Limits {
@@ -214,7 +224,12 @@ pub fn parse(body: &Value, limits: &Limits) -> Result<Request, Vec<Problem>> {
             Value::Null
         }
         Some(Value::Null) => {
-            p.add(&["state".into()], "value_error", "state must not be null, send \"\" for an empty state", &Value::Null);
+            p.add(
+                &["state".into()],
+                "value_error",
+                "state must not be null, send \"\" for an empty state",
+                &Value::Null,
+            );
             Value::Null
         }
         Some(s) => s.clone(),
@@ -243,13 +258,22 @@ pub fn parse(body: &Value, limits: &Limits) -> Result<Request, Vec<Problem>> {
         None => p.add(&["questions".into()], "missing", "Field required", &Value::Null),
         Some(Value::Object(qs)) => {
             if qs.is_empty() && !limits.allow_no_questions {
-                p.add(&["questions".into()], "too_short", "questions must have at least one question", &Value::Object(qs.clone()));
+                p.add(
+                    &["questions".into()],
+                    "too_short",
+                    "questions must have at least one question",
+                    &Value::Object(qs.clone()),
+                );
             }
             if qs.len() > limits.max_questions {
                 p.add(
                     &["questions".into()],
                     "too_long",
-                    format!("a request can have at most {} questions, got {}", limits.max_questions, qs.len()),
+                    format!(
+                        "a request can have at most {} questions, got {}",
+                        limits.max_questions,
+                        qs.len()
+                    ),
                     &Value::Null,
                 );
             }
@@ -259,7 +283,9 @@ pub fn parse(body: &Value, limits: &Limits) -> Result<Request, Vec<Problem>> {
                 }
             }
         }
-        Some(other) => p.add(&["questions".into()], "dict_type", "Input should be a valid dictionary", other),
+        Some(other) => {
+            p.add(&["questions".into()], "dict_type", "Input should be a valid dictionary", other)
+        }
     }
 
     if p.0.is_empty() { Ok(Request { state, model, questions, kime }) } else { Err(p.0) }
@@ -284,7 +310,12 @@ fn question(id: &str, q: &Value, limits: &Limits, p: &mut Problems) -> Option<Qu
         Some(Value::String(t)) if t == "score" => QType::Score,
         Some(Value::String(t)) if t == "noul" => QType::Noul,
         Some(other) => {
-            p.add(&at(&["type".into()]), "literal_error", "Input should be 'choice', 'score' or 'noul'", other);
+            p.add(
+                &at(&["type".into()]),
+                "literal_error",
+                "Input should be 'choice', 'score' or 'noul'",
+                other,
+            );
             return None;
         }
     };
@@ -309,7 +340,13 @@ fn with(loc: &[Loc], last: Loc) -> Vec<Loc> {
     v
 }
 
-fn choice(id: &str, crit: Option<&Value>, limits: &Limits, loc: &[Loc], p: &mut Problems) -> Criteria {
+fn choice(
+    id: &str,
+    crit: Option<&Value>,
+    limits: &Limits,
+    loc: &[Loc],
+    p: &mut Problems,
+) -> Criteria {
     let mut options = Vec::new();
     match crit {
         None => p.add(loc, "missing", "Field required", &Value::Null),
@@ -341,13 +378,21 @@ fn choice(id: &str, crit: Option<&Value>, limits: &Limits, loc: &[Loc], p: &mut 
             _ => 0,
         };
         if n == 0 {
-            p.add(loc, "too_short", format!("choice question '{id}' needs at least 1 option, got 0"), c);
+            p.add(
+                loc,
+                "too_short",
+                format!("choice question '{id}' needs at least 1 option, got 0"),
+                c,
+            );
         }
         if n > limits.max_options {
             p.add(
                 loc,
                 "too_long",
-                format!("choice question '{id}' has {n} options, the limit is {}", limits.max_options),
+                format!(
+                    "choice question '{id}' has {n} options, the limit is {}",
+                    limits.max_options
+                ),
                 &Value::Null,
             );
         }
@@ -367,7 +412,13 @@ fn choice(id: &str, crit: Option<&Value>, limits: &Limits, loc: &[Loc], p: &mut 
     Criteria::Choice(options)
 }
 
-fn score(id: &str, crit: Option<&Value>, limits: &Limits, loc: &[Loc], p: &mut Problems) -> Criteria {
+fn score(
+    id: &str,
+    crit: Option<&Value>,
+    limits: &Limits,
+    loc: &[Loc],
+    p: &mut Problems,
+) -> Criteria {
     let levels: Vec<Value> = match crit {
         None => {
             p.add(loc, "missing", "Field required", &Value::Null);
@@ -391,10 +442,20 @@ fn score(id: &str, crit: Option<&Value>, limits: &Limits, loc: &[Loc], p: &mut P
     let n = levels.len();
     if n < limits.min_levels {
         let unit = if limits.min_levels == 1 { "level" } else { "levels" };
-        p.add(loc, "too_short", format!("score question '{id}' needs at least {} {unit}, got {n}", limits.min_levels), crit.unwrap_or(&Value::Null));
+        p.add(
+            loc,
+            "too_short",
+            format!("score question '{id}' needs at least {} {unit}, got {n}", limits.min_levels),
+            crit.unwrap_or(&Value::Null),
+        );
     }
     if n > limits.max_levels {
-        p.add(loc, "too_long", format!("score question '{id}' has {n} levels, the limit is {}", limits.max_levels), &Value::Null);
+        p.add(
+            loc,
+            "too_long",
+            format!("score question '{id}' has {n} levels, the limit is {}", limits.max_levels),
+            &Value::Null,
+        );
     }
     Criteria::Score(levels)
 }
@@ -480,7 +541,10 @@ mod tests {
             ]
         );
         assert_eq!(errs[1].to_json()["loc"], json!(["body", "questions", "a", "criteria"]));
-        assert_eq!(errs[4].to_json()["loc"], json!(["body", "questions", "d", "criteria", "perhaps"]));
+        assert_eq!(
+            errs[4].to_json()["loc"],
+            json!(["body", "questions", "d", "criteria", "perhaps"])
+        );
     }
 
     #[test]

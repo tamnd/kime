@@ -21,7 +21,10 @@ fn tokenizer(dir: &str) -> Option<Tokenizer> {
     match root.filter(|r| r.is_dir()) {
         Some(r) => Some(Tokenizer::from_dir(r.join(dir)).unwrap()),
         None => {
-            assert!(std::env::var_os("KIME_REQUIRE_MODELS").is_none(), "KIME_MODELS is not set or has no laya folder");
+            assert!(
+                std::env::var_os("KIME_REQUIRE_MODELS").is_none(),
+                "KIME_MODELS is not set or has no laya folder"
+            );
             None
         }
     }
@@ -59,9 +62,13 @@ fn check(model: &str, tok_dir: &str, mask: &str, budget: CompatBudget) {
             let p = &want["pieces"];
             let text = compat_question(q, mask);
             texts += 1;
-            let want_opts: Vec<&str> = p["options"].as_array().unwrap().iter().map(|o| o.as_str().unwrap()).collect();
+            let want_opts: Vec<&str> =
+                p["options"].as_array().unwrap().iter().map(|o| o.as_str().unwrap()).collect();
             if text.head != p["head"] || text.options != want_opts || state != p["state"] {
-                bad.push(format!("{} {}: rendered text differs\n  head {:?}\n  want {}", case["id"], q.id, text.head, p["head"]));
+                bad.push(format!(
+                    "{} {}: rendered text differs\n  head {:?}\n  want {}",
+                    case["id"], q.id, text.head, p["head"]
+                ));
             }
             let (Some(tok), Some(state_ids)) = (&tok, &state_ids) else { continue };
             let seq = tok.compat_sequence(&text.head, &text.options, state_ids, budget, Cut::Tail);
@@ -71,9 +78,16 @@ fn check(model: &str, tok_dir: &str, mask: &str, budget: CompatBudget) {
             }
         }
     }
-    assert!(bad.is_empty(), "{model}: {} questions differ from Laya\n{}", bad.len(), bad.iter().take(5).cloned().collect::<Vec<_>>().join("\n"));
+    assert!(
+        bad.is_empty(),
+        "{model}: {} questions differ from Laya\n{}",
+        bad.len(),
+        bad.iter().take(5).cloned().collect::<Vec<_>>().join("\n")
+    );
     assert!(texts > 600, "{model}: only {texts} questions checked");
-    eprintln!("{model}: {texts} questions render as Laya does, {seqs} laid out to the same ids and markers");
+    eprintln!(
+        "{model}: {texts} questions render as Laya does, {seqs} laid out to the same ids and markers"
+    );
 }
 
 #[test]
@@ -83,5 +97,10 @@ fn laya_english() {
 
 #[test]
 fn laya_multilingual() {
-    check("laya-multilingual", "multilingual/tokenizer", "<mask>", CompatBudget { max_len: 1024, head_max_len: 256 });
+    check(
+        "laya-multilingual",
+        "multilingual/tokenizer",
+        "<mask>",
+        CompatBudget { max_len: 1024, head_max_len: 256 },
+    );
 }

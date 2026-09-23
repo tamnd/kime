@@ -103,6 +103,10 @@ fn push_u(out: &mut String, unit: u32) {
 /// Python's `repr(float)`: the shortest digits that round trip, in fixed notation when the decimal
 /// exponent is from -4 to 15 and in scientific notation otherwise, with a sign and at least two
 /// exponent digits. Integral values keep a `.0`.
+///
+/// # Panics
+///
+/// Never. The expects below hold for every string Rust's `{:e}` writes.
 pub fn float_repr(f: f64, out: &mut String) {
     if f.is_nan() {
         out.push_str("NaN");

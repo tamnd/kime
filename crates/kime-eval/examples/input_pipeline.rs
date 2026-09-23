@@ -14,10 +14,15 @@ use serde_json::Value;
 fn main() {
     let root = std::env::args().nth(1).expect("usage: input_pipeline <models>/laya");
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/parity/cases.jsonl");
-    let bodies: Vec<String> = std::fs::read_to_string(path).unwrap().lines().map(str::to_string).collect();
+    let bodies: Vec<String> =
+        std::fs::read_to_string(path).unwrap().lines().map(str::to_string).collect();
     for (name, dir, budget) in [
         ("laya", "tokenizer", CompatBudget { max_len: 512, head_max_len: 192 }),
-        ("laya-multilingual", "multilingual/tokenizer", CompatBudget { max_len: 1024, head_max_len: 256 }),
+        (
+            "laya-multilingual",
+            "multilingual/tokenizer",
+            CompatBudget { max_len: 1024, head_max_len: 256 },
+        ),
     ] {
         let tok = Tokenizer::from_dir(format!("{root}/{dir}")).unwrap();
         let mask = tok.mask_text().to_string();
@@ -32,7 +37,10 @@ fn main() {
                 let mut n = 0;
                 for q in &req.questions {
                     let text = compat_question(q, &mask);
-                    n += tok.compat_sequence(&text.head, &text.options, &state_ids, budget, Cut::Tail).ids.len();
+                    n += tok
+                        .compat_sequence(&text.head, &text.options, &state_ids, budget, Cut::Tail)
+                        .ids
+                        .len();
                 }
                 let dt = t.elapsed().as_nanos() as u64;
                 if pass > 0 {

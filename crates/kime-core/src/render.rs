@@ -41,7 +41,10 @@ pub fn compat_question(q: &Question, mask: &str) -> CompatText {
         Some(v) => ASCII.to_string(v),
     };
     let head = format!("{} question: {}", q.qtype.as_str(), ins.replace(mask, " "));
-    let options = compat_options(&q.criteria).into_iter().map(|o| format!(" {}", o.replace(mask, " "))).collect();
+    let options = compat_options(&q.criteria)
+        .into_iter()
+        .map(|o| format!(" {}", o.replace(mask, " ")))
+        .collect();
     CompatText { head, options }
 }
 
@@ -58,14 +61,19 @@ pub fn compat_options(c: &Criteria) -> Vec<String> {
                 Some(v) => format!("{}: {}", o.label, criterion(v)),
             })
             .collect(),
-        Criteria::Score(levels) => levels.iter().enumerate().map(|(i, v)| format!("level {i}: {}", criterion(v))).collect(),
+        Criteria::Score(levels) => {
+            levels.iter().enumerate().map(|(i, v)| format!("level {i}: {}", criterion(v))).collect()
+        }
         Criteria::Noul { when_false, when_true } => {
             let side = |v: &Option<Value>, default: &str| match v {
                 None | Some(Value::Null) => default.to_string(),
                 Some(Value::String(s)) if s.is_empty() => default.to_string(),
                 Some(v) => criterion(v),
             };
-            vec![format!("false: {}", side(when_false, NOUL_FALSE)), format!("true: {}", side(when_true, NOUL_TRUE))]
+            vec![
+                format!("false: {}", side(when_false, NOUL_FALSE)),
+                format!("true: {}", side(when_true, NOUL_TRUE)),
+            ]
         }
     }
 }
@@ -102,20 +110,29 @@ mod tests {
 
     #[test]
     fn choice_score_noul() {
-        let t = render(json!({"type": "choice", "instructions": "Pick [MASK] one", "criteria": {"a": "", "b": null, "c": 0, "d": {"x": [1, 2.5]}}}));
+        let t = render(
+            json!({"type": "choice", "instructions": "Pick [MASK] one", "criteria": {"a": "", "b": null, "c": 0, "d": {"x": [1, 2.5]}}}),
+        );
         assert_eq!(t.head, "choice question: Pick   one");
         assert_eq!(t.options, [" a", " b", " c: 0", " d: {\"x\": [1, 2.5]}"]);
-        let t = render(json!({"type": "score", "instructions": {"ask": "é"}, "criteria": ["low", null, true]}));
+        let t = render(
+            json!({"type": "score", "instructions": {"ask": "é"}, "criteria": ["low", null, true]}),
+        );
         assert_eq!(t.head, "score question: {\"ask\": \"\\u00e9\"}");
         assert_eq!(t.options, [" level 0: low", " level 1: null", " level 2: true"]);
-        let t = render(json!({"type": "noul", "instructions": null, "criteria": {"TRUE": "", "false": "nope"}}));
+        let t = render(
+            json!({"type": "noul", "instructions": null, "criteria": {"TRUE": "", "false": "nope"}}),
+        );
         assert_eq!(t.head, "noul question: null");
         assert_eq!(t.options, [" false: nope", " true: yes, the statement holds"]);
     }
 
     #[test]
     fn state() {
-        assert_eq!(compat_state(&json!({"k": "ü", "n": [1e-5]}), "[MASK]"), "{\"k\": \"ü\", \"n\": [1e-05]}");
+        assert_eq!(
+            compat_state(&json!({"k": "ü", "n": [1e-5]}), "[MASK]"),
+            "{\"k\": \"ü\", \"n\": [1e-05]}"
+        );
         assert_eq!(compat_state(&json!("a<mask>b"), "<mask>"), "a b");
     }
 }
