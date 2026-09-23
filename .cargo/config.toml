@@ -1,0 +1,3 @@
+# `cargo xtask <task>` rather than `cargo run -p xtask -- <task>`.
+[alias]
+xtask = "run --quiet --package xtask --"

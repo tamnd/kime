@@ -1,0 +1,57 @@
+name: Wrong answer
+description: kime gives a different answer than the reference for the same weights and the same input.
+title: "wrong answer: "
+labels: ["kind/wrong-answer", "priority/p0"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most valuable kind of report the project gets. On the compat models kime runs Laya's own weights, so any argmax that differs from Laya, or any probability outside the tolerances in `spec/15-testing.md`, is an engine bug and not a model question. On kime's own models the same holds against `tools/ref/kime_ref.py`. A fast engine that is quietly wrong is worth nothing.
+
+        If the answer is the same as the reference and you think the model is just wrong, the quality template is the right one.
+  - type: textarea
+    id: request
+    attributes:
+      label: The request
+      description: State and questions, in full.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: answers
+    attributes:
+      label: What kime returns, and what the reference returns
+      description: Both probability vectors if you have them. Say which reference: Laya 0.3.7, laya-mlx, laya-coreml, or kime_ref.py.
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: The model name and, if you can, the hash `kime models` prints.
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend
+      options:
+        - CUDA
+        - Metal
+        - Apple Neural Engine
+        - CPU
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: narrowing
+    attributes:
+      label: What narrows it
+      description: Whether it survives `--backend cpu`, whether it differs alone and inside a batch, whether a shorter state still shows it. Each of those cuts the search in half.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `kime --version`, or the commit.
+    validations:
+      required: true

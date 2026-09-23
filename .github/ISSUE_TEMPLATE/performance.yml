@@ -1,0 +1,50 @@
+name: Performance
+description: A request is slower, uses more memory, or costs more energy than it should.
+title: "perf: "
+labels: ["kind/perf"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The measurement rules in `spec/13-benchmarks.md` apply to reports too: p50, p95 and p99 over at least 2,000 calls after 200 warmup calls, the machine named, and any baseline measured on the same machine in the same session. A number without a machine attached cannot be acted on.
+  - type: dropdown
+    id: which
+    attributes:
+      label: Which one
+      options:
+        - In process latency
+        - HTTP latency
+        - Throughput at saturation
+        - Cold load
+        - Peak memory
+        - Energy per decision
+    validations:
+      required: true
+  - type: textarea
+    id: numbers
+    attributes:
+      label: The numbers
+      description: What was measured, against what, and the exact command. If you compared against Laya, laya-mlx, laya-coreml or Jev, give their versions and settings.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: workload
+    attributes:
+      label: The workload
+      description: One of W1 to W9 from `spec/13-benchmarks.md`, or the request shape: state tokens, number and type of questions, option counts, batch size, concurrency.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: kime doctor
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+    validations:
+      required: true

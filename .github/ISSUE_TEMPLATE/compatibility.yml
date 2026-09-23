@@ -1,0 +1,44 @@
+name: Compatibility gap
+description: A Jev or Laya client, request or behaviour that does not work against kime unchanged.
+title: "compat: "
+labels: ["kind/compat", "area/compat"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The promise in `spec/03-api.md` and `spec/15-testing.md` is that TypeSafe's SDKs, jev-ultrafast and Laya's own Python API work against kime with only a base URL or an import changed. Any place that is not true is a bug against that promise, and the fixture that shows it goes into tamnd/kime-compat.
+
+        Laya has a few documented bugs kime deliberately does not reproduce. They are listed in `tests/laya_expected_diffs.md`. If your gap is one of those, it is not a gap.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface
+      options:
+        - The System One HTTP API (Jev wire format)
+        - The TypeSafe Python SDK
+        - The TypeSafe TypeScript SDK
+        - jev-ultrafast
+        - Laya's Python API (Router, load, presets, email, shortlist)
+        - laya-serve's HTTP API or config
+        - Error bodies, status codes or headers
+    validations:
+      required: true
+  - type: textarea
+    id: theirs
+    attributes:
+      label: What Jev or Laya does
+      description: The request and the response, or the code, and the version it was checked against.
+    validations:
+      required: true
+  - type: textarea
+    id: ours
+    attributes:
+      label: What kime does
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: kime version
+    validations:
+      required: true

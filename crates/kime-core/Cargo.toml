@@ -1,0 +1,18 @@
+[package]
+name = "kime-core"
+description = "Request and answer types, validation, rendering, confidence, calibration and presets for kime."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

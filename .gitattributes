@@ -1,0 +1,13 @@
+* text=auto eol=lf
+
+# Parity fixtures are compared byte for byte against the reference dumps, so git must not rewrite
+# them. A line ending change here would fail the tokenizer parity test on Windows and nowhere else.
+tests/**/fixtures/** -text
+crates/*/fixtures/** -text
+
+*.safetensors binary
+*.kime binary
+*.mlpackage binary
+*.cubin binary
+*.metallib binary
+*.parquet binary

@@ -1,0 +1,50 @@
+name: Quality
+description: A model is inaccurate, badly calibrated, sensitive to option order or wrong on noul polarity.
+title: "quality: "
+labels: ["kind/quality"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The model behaviour tests in `spec/15-testing.md` are order invariance, score mirror, noul polarity, level coverage, label neutrality, chunk and segment consistency, routing and calibration. If what you found is one of those, say which, because each one has a release gate threshold and a failing case goes into its test set.
+
+        One example is a data point. Twenty examples with a pattern are a bug. A few labelled cases are worth more than a long description.
+  - type: dropdown
+    id: which
+    attributes:
+      label: Which property
+      options:
+        - Accuracy
+        - Calibration, the probabilities are over or under confident
+        - Order, shuffling the options changes the answer
+        - Score mirror, reversing the levels does not mirror the answer
+        - Noul polarity, swapping the criteria does not flip the answer
+        - Routing, the wrong language family was picked
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: cases
+    attributes:
+      label: The cases
+      description: Requests, what kime answered, and what the right answer is. JSONL is fine.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: comparison
+    attributes:
+      label: What the baselines do
+      description: If Laya or Jev get these right, say so. That decides whether it is a regression against the bar or a shared weakness.
+  - type: input
+    id: model
+    attributes:
+      label: Model
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+    validations:
+      required: true

@@ -1,0 +1,39 @@
+# Weekly is often enough for a dependency list this short, and grouping the patch and minor bumps
+# keeps the noise down without hiding a major one.
+
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    # A release gets a week before we take it. Most malicious or broken publishes are yanked
+    # within days, and nothing here is urgent enough to be first.
+    cooldown:
+      default-days: 7
+    groups:
+      patch:
+        update-types: ["patch"]
+      minor:
+        update-types: ["minor"]
+
+  # Actions are pinned to a commit hash, which means they need something to move them. This moves
+  # the hash and the version comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    commit-message:
+      prefix: "ci"
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

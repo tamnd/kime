@@ -1,0 +1,97 @@
+# The nightly tier from spec/15-testing.md.
+#
+# Everything here is too slow or too noisy to gate a merge, and all of it is the kind of check that
+# finds a problem days before a user would. At M0 the list is short, because most of what belongs
+# here needs a model that runs. It grows with the milestones, and the rest is named in the last job
+# rather than left implicit, so the gap is visible.
+
+name: nightly
+
+on:
+  schedule:
+    # 03:00 UTC. Late enough that a day's commits are in, early enough that the results are waiting
+    # in the morning.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  miri:
+    name: miri
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: install nightly with miri
+        run: rustup toolchain install nightly --profile minimal --component miri
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: miri
+      # The unsafe in this workspace is arena views in kime-tensor, SIMD intrinsics in kime-cpu and
+      # the tokenizer's unchecked indexing, all of it the kind Miri finds. Unit tests only, because
+      # the device backends and anything that opens a model file cannot run under it.
+      - run: cargo +nightly miri test --workspace --lib
+        env:
+          MIRIFLAGS: -Zmiri-strict-provenance
+
+  advisories:
+    name: advisories
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@7623a79cdfecb99d681017af368ca353d9f49bb5 # v2.87.19
+        with:
+          tool: cargo-deny
+      # The per commit job checks the advisory database as it stood when the commit landed. This one
+      # catches an advisory published afterwards, which is the case that matters for something
+      # already shipped.
+      - run: cargo deny --all-features check advisories bans
+
+  # The full suite in release on every host. The per commit matrix runs release on Linux x86 only.
+  release-everywhere:
+    name: release build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-26, windows-2025]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: nightly-release
+      - run: cargo test --workspace --all-features --release
+
+  # Named so the gap is visible. Each of these turns into a real job at the milestone that makes it
+  # possible, per spec/15-testing.md and spec/16-roadmap.md.
+  planned:
+    name: what belongs here and does not exist yet
+    runs-on: ubuntu-24.04
+    steps:
+      - name: the list
+        run: |
+          cat <<'LIST'
+          CUDA parity, determinism and kernel tests on the T4 and L4 runners      M0
+          full tokenizer parity over 10M lines against HF tokenizers              M0
+          cargo fuzz, one hour per target: request, renderer, tokenizers, email   M1
+          API compatibility through tamnd/kime-compat against the built server    M1
+          small W9 load test on a CPU runner, p99 under 5x p50, bounded memory     M1
+          quality suites on candidate checkpoints                                 M2
+          speed suite on T4, L4, M3 Max and Ryzen 6900HX through tamnd/kime-bench M3
+          Metal and ANE parity and determinism on the macOS runner                M4
+          LIST

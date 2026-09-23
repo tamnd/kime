@@ -1,0 +1,18 @@
+[package]
+name = "kime-tok"
+description = "Byte level and SentencePiece style BPE tokenizers for kime, with Hugging Face parity."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

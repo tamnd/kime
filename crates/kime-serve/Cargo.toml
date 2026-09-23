@@ -1,0 +1,20 @@
+[package]
+name = "kime-serve"
+description = "The kime HTTP server: the System One API, auth, rate limits and metrics."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+kime-core.workspace = true
+kime-engine.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,43 @@
+# cargo-deny configuration. Runs in CI on every commit and again nightly for advisories published
+# after a commit landed. The dependency list in spec/07-engine.md is meant to stay short enough for a
+# person to audit, and this file is what stops it growing by accident.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+# We ship under Apache-2.0 and only take dependencies whose terms that license can carry.
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.93
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = [
+  # spec/07-engine.md: no general tensor framework on the inference path, because their per op
+  # dispatch costs more than the whole latency budget at batch 1. Training uses burn, which is a
+  # different decision made in spec/12-training.md for a different reason.
+  { name = "candle-core" },
+  { name = "tch" },
+  { name = "ort" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

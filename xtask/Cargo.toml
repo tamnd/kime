@@ -1,0 +1,15 @@
+[package]
+name = "xtask"
+description = "Build and check tasks for the kime workspace."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# No dependencies. A task runner that fails to build is a task runner that cannot tell you why the
+# build failed, so everything here reads files and shells out.
+[dependencies]
+
+[lints]
+workspace = true

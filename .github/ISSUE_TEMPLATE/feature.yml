@@ -1,0 +1,25 @@
+name: Feature
+description: Something kime should do and does not, that is not a Jev or Laya compatibility gap.
+title: "feat: "
+labels: ["kind/feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If Jev or Laya already does it, the compatibility template is the right one. The milestones in `spec/16-roadmap.md` are ordered so that each proves a claim the next depends on, so it is worth saying which milestone you think this belongs to.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do and what stops you. The problem first, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you think should happen
+  - type: textarea
+    id: cost
+    attributes:
+      label: What it would cost
+      description: If it touches the wire format, the `.kime` format or the model architecture, say so. Those are the expensive places.

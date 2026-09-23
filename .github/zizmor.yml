@@ -1,0 +1,6 @@
+# zizmor's own configuration. It is found here by the local run and by the workflow audit job.
+rules:
+  # The composite action is called as ./.github/actions/build-archive, which every runner and every
+  # fork understands. The newer self repository syntax is not worth a release path that depends on it.
+  self-repository:
+    disable: true

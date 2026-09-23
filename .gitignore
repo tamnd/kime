@@ -1,0 +1,31 @@
+/target
+**/*.rs.bk
+*.pdb
+
+# Weights, packed models and datasets. Large, and pulled or regenerated rather than committed.
+*.safetensors
+*.kime
+*.mlpackage
+*.mlmodelc
+/models
+/data
+/bench-results
+
+# Profiles
+perf.data
+perf.data.old
+*.profraw
+*.profdata
+*.nsys-rep
+*.ncu-rep
+flamegraph.svg
+
+# Python reference tooling under tools/ref
+__pycache__/
+.venv/
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp

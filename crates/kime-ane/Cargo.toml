@@ -1,0 +1,19 @@
+[package]
+name = "kime-ane"
+description = "The Apple Neural Engine backend for kime, through Core ML with fixed shape buckets."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+kime-tensor.workspace = true
+
+[lints]
+workspace = true

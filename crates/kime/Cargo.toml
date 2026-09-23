@@ -1,0 +1,19 @@
+[package]
+name = "kime"
+description = "The kime typed decision engine. Answers choice, score and yes or no questions over text with calibrated probabilities."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+kime-core.workspace = true
+
+[lints]
+workspace = true

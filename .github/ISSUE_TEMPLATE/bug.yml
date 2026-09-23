@@ -1,0 +1,52 @@
+name: Bug
+description: A crash, a hang, an error on a valid request, or anything else that is not a wrong or badly calibrated answer.
+title: "bug: "
+labels: ["kind/bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If kime returned an answer that differs from Laya or the reference on the same weights, please use the wrong-answer template. If the answer is plausible but the model is simply not good at the question, use the quality template.
+  - type: textarea
+    id: repro
+    attributes:
+      label: The reproduction
+      description: The request body or the command, in full. Paste it rather than linking it, so the issue stays readable.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+      description: The error or the log in full, including the backtrace if there is one.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - kime-serve over HTTP
+        - The Rust API
+        - The Python package
+        - The TypeScript SDK
+        - The kime CLI
+        - Something else, described above
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `kime --version`, or the commit.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: kime doctor
+      description: The output of `kime doctor`. It names the devices, drivers and CPU features the engine sees.
+      render: text
+    validations:
+      required: true

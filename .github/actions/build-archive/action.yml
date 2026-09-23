@@ -1,0 +1,70 @@
+# Build the kime binary for one target and package it as the two archives a release publishes.
+#
+# A composite action rather than a step list in the workflow, because the release matrix is split
+# in two (the hosts the release waits for and the macOS hosts GitHub's queue keeps waiting) and
+# both halves run exactly the same steps. One file means neither copy can drift.
+#
+# The caller checks the repository out, because a local action is read from the workspace.
+
+name: build archive
+description: build the kime binary for one target and package it with its checksums
+
+inputs:
+  target:
+    description: the Rust target triple to build
+    required: true
+  tag:
+    description: the tag the archives are named after
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: add the target
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: rustup target add "$TARGET"
+    - name: build
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: cargo build --release --bin kime --target "$TARGET"
+    - name: package
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        set -euo pipefail
+        name="kime-$TAG-$TARGET"
+        mkdir -p "dist/$name"
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          cp "target/$TARGET/release/kime.exe" "dist/$name/"
+        else
+          cp "target/$TARGET/release/kime" "dist/$name/"
+        fi
+        cp README.md LICENSE-APACHE CHANGELOG.md "dist/$name/"
+        cd dist
+        tar --format=ustar -czf "$name.tar.gz" "$name"
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          7z a -tzip "$name.zip" "$name" > /dev/null
+        else
+          zip -qr "$name.zip" "$name"
+        fi
+        for f in "$name.tar.gz" "$name.zip"; do
+          if command -v sha256sum > /dev/null; then
+            sha256sum "$f" > "$f.sha256"
+          else
+            shasum -a 256 "$f" > "$f.sha256"
+          fi
+        done
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: dist-${{ inputs.target }}
+        path: |
+          dist/*.tar.gz
+          dist/*.zip
+          dist/*.sha256
+        if-no-files-found: error
+        retention-days: 7
