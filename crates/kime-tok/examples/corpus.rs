@@ -59,6 +59,31 @@ fn main() {
             lines.len() as f64 / best,
             bytes as f64 / 1e6 / best
         );
+        // One 2 KB request made of whole ASCII lines, the size the spec budgets 15 microseconds for.
+        let mut request = String::new();
+        for line in lines.iter().filter(|l| l.is_ascii()) {
+            if request.len() + line.len() + 1 > 2048 {
+                break;
+            }
+            request.push_str(line);
+            request.push('\n');
+        }
+        let reps = 20_000;
+        let mut samples = Vec::with_capacity(reps);
+        for _ in 0..reps {
+            let t = Instant::now();
+            out.clear();
+            tok.encode_into(&request, &mut out);
+            samples.push(t.elapsed().as_nanos() as u64);
+        }
+        samples.sort_unstable();
+        println!(
+            "{name}: {} byte request, {} tokens, p50 {:.1} us, p99 {:.1} us",
+            request.len(),
+            out.len(),
+            samples[reps / 2] as f64 / 1e3,
+            samples[reps * 99 / 100] as f64 / 1e3
+        );
         failed |= bad > 0;
     }
     if failed {
