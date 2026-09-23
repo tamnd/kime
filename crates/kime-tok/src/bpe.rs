@@ -238,7 +238,9 @@ impl Bpe {
             let scratch = &mut *guard;
             let cacheable = word.len() <= CACHE_MAX_WORD;
             let hash = word_hash(self.uid, word);
-            let at = (hash as usize) & (CACHE_SLOTS - 1);
+            // The high bits, because the low bits of a multiplicative hash only depend on the low bits
+            // of the last word written, which for a short word is its first two bytes.
+            let at = (hash >> (64 - CACHE_SLOTS.trailing_zeros())) as usize;
             if cacheable {
                 if scratch.slots.is_empty() {
                     scratch.slots.resize_with(CACHE_SLOTS, Slot::default);
