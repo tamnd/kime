@@ -8,4 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod confidence;
+pub mod pyjson;
+pub mod render;
+pub mod request;
 pub mod round;

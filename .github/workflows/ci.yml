@@ -135,7 +135,7 @@ jobs:
         env:
           KIME_MODELS: ${{ github.workspace }}/models
           KIME_REQUIRE_MODELS: "1"
-        run: cargo test --release -p kime-tok
+        run: cargo test --release -p kime-tok -p kime-eval
 
   docs:
     name: documentation
