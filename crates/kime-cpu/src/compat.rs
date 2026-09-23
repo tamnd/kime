@@ -11,7 +11,7 @@ use kime_model::laya::{Affine, LayaGraph, LayaSpec};
 
 use crate::attention::{HEAD, attention};
 use crate::gemm::linear;
-use crate::ops::{Rope, add, gelu, geglu, layer_norm};
+use crate::ops::{Rope, add, geglu, gelu, layer_norm};
 use crate::par;
 
 /// PyTorch's LayerNorm default, which the head and scorer use.
@@ -129,7 +129,8 @@ impl Compat {
                 None => &h,
             };
             let mut qkv = self.linear(xin, d, layer.wqkv, None);
-            let rope = &ropes.iter().find(|r| r.0.to_bits() == layer.rope_theta.to_bits()).unwrap().1;
+            let rope =
+                &ropes.iter().find(|r| r.0.to_bits() == layer.rope_theta.to_bits()).unwrap().1;
             for s in 0..batch.len() {
                 for (pos, i) in (cu[s]..cu[s + 1]).enumerate() {
                     let row = &mut qkv[i * 3 * d..(i + 1) * 3 * d];

@@ -23,7 +23,9 @@ struct Question {
 
 fn questions(name: &str) -> Vec<Question> {
     let path = format!("{}/../kime-eval/fixtures/parity/{name}.jsonl", env!("CARGO_MANIFEST_DIR"));
-    let nums = |v: &Value| -> Vec<f64> { v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect() };
+    let nums = |v: &Value| -> Vec<f64> {
+        v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect()
+    };
     let mut out = Vec::new();
     for line in std::fs::read_to_string(path).unwrap().lines() {
         let case: Value = serde_json::from_str(line).unwrap();
@@ -68,8 +70,10 @@ fn check(name: &str, sub: &str) {
     let (mut logit_err, mut prob_err, mut act_err) = (0f64, 0f64, 0f64);
     let mut agree = 0;
     for chunk in qs.chunks(16) {
-        let inputs: Vec<Input<'_>> =
-            chunk.iter().map(|q| Input { ids: &q.ids, markers: &q.markers, qtype: q.qtype }).collect();
+        let inputs: Vec<Input<'_>> = chunk
+            .iter()
+            .map(|q| Input { ids: &q.ids, markers: &q.markers, qtype: q.qtype })
+            .collect();
         let outs = compat.forward(&inputs);
         for (q, o) in chunk.iter().zip(&outs) {
             assert_eq!(o.logits.len(), q.logits.len(), "{}", q.case);
@@ -86,7 +90,10 @@ fn check(name: &str, sub: &str) {
             if argmax(&o.logits) == argmax(&q.logits) {
                 agree += 1;
             } else {
-                eprintln!("{name} {}: argmax differs, {:?} against {:?}", q.case, o.logits, q.logits);
+                eprintln!(
+                    "{name} {}: argmax differs, {:?} against {:?}",
+                    q.case, o.logits, q.logits
+                );
             }
         }
     }

@@ -24,12 +24,30 @@ const MB: usize = 128;
 /// # Panics
 ///
 /// If the lengths differ.
-#[inline(always)]
 #[must_use]
 pub fn dot(a: &[f32], b: &[f32]) -> f32 {
     assert_eq!(a.len(), b.len());
-    let acc = tile::<1, 1>([a], [b]);
-    acc[0][0]
+    #[cfg(target_arch = "aarch64")]
+    return tile::<neon::Neon, 1, 1>([a], [b])[0][0];
+    #[cfg(target_arch = "x86_64")]
+    if has_fma() {
+        // SAFETY: the features dot_fma enables were detected on this machine.
+        return unsafe { dot_fma(a, b) };
+    }
+    #[allow(unreachable_code)]
+    tile::<[f32; LANES], 1, 1>([a], [b])[0][0]
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+fn dot_fma(a: &[f32], b: &[f32]) -> f32 {
+    tile::<avx::Avx, 1, 1>([a], [b])[0][0]
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+fn has_fma() -> bool {
+    std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
 }
 
 #[inline(always)]
@@ -37,21 +55,124 @@ fn reduce(v: [f32; LANES]) -> f32 {
     ((v[0] + v[4]) + (v[2] + v[6])) + ((v[1] + v[5]) + (v[3] + v[7]))
 }
 
+/// Eight f32 lanes with a fused multiply add, the one vector op the dots need. Each lane is its
+/// own running sum, so every implementation gives the same bits.
+trait V8: Copy {
+    fn zero() -> Self;
+    fn load(s: &[f32; LANES]) -> Self;
+    /// `self + a * b`, rounded once.
+    fn fma(self, a: Self, b: Self) -> Self;
+    fn lanes(self) -> [f32; LANES];
+}
+
+impl V8 for [f32; LANES] {
+    #[inline(always)]
+    fn zero() -> Self {
+        [0.0; LANES]
+    }
+    #[inline(always)]
+    fn load(s: &[f32; LANES]) -> Self {
+        *s
+    }
+    #[inline(always)]
+    fn fma(self, a: Self, b: Self) -> Self {
+        std::array::from_fn(|l| a[l].mul_add(b[l], self[l]))
+    }
+    #[inline(always)]
+    fn lanes(self) -> [f32; LANES] {
+        self
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+mod neon {
+    use std::arch::aarch64::{float32x4_t, vdupq_n_f32, vfmaq_f32, vld1q_f32, vst1q_f32};
+
+    use super::{LANES, V8};
+
+    #[derive(Clone, Copy)]
+    pub(super) struct Neon(float32x4_t, float32x4_t);
+
+    impl V8 for Neon {
+        #[inline(always)]
+        fn zero() -> Self {
+            // SAFETY: NEON is part of the aarch64 baseline.
+            unsafe { Self(vdupq_n_f32(0.0), vdupq_n_f32(0.0)) }
+        }
+        #[inline(always)]
+        fn load(s: &[f32; LANES]) -> Self {
+            // SAFETY: both loads read four floats inside the eight the reference covers.
+            unsafe { Self(vld1q_f32(s.as_ptr()), vld1q_f32(s.as_ptr().add(4))) }
+        }
+        #[inline(always)]
+        fn fma(self, a: Self, b: Self) -> Self {
+            // SAFETY: NEON is part of the aarch64 baseline.
+            unsafe { Self(vfmaq_f32(self.0, a.0, b.0), vfmaq_f32(self.1, a.1, b.1)) }
+        }
+        #[inline(always)]
+        fn lanes(self) -> [f32; LANES] {
+            let mut out = [0f32; LANES];
+            // SAFETY: both stores write four floats inside the eight of out.
+            unsafe {
+                vst1q_f32(out.as_mut_ptr(), self.0);
+                vst1q_f32(out.as_mut_ptr().add(4), self.1);
+            }
+            out
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+mod avx {
+    use std::arch::x86_64::{
+        __m256, _mm256_fmadd_ps, _mm256_loadu_ps, _mm256_setzero_ps, _mm256_storeu_ps,
+    };
+
+    use super::{LANES, V8};
+
+    /// Only built inside functions that enable avx2 and fma, after detecting them.
+    #[derive(Clone, Copy)]
+    pub(super) struct Avx(__m256);
+
+    impl V8 for Avx {
+        #[inline(always)]
+        fn zero() -> Self {
+            // SAFETY: Avx values only exist on machines where AVX was detected.
+            unsafe { Self(_mm256_setzero_ps()) }
+        }
+        #[inline(always)]
+        fn load(s: &[f32; LANES]) -> Self {
+            // SAFETY: an unaligned load of the eight floats of s, on a machine with AVX.
+            unsafe { Self(_mm256_loadu_ps(s.as_ptr())) }
+        }
+        #[inline(always)]
+        fn fma(self, a: Self, b: Self) -> Self {
+            // SAFETY: FMA was detected before any Avx value was made.
+            unsafe { Self(_mm256_fmadd_ps(a.0, b.0, self.0)) }
+        }
+        #[inline(always)]
+        fn lanes(self) -> [f32; LANES] {
+            let mut out = [0f32; LANES];
+            // SAFETY: an unaligned store of eight floats into out, on a machine with AVX.
+            unsafe { _mm256_storeu_ps(out.as_mut_ptr(), self.0) };
+            out
+        }
+    }
+}
+
 /// The dots of `R` rows of x against `C` rows of w, all of the same length.
 #[inline(always)]
-fn tile<const R: usize, const C: usize>(x: [&[f32]; R], w: [&[f32]; C]) -> [[f32; C]; R] {
+fn tile<V: V8, const R: usize, const C: usize>(x: [&[f32]; R], w: [&[f32]; C]) -> [[f32; C]; R] {
     let k = w[0].len();
     let body = k - k % LANES;
-    let mut acc = [[[0f32; LANES]; C]; R];
+    let mut acc = [[V::zero(); C]; R];
     let mut p = 0;
     while p < body {
-        let xv: [&[f32; LANES]; R] = std::array::from_fn(|r| x[r][p..p + LANES].try_into().unwrap());
-        let wv: [&[f32; LANES]; C] = std::array::from_fn(|c| w[c][p..p + LANES].try_into().unwrap());
+        let xv: [V; R] = std::array::from_fn(|r| V::load(x[r][p..p + LANES].try_into().unwrap()));
+        let wv: [V; C] = std::array::from_fn(|c| V::load(w[c][p..p + LANES].try_into().unwrap()));
         for r in 0..R {
             for c in 0..C {
-                for l in 0..LANES {
-                    acc[r][c][l] = xv[r][l].mul_add(wv[c][l], acc[r][c][l]);
-                }
+                acc[r][c] = acc[r][c].fma(xv[r], wv[c]);
             }
         }
         p += LANES;
@@ -59,7 +180,7 @@ fn tile<const R: usize, const C: usize>(x: [&[f32]; R], w: [&[f32]; C]) -> [[f32
     let mut out = [[0f32; C]; R];
     for r in 0..R {
         for c in 0..C {
-            let mut s = reduce(acc[r][c]);
+            let mut s = reduce(acc[r][c].lanes());
             for q in body..k {
                 s = x[r][q].mul_add(w[c][q], s);
             }
@@ -80,11 +201,11 @@ struct Args<'a> {
 
 impl Args<'_> {
     #[inline(always)]
-    fn run<const R: usize, const C: usize>(&self, i: usize, j: usize) {
+    fn run<V: V8, const R: usize, const C: usize>(&self, i: usize, j: usize) {
         let k = self.k;
         let xs = std::array::from_fn(|r| &self.x[(i + r) * k..(i + r + 1) * k]);
         let ws = std::array::from_fn(|c| &self.w[(j + c) * k..(j + c + 1) * k]);
-        let out = tile::<R, C>(xs, ws);
+        let out = tile::<V, R, C>(xs, ws);
         for (r, row) in out.iter().enumerate() {
             for (c, &v) in row.iter().enumerate() {
                 let v = match self.b {
@@ -98,27 +219,27 @@ impl Args<'_> {
     }
 
     #[inline(always)]
-    fn block(&self, rows: (usize, usize), cols: (usize, usize)) {
+    fn block<V: V8>(&self, rows: (usize, usize), cols: (usize, usize)) {
         let mut j = cols.0;
         while j < cols.1 {
             let wide = cols.1 - j >= NR;
             let mut i = rows.0;
             while i + MR <= rows.1 {
                 if wide {
-                    self.run::<MR, NR>(i, j);
+                    self.run::<V, MR, NR>(i, j);
                 } else {
                     for c in j..cols.1 {
-                        self.run::<MR, 1>(i, c);
+                        self.run::<V, MR, 1>(i, c);
                     }
                 }
                 i += MR;
             }
             for r in i..rows.1 {
                 if wide {
-                    self.run::<1, NR>(r, j);
+                    self.run::<V, 1, NR>(r, j);
                 } else {
                     for c in j..cols.1 {
-                        self.run::<1, 1>(r, c);
+                        self.run::<V, 1, 1>(r, c);
                     }
                 }
             }
@@ -127,20 +248,22 @@ impl Args<'_> {
     }
 
     fn block_dispatch(&self, rows: (usize, usize), cols: (usize, usize)) {
+        #[cfg(target_arch = "aarch64")]
+        return self.block::<neon::Neon>(rows, cols);
         #[cfg(target_arch = "x86_64")]
-        if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
-        {
-            // SAFETY: the target features block_fma enables were detected on this machine.
+        if has_fma() {
+            // SAFETY: the features block_fma enables were detected on this machine.
             unsafe { self.block_fma(rows, cols) };
             return;
         }
-        self.block(rows, cols);
+        #[allow(unreachable_code)]
+        self.block::<[f32; LANES]>(rows, cols);
     }
 
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2,fma")]
     fn block_fma(&self, rows: (usize, usize), cols: (usize, usize)) {
-        self.block(rows, cols);
+        self.block::<avx::Avx>(rows, cols);
     }
 }
 
@@ -199,7 +322,8 @@ mod tests {
         let mut y = vec![0f32; m * n];
         for i in 0..m {
             for j in 0..n {
-                let s: f64 = (0..k).map(|p| f64::from(x[i * k + p]) * f64::from(w[j * k + p])).sum();
+                let s: f64 =
+                    (0..k).map(|p| f64::from(x[i * k + p]) * f64::from(w[j * k + p])).sum();
                 y[i * n + j] = (s + b.map_or(0.0, |b| f64::from(b[j]))) as f32;
             }
         }

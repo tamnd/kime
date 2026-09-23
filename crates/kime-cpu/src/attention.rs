@@ -123,7 +123,10 @@ mod tests {
                         let v: f64 = keys
                             .iter()
                             .zip(&sc)
-                            .map(|(&j, x)| (x - mx).exp() / z * f64::from(qkv[j * 3 * d + 2 * d + h * HEAD + c]))
+                            .map(|(&j, x)| {
+                                (x - mx).exp() / z
+                                    * f64::from(qkv[j * 3 * d + 2 * d + h * HEAD + c])
+                            })
                             .sum();
                         out[i * d + h * HEAD + c] = v as f32;
                     }
