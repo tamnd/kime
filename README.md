@@ -16,11 +16,11 @@ Nothing works yet. The specification is written, the workspace, CI and release p
 curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
   "state": "Hi, we were billed twice for March. Refund the duplicate today or we cancel.",
   "questions": {
-    "team":   {"type": "choice", "instruction": "Which team should handle this",
+    "team":   {"type": "choice", "instructions": "Which team should handle this",
                "options": {"billing": "Payment issues", "technical": "Bugs", "sales": "Plans", "other": "Anything else"}},
-    "urgency": {"type": "score", "instruction": "How urgent is it",
+    "urgency": {"type": "score", "instructions": "How urgent is it",
                "criteria": ["not urgent", "this week", "today", "right now"]},
-    "churn":  {"type": "noul", "instruction": "The customer threatens to leave"}
+    "churn":  {"type": "noul", "instructions": "The customer threatens to leave"}
   }
 }'
 ```
