@@ -94,4 +94,42 @@ fn main() {
         b * 1e3 / qs.len() as f64,
         tokens as f64 / b
     );
+
+    // Where the time goes in batches, with a wait after every step.
+    for p in exec.plans_mut() {
+        p.profile();
+    }
+    for chunk in qs.chunks(batch) {
+        run(&mut exec, chunk);
+    }
+    let mut total: Vec<(&str, u64)> = Vec::new();
+    for p in exec.plans_mut() {
+        for (k, ns) in p.timings() {
+            match total.iter_mut().find(|t| t.0 == k) {
+                Some(t) => t.1 += ns,
+                None => total.push((k, ns)),
+            }
+        }
+    }
+    total.sort_by_key(|t| std::cmp::Reverse(t.1));
+    let all: u64 = total.iter().map(|t| t.1).sum();
+    let parts: Vec<String> = total
+        .iter()
+        .map(|(k, ns)| format!("{k} {:.1}%", *ns as f64 * 100.0 / all.max(1) as f64))
+        .collect();
+    for p in exec.plans_mut() {
+        for ((m, k, n), calls, ns) in p.gemm_timings().into_iter().take(4) {
+            if calls == 0 {
+                continue;
+            }
+            let tf = 2.0 * (m * k * n) as f64 * calls as f64 / ns as f64 / 1e3;
+            let us = ns as f64 / calls as f64 / 1e3;
+            println!("gemm {m}x{k}x{n}: {calls} calls, {us:.1} us each, {tf:.1} TFLOPS");
+        }
+    }
+    println!(
+        "time by step, batches of {batch}: {:.0} ms total, {}",
+        all as f64 / 1e6,
+        parts.join(", ")
+    );
 }
