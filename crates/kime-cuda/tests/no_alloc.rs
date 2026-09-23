@@ -82,7 +82,11 @@ fn main() {
         }
         ON.store(false, Ordering::SeqCst);
         assert_eq!(exec.warm().collect::<Vec<_>>(), warm);
-        assert_eq!(COUNT.load(Ordering::SeqCst), 0, "allocations on the warm path in {precision:?}");
+        assert_eq!(
+            COUNT.load(Ordering::SeqCst),
+            0,
+            "allocations on the warm path in {precision:?}"
+        );
         println!("a warm {precision:?} plan does not allocate: ok, {} buckets", warm.len());
     }
 }

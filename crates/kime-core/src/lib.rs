@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod answer;
 pub mod confidence;
 pub mod pyjson;
 pub mod render;

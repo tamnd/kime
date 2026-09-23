@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime-core` builds answers from logits the way Laya does, in the module `answer`: the calibrated softmax with the checkpoint's temperatures, entropy confidence, the expected score, the noul probability and the act probability, rounded to 4 places. It uses numpy's float types, numpy's pairwise sums and ports of numpy's AVX2 `exp` and `log`, which are bit exact against numpy over 2 million values each. Given Laya's own logits, all 400 parity responses equal Laya's byte for byte. With libm's `exp`, 2 of them were off in the fourth decimal.
+
 ## 0.0.5
 
 The CUDA backend is finished for M0. Rope runs inside attention, every kernel has its own test against a naive version, and a warm plan allocates nothing on the host. The GPU tests skip cleanly on machines without CUDA, which is what broke the 0.0.4 release run.
