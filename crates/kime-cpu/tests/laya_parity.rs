@@ -5,6 +5,12 @@
 //! CI, so the test reads them from `$KIME_MODELS/laya`, and passes with a note when they are
 //! missing unless `KIME_REQUIRE_WEIGHTS` is set. It is slow without optimizations, so run it with
 //! `cargo test --release -p kime-cpu --test laya_parity`.
+//!
+//! The bounds come from how far Laya is from itself. The same Laya run with 8 threads instead of
+//! the default 32 on an i9-13900K moves the English logits by up to 9.4e-5 and the probabilities
+//! by up to 1.2e-5, because MKL splits the sums differently. kime cannot be held closer to Laya
+//! than Laya is to itself, so the bounds sit a little above that, and argmax has to agree on every
+//! question.
 
 use std::path::PathBuf;
 
@@ -63,11 +69,12 @@ fn check(name: &str, sub: &str) {
         return;
     };
     let model = Model::open(&dir).unwrap();
-    let compat = Compat::new(&model, par::available());
+    let mut compat = Compat::new(&model, par::available());
     let qs = questions(name);
     assert!(qs.len() >= 600, "{name}: only {} questions", qs.len());
 
     let (mut logit_err, mut prob_err, mut act_err) = (0f64, 0f64, 0f64);
+    let (mut sum_err, mut n_logits) = (0f64, 0usize);
     let mut agree = 0;
     for chunk in qs.chunks(16) {
         let inputs: Vec<Input<'_>> = chunk
@@ -79,6 +86,8 @@ fn check(name: &str, sub: &str) {
             assert_eq!(o.logits.len(), q.logits.len(), "{}", q.case);
             for (a, b) in o.logits.iter().zip(&q.logits) {
                 logit_err = logit_err.max(f64::from((a - b).abs()));
+                sum_err += f64::from((a - b).abs());
+                n_logits += 1;
             }
             for (a, b) in softmax(&o.logits).iter().zip(softmax(&q.logits)) {
                 prob_err = prob_err.max((a - b).abs());
@@ -98,13 +107,27 @@ fn check(name: &str, sub: &str) {
         }
     }
     eprintln!(
-        "{name}: {} questions, argmax agrees on {agree}, max logit error {logit_err:.2e}, max probability error {prob_err:.2e}, max act error {act_err:.2e} relative",
-        qs.len()
+        "{name}: {} questions, argmax agrees on {agree}, logit error max {logit_err:.2e} mean {:.2e}, max probability error {prob_err:.2e}, max act error {act_err:.2e} relative",
+        qs.len(),
+        sum_err / n_logits.max(1) as f64
     );
     assert_eq!(agree, qs.len());
-    assert!(logit_err < 1e-4, "{name}: logit error {logit_err}");
-    assert!(prob_err < 1e-5, "{name}: probability error {prob_err}");
-    assert!(act_err < 1e-4, "{name}: act error {act_err}");
+
+    // The same bits on one thread as on all of them.
+    let few: Vec<Input<'_>> = qs[..6]
+        .iter()
+        .map(|q| Input { ids: &q.ids, markers: &q.markers, qtype: q.qtype })
+        .collect();
+    let many = compat.forward(&few);
+    compat.set_threads(1);
+    let one = compat.forward(&few);
+    for (a, b) in many.iter().zip(&one) {
+        assert!(a.logits.iter().zip(&b.logits).all(|(x, y)| x.to_bits() == y.to_bits()));
+        assert!(a.act.iter().zip(&b.act).all(|(x, y)| x.to_bits() == y.to_bits()));
+    }
+    assert!(logit_err < 1.5e-4, "{name}: logit error {logit_err}");
+    assert!(prob_err < 2e-5, "{name}: probability error {prob_err}");
+    assert!(act_err < 5e-5, "{name}: act error {act_err}");
 }
 
 #[test]

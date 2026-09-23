@@ -168,8 +168,10 @@ fn tile<V: V8, const R: usize, const C: usize>(x: [&[f32]; R], w: [&[f32]; C]) -
         let end = (p + BLOCK).min(body);
         let mut acc = [[V::zero(); C]; R];
         while p < end {
-            let xv: [V; R] = std::array::from_fn(|r| V::load(x[r][p..p + LANES].try_into().unwrap()));
-            let wv: [V; C] = std::array::from_fn(|c| V::load(w[c][p..p + LANES].try_into().unwrap()));
+            let xv: [V; R] =
+                std::array::from_fn(|r| V::load(x[r][p..p + LANES].try_into().unwrap()));
+            let wv: [V; C] =
+                std::array::from_fn(|c| V::load(w[c][p..p + LANES].try_into().unwrap()));
             for r in 0..R {
                 for c in 0..C {
                     acc[r][c] = acc[r][c].fma(xv[r], wv[c]);

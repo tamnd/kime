@@ -56,6 +56,11 @@ impl Compat {
         Self { spec: model.spec.clone(), graph: model.graph.clone(), w, threads: threads.max(1) }
     }
 
+    /// Changes the number of threads the forward pass uses. The results do not change with it.
+    pub fn set_threads(&mut self, threads: usize) {
+        self.threads = threads.max(1);
+    }
+
     /// The checkpoint's configuration.
     #[must_use]
     pub fn spec(&self) -> &LayaSpec {
