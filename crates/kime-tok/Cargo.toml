@@ -13,6 +13,10 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
+unicode-normalization.workspace = true
+unicode-properties.workspace = true
 
 [lints]
 workspace = true
