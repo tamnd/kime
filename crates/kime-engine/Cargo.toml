@@ -16,6 +16,16 @@ readme.workspace = true
 kime-core.workspace = true
 kime-model.workspace = true
 kime-tensor.workspace = true
+kime-tok.workspace = true
+kime-cpu.workspace = true
+kime-cuda = { workspace = true, optional = true }
+serde_json.workspace = true
+
+[features]
+default = ["cuda"]
+# The CUDA backend. It loads the CUDA libraries at run time, so a build with it still runs on a
+# machine without a GPU.
+cuda = ["dep:kime-cuda"]
 
 [lints]
 workspace = true
