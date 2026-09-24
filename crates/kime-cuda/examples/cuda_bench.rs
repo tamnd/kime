@@ -3,7 +3,8 @@
 //!     cargo run --release -p kime-cuda --example cuda_bench -- <laya dir> <fixture.jsonl> [f32|f16] [batch]
 //!
 //! It prints the load time, the latency of one question at a time (p50 and p99) and the
-//! throughput when `batch` questions run together.
+//! throughput when `batch` questions run together. Where NVML is there it also prints the energy
+//! per decision, over again as many runs and next to the board's idle draw.
 
 use std::time::Instant;
 
@@ -94,6 +95,34 @@ fn main() {
         b * 1e3 / qs.len() as f64,
         tokens as f64 / b
     );
+
+    match kime_cuda::energy::Meter::open(0) {
+        Ok(meter) => {
+            let idle = meter.idle_watts(5.0).unwrap();
+            println!("idle: {idle:.1} W");
+            let mut each = |name: &str, f: &mut dyn FnMut(&mut kime_tensor::Executor<_>)| {
+                let (_, s, j) = meter.measure(|| f(&mut exec)).unwrap();
+                let n = qs.len() as f64;
+                println!(
+                    "energy, {name}: {:.1} W over {s:.2} s, {:.2} mJ per decision, {:.2} mJ above idle",
+                    j / s,
+                    j * 1e3 / n,
+                    (j - idle * s) * 1e3 / n
+                );
+            };
+            each("one at a time", &mut |e| {
+                for q in &qs {
+                    run(e, std::slice::from_ref(q));
+                }
+            });
+            each(&format!("batches of {batch}"), &mut |e| {
+                for chunk in qs.chunks(batch) {
+                    run(e, chunk);
+                }
+            });
+        }
+        Err(e) => println!("no energy counter: {e}"),
+    }
 
     // Where the time goes in batches, with a wait after every step.
     for p in exec.plans_mut() {

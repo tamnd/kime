@@ -13,6 +13,7 @@
 //! that names the invariant which makes it sound.
 
 mod compat;
+pub mod energy;
 #[cfg(test)]
 mod kernel_tests;
 mod lt;

@@ -239,6 +239,7 @@ dependencies = [
  "kime-cpu",
  "kime-model",
  "kime-tensor",
+ "libloading",
  "serde_json",
 ]
 
