@@ -142,7 +142,7 @@ The response is `{"model": "...", "results": [{"id": "a", "answers": {...}, "usa
 ]}
 ```
 
-The server config maps aliases to concrete ids. By default `jev-latest`, `jev-preview`, `jev` and any `jev-*` id map to `kime-latest`. This lets clients with a hard coded `jev-latest` work unchanged. Operators can turn this off with `--no-jev-aliases`. `laya`, `convaiinnovations/laya`, `laya-multilingual` and `laya-typed-decisions` map to the compat models when those are loaded, and to their native kime-v1 equivalents otherwise.
+The server config maps aliases to concrete ids. By default `jev-latest`, `jev-preview`, `jev` and any `jev-*` id map to `kime-latest`. This lets clients that send `jev-latest` work unchanged, and all of them do by default: `typesafe-sdk` 0.7.1 (`DEFAULT_MODEL`), `@typesafe-ai/sdk` 0.6.0 (`defaultModel`) and jev-ultrafast (`TYPESAFE_MODEL`). The server says so in one line at start, naming the model that answers. Operators can turn this off with `--no-jev-aliases`. `laya`, `convaiinnovations/laya`, `laya-multilingual` and `laya-typed-decisions` map to the compat models when those are loaded, and to their native kime-v1 equivalents otherwise.
 
 ## Errors
 
