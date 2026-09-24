@@ -23,6 +23,7 @@ use kime_engine::Error;
 use serde_json::{Map, Value, json};
 
 use crate::auth::{Auth, Bucket, Denied};
+use crate::log::{Line, Log, Served};
 use crate::metrics::{Metrics, ModelView, route};
 use crate::models::{Done, Models, Named, Refused, Resolved};
 
@@ -34,6 +35,7 @@ pub(crate) struct State {
     pub(crate) metrics: Metrics,
     pub(crate) auth: Auth,
     pub(crate) buckets: Vec<Bucket>,
+    pub(crate) log: Log,
 }
 
 type Shared = Arc<State>;
@@ -90,9 +92,43 @@ async fn request_id(mut req: HttpRequest, next: Next) -> HttpResponse {
     req.extensions_mut().insert(RequestId(id.clone()));
     let (start, route) = (Instant::now(), route(req.uri().path()));
     let state = req.extensions().get::<Shared>().cloned();
+    // Logging needs the body's size and hash, so it reads the body here and hands the handler a
+    // copy. Off, the body goes to the handler untouched.
+    let logged = match &state {
+        Some(s) if s.log != Log::Off => {
+            let (method, path) = (req.method().to_string(), req.uri().path().to_string());
+            let (parts, body) = req.into_parts();
+            let Ok(bytes) = axum::body::to_bytes(body, s.max_body).await else {
+                return too_large(s.max_body);
+            };
+            let seen = (method, path, bytes.len(), blake3::hash(&bytes), SystemTime::now());
+            req = HttpRequest::from_parts(parts, Body::from(bytes));
+            Some(seen)
+        }
+        _ => None,
+    };
     let mut res = next.run(req).await;
-    if let Some(s) = state {
-        s.metrics.record(route, res.status().as_u16(), start.elapsed());
+    let took = start.elapsed();
+    if let Some(s) = &state {
+        s.metrics.record(route, res.status().as_u16(), took);
+        if let Some((method, path, bytes, hash, at)) = &logged {
+            let served = res
+                .extensions()
+                .get::<Served>()
+                .map(|v| (s.models.list[v.model].id.as_str(), v.questions, v.tokens));
+            Line {
+                at: *at,
+                id: &id,
+                method,
+                path,
+                status: res.status().as_u16(),
+                took,
+                bytes: *bytes,
+                hash: *hash,
+                served,
+            }
+            .write(s.log);
+        }
     }
     if let Ok(v) = HeaderValue::from_str(&id) {
         res.headers_mut().insert(HeaderName::from_static("x-request-id"), v.clone());
@@ -100,10 +136,6 @@ async fn request_id(mut req: HttpRequest, next: Next) -> HttpResponse {
     }
     res
 }
-
-/// The input tokens a response charged, for the tokens per second limit.
-#[derive(Debug, Clone, Copy)]
-struct Tokens(u64);
 
 /// Checks the key and the rate limits in front of the `/v1` routes, and charges the tokens of the
 /// answer afterwards.
@@ -121,8 +153,8 @@ async fn guard(req: HttpRequest, next: Next) -> HttpResponse {
         }
     };
     let res = next.run(req).await;
-    if let Some(Tokens(n)) = res.extensions().get::<Tokens>() {
-        s.buckets[at].charge(*n);
+    if let Some(v) = res.extensions().get::<Served>() {
+        s.buckets[at].charge(v.tokens);
     }
     res
 }
@@ -227,14 +259,16 @@ fn refused(r: Refused, deadline: Option<Duration>) -> HttpResponse {
     }
 }
 
+fn too_large(max: usize) -> HttpResponse {
+    detail(
+        StatusCode::BAD_REQUEST,
+        format!("request body could not be read or is over {max} bytes"),
+    )
+}
+
 /// Reads and parses a JSON object body, or the 400 laya-serve and Jev both give.
 async fn object(body: Body, max: usize) -> Result<Map<String, Value>, HttpResponse> {
-    let bytes = axum::body::to_bytes(body, max).await.map_err(|_| {
-        detail(
-            StatusCode::BAD_REQUEST,
-            format!("request body could not be read or is over {max} bytes"),
-        )
-    })?;
+    let bytes = axum::body::to_bytes(body, max).await.map_err(|_| too_large(max))?;
     match serde_json::from_slice(&bytes) {
         Ok(Value::Object(o)) => Ok(o),
         Ok(_) => Err(detail(
@@ -469,7 +503,11 @@ async fn systemone(
     };
     let mut r = reply(StatusCode::OK, &out);
     timing(r.headers_mut(), &done, total);
-    r.extensions_mut().insert(Tokens(res.input_tokens as u64));
+    r.extensions_mut().insert(Served {
+        model: resolved.at,
+        questions: res.answers.len(),
+        tokens: res.input_tokens as u64,
+    });
     r
 }
 
@@ -553,7 +591,7 @@ async fn batch(
     let mut answered: Vec<Option<Result<Response, Error>>> =
         std::mem::take(&mut done.results).into_iter().map(Some).collect();
     let model = &s.models.list[resolved.at].id;
-    let mut tokens = 0;
+    let (mut tokens, mut questions) = (0, 0);
     let results: Vec<Value> = ids
         .into_iter()
         .zip(slots)
@@ -562,6 +600,7 @@ async fn batch(
             Ok(k) => match answered[k].take() {
                 Some(Ok(r)) => {
                     tokens += r.input_tokens;
+                    questions += r.answers.len();
                     let mut v = jev(model, &r, o, None);
                     if let Some(m) = v.as_object_mut() {
                         m.shift_remove("model");
@@ -585,7 +624,7 @@ async fn batch(
         &json!({"model": model, "results": results, "usage": {"input_tokens": tokens, "output_tokens": 0}}),
     );
     timing(r.headers_mut(), &done, start.elapsed());
-    r.extensions_mut().insert(Tokens(tokens as u64));
+    r.extensions_mut().insert(Served { model: resolved.at, questions, tokens: tokens as u64 });
     r
 }
 
