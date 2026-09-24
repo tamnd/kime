@@ -785,5 +785,381 @@
         ]
       }
     }
+  },
+  {
+    "name": "keys-missing",
+    "server": "keys",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "kime": {
+      "status": 403,
+      "body": {
+        "detail": {
+          "error_type": "authentication_error",
+          "message": "Must supply an API key! Check your request and try again."
+        }
+      }
+    }
+  },
+  {
+    "name": "keys-wrong",
+    "server": "keys",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "headers": [
+      "authorization: Bearer nope"
+    ],
+    "kime": {
+      "status": 401,
+      "body": {
+        "detail": {
+          "error_type": "authentication_error",
+          "message": "Cannot authenticate with the server. Please check your API key and try again."
+        }
+      }
+    }
+  },
+  {
+    "name": "keys-not-bearer",
+    "server": "keys",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "headers": [
+      "authorization: k1"
+    ],
+    "kime": {
+      "status": 403,
+      "body": {
+        "detail": {
+          "error_type": "authentication_error",
+          "message": "Must supply an API key! Check your request and try again."
+        }
+      }
+    }
+  },
+  {
+    "name": "keys-models-need-a-key",
+    "server": "keys",
+    "jev": true,
+    "method": "GET",
+    "path": "/v1/models",
+    "body": null,
+    "kime": {
+      "status": 403,
+      "body": {
+        "detail": {
+          "error_type": "authentication_error",
+          "message": "Must supply an API key! Check your request and try again."
+        }
+      }
+    }
+  },
+  {
+    "name": "keys-health-is-open",
+    "server": "keys",
+    "jev": true,
+    "method": "GET",
+    "path": "/health",
+    "body": null,
+    "kime": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "loaded": [
+          "english"
+        ]
+      }
+    }
+  },
+  {
+    "name": "keys-first",
+    "server": "keys",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "headers": [
+      "authorization: Bearer k1"
+    ],
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "confidence": 0.56,
+            "probabilities": {
+              "a": 0.78,
+              "b": 0.22
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "keys-second",
+    "server": "keys",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "headers": [
+      "authorization: bearer k1"
+    ],
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "confidence": 0.56,
+            "probabilities": {
+              "a": 0.78,
+              "b": 0.22
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "keys-over-rpm",
+    "server": "keys",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "headers": [
+      "authorization: Bearer k1"
+    ],
+    "kime": {
+      "status": 429,
+      "body": {
+        "detail": {
+          "error_type": "rate_limit_error",
+          "message": "Rate limit exceeded: this key allows 2 requests per minute. Retry after retry-after-ms."
+        }
+      },
+      "retry_after": 30
+    }
+  },
+  {
+    "name": "keys-other-key-has-its-own-limit",
+    "server": "keys",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "headers": [
+      "authorization: Bearer t1"
+    ],
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "confidence": 0.56,
+            "probabilities": {
+              "a": 0.78,
+              "b": 0.22
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "keys-over-tps",
+    "server": "keys",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "headers": [
+      "authorization: Bearer t1"
+    ],
+    "kime": {
+      "status": 429,
+      "body": {
+        "detail": {
+          "error_type": "rate_limit_error",
+          "message": "Rate limit exceeded: this key allows 10 input tokens per second. Retry after retry-after-ms."
+        }
+      },
+      "retry_after": 1
+    }
+  },
+  {
+    "name": "laya-key-missing",
+    "server": "laya-key",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}}",
+    "laya": {
+      "status": 401,
+      "body": {
+        "detail": "invalid or missing bearer token"
+      }
+    },
+    "kime": {
+      "status": 401,
+      "body": {
+        "detail": "invalid or missing bearer token"
+      }
+    }
+  },
+  {
+    "name": "laya-key-wrong",
+    "server": "laya-key",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}}",
+    "headers": [
+      "authorization: Bearer nope"
+    ],
+    "laya": {
+      "status": 401,
+      "body": {
+        "detail": "invalid or missing bearer token"
+      }
+    },
+    "kime": {
+      "status": 401,
+      "body": {
+        "detail": "invalid or missing bearer token"
+      }
+    }
+  },
+  {
+    "name": "laya-key-lower-case-scheme",
+    "server": "laya-key",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}}",
+    "headers": [
+      "authorization: bearer s3cret"
+    ],
+    "laya": {
+      "status": 401,
+      "body": {
+        "detail": "invalid or missing bearer token"
+      }
+    },
+    "kime": {
+      "status": 401,
+      "body": {
+        "detail": "invalid or missing bearer token"
+      }
+    }
+  },
+  {
+    "name": "laya-key-health-is-open",
+    "server": "laya-key",
+    "method": "GET",
+    "path": "/health",
+    "body": null,
+    "laya": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "loaded": [
+          "english"
+        ],
+        "device": "cpu"
+      }
+    },
+    "kime": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "loaded": [
+          "english"
+        ]
+      }
+    }
+  },
+  {
+    "name": "laya-key-ok",
+    "server": "laya-key",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}}",
+    "headers": [
+      "authorization: Bearer s3cret"
+    ],
+    "laya": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "probabilities": {
+              "a": 0.7799,
+              "b": 0.2201
+            },
+            "confidence": 0.2397,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    },
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "probabilities": {
+              "a": 0.7799,
+              "b": 0.2201
+            },
+            "confidence": 0.2397,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    }
   }
 ]

@@ -58,7 +58,7 @@ Rendered question headers and options tokenize to the same ids across requests w
 
 ## Rate limiting and overload
 
-- Per key limits: requests per minute and tokens per second, as token buckets in a flat array indexed by key id, with one atomic per bucket and no locks. The keys file gives each key its limits. Global defaults come from flags. Exceeding a limit returns 429 with `retry-after-ms` computed from the bucket refill time.
+- Per key limits: requests per minute and input tokens per second, as token buckets in a flat array indexed by key id, with one atomic per bucket and no locks. Each bucket is kept as the time it will be full again (GCRA), so admitting a request is one compare and swap. A key may send a whole minute of requests at once. Tokens are only known after the answer, so they are charged then, and a key more than one second of tokens in debt is refused until it is paid down. The keys file gives each key its limits. Global defaults come from `--rpm` and `--tps`, and with no keys they apply to all requests together. Exceeding a limit returns 429 with `retry-after-ms` computed from the bucket refill time and `retry-after` in whole seconds. A refused request's body is still read, so the connection stays open for the retry.
 - Overload: when the estimated queue wait exceeds `--max-queue-ms` (default 500), new requests get 529 with `retry-after-ms` set to the current wait estimate. This is Jev's 529 status. It protects tail latency instead of letting the queue grow without limit.
 - Concurrency limit: a semaphore on in-flight requests per server (default 4,096) bounds memory.
 

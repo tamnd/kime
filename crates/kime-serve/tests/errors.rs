@@ -8,6 +8,11 @@
 //! with a 400, 404 or 405, the body must be the same. Laya's 422 messages come from Python
 //! exceptions, so only their shape is compared.
 //!
+//! Cases run against one of three servers, named by `server`: `open` with no keys (the default),
+//! `keys` with Jev style keys and rate limits, and `laya-key` with laya-serve's `LAYA_API_KEY`.
+//! `headers` adds request headers, and `retry_after` in the snapshot is the `retry-after`
+//! header in seconds.
+//!
 //! The cases run in order. `jev-deadline` comes right after a forward pass, so the wait estimate
 //! is fresh and a 1 ms deadline is refused.
 //!
@@ -21,16 +26,25 @@ use kime_engine::{Device, Kime};
 use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-/// One exchange on a fresh connection: the status and the body, as JSON when it parses and as a
-/// string when it does not, without `routing`, which spec/10 owns and kime-route will change.
-async fn call(addr: SocketAddr, method: &str, path: &str, body: Option<&str>) -> (u16, Value) {
+/// One exchange on a fresh connection: the status, the body, as JSON when it parses and as a
+/// string when it does not, without `routing`, which spec/10 owns and kime-route will change,
+/// or `device`, and `retry-after` in seconds when it is there.
+async fn call(
+    addr: SocketAddr,
+    method: &str,
+    path: &str,
+    body: Option<&str>,
+    headers: &str,
+) -> (u16, Value, Option<u64>) {
     let mut s = tokio::net::TcpStream::connect(addr).await.unwrap();
     let head = match body {
         Some(b) => format!(
-            "{method} {path} HTTP/1.1\r\nhost: x\r\nconnection: close\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{b}",
+            "{method} {path} HTTP/1.1\r\nhost: x\r\nconnection: close\r\n{headers}content-type: application/json\r\ncontent-length: {}\r\n\r\n{b}",
             b.len()
         ),
-        None => format!("{method} {path} HTTP/1.1\r\nhost: x\r\nconnection: close\r\n\r\n"),
+        None => {
+            format!("{method} {path} HTTP/1.1\r\nhost: x\r\nconnection: close\r\n{headers}\r\n")
+        }
     };
     s.write_all(head.as_bytes()).await.unwrap();
     let mut out = String::new();
@@ -39,8 +53,67 @@ async fn call(addr: SocketAddr, method: &str, path: &str, body: Option<&str>) ->
     let mut v = serde_json::from_str(body).unwrap_or_else(|_| Value::String(body.to_string()));
     if let Some(o) = v.as_object_mut() {
         o.remove("routing");
+        // `/health` names the device and its thread count, which depend on the machine.
+        o.remove("device");
     }
-    (head[9..12].parse().unwrap(), v)
+    let retry = head.lines().find_map(|l| {
+        let (k, v) = l.split_once(':')?;
+        k.eq_ignore_ascii_case("retry-after").then(|| v.trim().parse().unwrap())
+    });
+    (head[9..12].parse().unwrap(), v, retry)
+}
+
+/// Starts a server on an ephemeral port that stops when the sender is dropped or sent to.
+fn start(
+    kime: &Kime,
+    auth: kime_serve::Auth,
+) -> (SocketAddr, tokio::sync::oneshot::Sender<()>, tokio::task::JoinHandle<std::io::Result<()>>) {
+    let std = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    std.set_nonblocking(true).unwrap();
+    let listener = tokio::net::TcpListener::from_std(std).unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let mut cfg = kime_serve::Config::new(addr, vec![kime.clone()]);
+    cfg.max_queue = std::time::Duration::ZERO;
+    cfg.auth = auth;
+    let server = tokio::spawn(kime_serve::serve(listener, cfg, async {
+        let _ = stopped.await;
+    }));
+    (addr, stop, server)
+}
+
+/// Two requests on one connection, the first refused before its body is read.
+async fn keep_alive(addr: SocketAddr) {
+    use tokio::io::AsyncBufReadExt;
+    let s = tokio::net::TcpStream::connect(addr).await.unwrap();
+    let mut s = tokio::io::BufReader::new(s);
+    let body = r#"{"state":"x","questions":{"q":{"type":"noul","instructions":"i"}},"kime":{}}"#;
+    for (key, want) in [("nope", "401"), ("t1", "429"), ("nope", "401")] {
+        let head = format!(
+            "POST /v1/systemone HTTP/1.1\r\nhost: x\r\nauthorization: Bearer {key}\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n",
+            body.len()
+        );
+        // The body comes a moment after the head, as it does from Python's http.client, so the
+        // server has to wait for it rather than find it already buffered.
+        s.get_mut().write_all(head.as_bytes()).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        s.get_mut().write_all(body.as_bytes()).await.unwrap();
+        let (mut line, mut len) = (String::new(), 0);
+        s.read_line(&mut line).await.unwrap();
+        assert_eq!(line.get(9..12), Some(want), "{line}");
+        loop {
+            let mut h = String::new();
+            s.read_line(&mut h).await.unwrap();
+            if h == "\r\n" {
+                break;
+            }
+            if let Some(v) = h.to_ascii_lowercase().strip_prefix("content-length:") {
+                len = v.trim().parse().unwrap();
+            }
+        }
+        let mut out = vec![0; len];
+        s.read_exact(&mut out).await.unwrap();
+    }
 }
 
 /// Equal, with numbers allowed to differ by one in the fourth decimal.
@@ -71,14 +144,16 @@ async fn error_snapshots() {
             return;
         }
     };
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-    let mut cfg = kime_serve::Config::new(addr, vec![kime]);
-    cfg.max_queue = std::time::Duration::ZERO;
-    let server = tokio::spawn(kime_serve::serve(listener, cfg, async {
-        let _ = stopped.await;
-    }));
+    // `open` has no keys. `keys` has Jev style keys: k1 at 2 requests a minute and t1 at 10 input
+    // tokens a second. `laya-key` is laya-serve's LAYA_API_KEY.
+    let mut keys = kime_serve::Auth::off();
+    keys.add_keys_file("k1 ops 2\nt1 tokens - 10\n").unwrap();
+    let servers = [
+        ("open", start(&kime, kime_serve::Auth::off())),
+        ("keys", start(&kime, keys)),
+        ("laya-key", start(&kime, kime_serve::Auth::laya("s3cret"))),
+    ];
+    let addr_of = |name: &str| servers.iter().find(|(n, _)| *n == name).map(|(_, s)| s.0).unwrap();
 
     let path = format!("{}/tests/errors/cases.json", env!("CARGO_MANIFEST_DIR"));
     let mut cases: Vec<Value> =
@@ -87,14 +162,22 @@ async fn error_snapshots() {
     let mut wrong = Vec::new();
     for c in &mut cases {
         let name = c["name"].as_str().unwrap().to_string();
-        let (status, body) = call(
-            addr,
+        let headers: String = c["headers"]
+            .as_array()
+            .map(|h| h.iter().map(|l| format!("{}\r\n", l.as_str().unwrap())).collect())
+            .unwrap_or_default();
+        let (status, body, retry) = call(
+            addr_of(c["server"].as_str().unwrap_or("open")),
             c["method"].as_str().unwrap(),
             c["path"].as_str().unwrap(),
             c["body"].as_str(),
+            &headers,
         )
         .await;
-        let got = json!({"status": status, "body": body});
+        let mut got = json!({"status": status, "body": body});
+        if let Some(r) = retry {
+            got["retry_after"] = r.into();
+        }
         if bless {
             c["kime"] = got.clone();
         } else if !close(&got, &c["kime"]) {
@@ -114,7 +197,7 @@ async fn error_snapshots() {
         let same = match status {
             _ if status != ls => false,
             200 => close(&body["answers"], &lb["answers"]) && body["usage"] == lb["usage"],
-            400 | 404 | 405 => body == *lb,
+            400 | 401 | 404 | 405 => body == *lb,
             _ => std::mem::discriminant(&body["detail"]) == std::mem::discriminant(&lb["detail"]),
         };
         if !same {
@@ -125,7 +208,12 @@ async fn error_snapshots() {
         let text = serde_json::to_string_pretty(&cases).unwrap() + "\n";
         std::fs::write(&path, text).unwrap();
     }
-    let _ = stop.send(());
-    server.await.unwrap().unwrap();
+    // A refused request leaves the connection open, so a client can retry on it.
+    keep_alive(addr_of("keys")).await;
+
+    for (_, (_, stop, server)) in servers {
+        let _ = stop.send(());
+        server.await.unwrap().unwrap();
+    }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

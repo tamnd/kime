@@ -19,12 +19,14 @@ All bodies are UTF-8 JSON. Requests may be gzip or zstd compressed with `Content
 
 ## Authentication
 
-Keys are configured with `--api-keys-file` (one key per line, optionally `key name rpm tps`), or the `KIME_API_KEYS` env var. When no keys are configured, auth is off and the server logs a warning at start if it is bound to a non-loopback address. The error bodies match Jev exactly:
+Keys are configured with `--api-keys-file` (one key per line as `key [name [rpm [tps]]]`, with `-` for the server default and `#` for comments), or the `KIME_API_KEYS` env var (comma separated). Clients send `Authorization: Bearer <key>` on every `/v1` route. `/health`, `/ready` and `/metrics` need no key. When no keys are configured, auth is off and the server logs a warning at start if it is bound to a non-loopback address. The error bodies match Jev exactly:
 
 - Missing header: `403` with `{"detail":{"error_type":"authentication_error","message":"Must supply an API key! Check your request and try again."}}`
 - Unknown key: `401` with `{"detail":{"error_type":"authentication_error","message":"Cannot authenticate with the server. Please check your API key and try again."}}`
 
 Keys are compared in constant time against a set of blake3 hashes. Raw keys are never kept in memory after load and never logged.
+
+laya-serve's `LAYA_API_KEY` is read too. When it is the only key, a missing or wrong key gets laya-serve's `401` with `{"detail":"invalid or missing bearer token"}`, and the scheme must be spelled `Bearer` exactly, as in laya-serve, so a laya-serve deployment can switch binaries without its clients seeing a change. Next to other keys it is one more key with Jev's errors.
 
 ## POST /v1/systemone
 

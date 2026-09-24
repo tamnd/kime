@@ -14,7 +14,10 @@ use std::time::Duration;
 use kime_engine::Kime;
 
 mod api;
+mod auth;
 mod models;
+
+pub use auth::Auth;
 
 /// How the server runs.
 #[derive(Debug)]
@@ -34,6 +37,8 @@ pub struct Config {
     /// New requests get 529 when the queue ahead of them would take longer than this. Zero
     /// turns the check off.
     pub max_queue: Duration,
+    /// API keys and rate limits. Off unless set.
+    pub auth: Auth,
 }
 
 impl Config {
@@ -48,6 +53,7 @@ impl Config {
             max_batch: 256,
             io_threads: 2,
             max_queue: Duration::from_millis(500),
+            auth: Auth::off(),
         }
     }
 }
@@ -66,7 +72,13 @@ pub fn run(cfg: Config) -> std::io::Result<()> {
         .build()?;
     rt.block_on(async {
         let listener = tokio::net::TcpListener::bind(cfg.addr).await?;
-        eprintln!("kime serve: listening on http://{}", listener.local_addr()?);
+        let addr = listener.local_addr()?;
+        eprintln!("kime serve: listening on http://{addr}");
+        if !cfg.auth.is_on() && !addr.ip().is_loopback() {
+            eprintln!(
+                "kime serve: warning: no API keys are set and the server is reachable from other machines, so anyone who can reach it can use it (set --api-keys-file, KIME_API_KEYS or LAYA_API_KEY)"
+            );
+        }
         serve(listener, cfg, shutdown()).await
     })
 }
@@ -84,6 +96,8 @@ pub async fn serve(
     use axum::serve::ListenerExt;
     let state = Arc::new(api::State {
         models: models::Models::new(cfg.models, cfg.jev_aliases, cfg.max_batch, cfg.max_queue),
+        buckets: cfg.auth.buckets(),
+        auth: cfg.auth,
         max_body: cfg.max_body,
         metrics: api::Metrics::default(),
     });
