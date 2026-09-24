@@ -174,6 +174,8 @@ async fn serve_laya() {
     let _ = s.read_to_string(&mut text).await;
     assert!(text.contains("kime_requests_total{route=\"/v1/systemone\",status=\"200\"}"), "{text}");
     assert!(text.contains("kime_requests_total{route=\"other\",status=\"404\"} 1"), "{text}");
+    assert!(text.contains("kime_forward_passes_total{model=\"laya\"}"), "{text}");
+    assert!(text.contains("kime_device_seconds_bucket{model=\"laya\",le=\"+Inf\"}"), "{text}");
 
     // The batch endpoint: items fail alone and the good ones match the single endpoint.
     let item = |c: &Value, id: &str| {

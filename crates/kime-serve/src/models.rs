@@ -11,6 +11,8 @@ use kime_engine::{Error, Kime, Timing};
 use serde_json::{Value, json};
 use tokio::sync::oneshot;
 
+use crate::metrics::{ModelView, Pass, Stats};
+
 /// The Hugging Face repo and Laya's router key for each published checkpoint, for the `routing`
 /// block laya-serve adds.
 const LAYA_KEYS: &[(&str, &str, &str)] = &[
@@ -46,6 +48,19 @@ pub(crate) struct Model {
     pub(crate) device: String,
     queue: mpsc::Sender<Job>,
     load: Arc<Load>,
+    stats: Arc<Stats>,
+}
+
+impl Model {
+    /// Its name and live numbers for `/metrics`.
+    pub(crate) fn view(&self) -> ModelView<'_> {
+        ModelView {
+            id: &self.id,
+            stats: &self.stats,
+            pending: self.load.pending.load(Ordering::Relaxed),
+            per_request: Duration::from_nanos(self.load.per_request.load(Ordering::Relaxed)),
+        }
+    }
 }
 
 /// What a model's queue holds and how fast it drains, for the overload check.
@@ -144,7 +159,8 @@ impl Models {
                 let (tx, rx) = mpsc::channel();
                 let (id, device) = (k.model_id().to_string(), k.device());
                 let load = Arc::new(Load::default());
-                let l = load.clone();
+                let stats = Arc::new(Stats::default());
+                let (l, st) = (load.clone(), stats.clone());
                 std::thread::Builder::new()
                     .name(format!("kime-{id}"))
                     .spawn(move || {
@@ -152,12 +168,13 @@ impl Models {
                             &rx,
                             max_batch.max(1),
                             &l,
+                            &st,
                             |r| k.decide_batch_timed(r),
                             |r| k.decide(r),
                         );
                     })
                     .expect("spawning a worker thread");
-                Model { id, device, queue: tx, load }
+                Model { id, device, queue: tx, load, stats }
             })
             .collect();
         Models { list, jev_aliases, max_queue }
@@ -235,7 +252,9 @@ impl Models {
             m.load.pending.fetch_sub(n, Ordering::Relaxed);
             return Ok(gone(n));
         }
-        Ok(rx.await.unwrap_or_else(|_| gone(n)))
+        let done = rx.await.unwrap_or_else(|_| gone(n));
+        m.stats.queue.time(done.queue);
+        Ok(done)
     }
 }
 
@@ -265,6 +284,7 @@ fn worker(
     rx: &mpsc::Receiver<Job>,
     max: usize,
     load: &Load,
+    stats: &Stats,
     batch: impl Fn(&[Request]) -> Result<(Vec<Response>, Timing), Error>,
     one: impl Fn(&Request) -> Result<Response, Error>,
 ) {
@@ -286,6 +306,15 @@ fn worker(
             jobs.iter_mut().flat_map(|j| std::mem::take(&mut j.reqs)).collect();
         let (mut results, pass) = answer(&reqs, &batch, &one);
         load.record(start.elapsed(), reqs.len());
+        let answered = results.iter().flatten();
+        stats.pass(Pass {
+            requests: reqs.len(),
+            questions: answered.clone().map(|r| r.answers.len()).sum(),
+            tokens: answered.map(|r| r.input_tokens).sum(),
+            batches: pass.batches,
+            tokenize: pass.tokenize,
+            device: pass.device,
+        });
         load.pending.fetch_sub(reqs.len(), Ordering::Relaxed);
         for (job, k) in jobs.into_iter().zip(counts) {
             let rest = results.split_off(k);
@@ -361,7 +390,7 @@ mod tests {
                 }
                 Ok((r.iter().map(resp).collect(), Timing::default()))
             };
-            worker(&rx, 1, &l, batch, |r| Ok(resp(r)));
+            worker(&rx, 1, &l, &Stats::default(), batch, |r| Ok(resp(r)));
         });
         let first = submit(&tx, &load, "boom");
         let d = first.blocking_recv().unwrap();

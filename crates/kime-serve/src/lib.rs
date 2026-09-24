@@ -15,6 +15,7 @@ use kime_engine::Kime;
 
 mod api;
 mod auth;
+mod metrics;
 mod models;
 
 pub use auth::Auth;
@@ -99,7 +100,7 @@ pub async fn serve(
         buckets: cfg.auth.buckets(),
         auth: cfg.auth,
         max_body: cfg.max_body,
-        metrics: api::Metrics::default(),
+        metrics: metrics::Metrics::default(),
     });
     let listener = listener.tap_io(|tcp| {
         // Answers are small and latency is the product, so Nagle only gets in the way.

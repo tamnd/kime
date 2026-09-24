@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `/metrics` has the per stage histograms from spec/11: queue, tokenize and device time, and how many requests, questions, input tokens and device batches each forward pass took, per model, plus request time by route, questions and input tokens answered, queue depth, the device time estimate, and rejections by reason. Recording is a few relaxed atomic adds per forward pass and per request. Checked with prometheus_client's parser on a live server after 30 s of 8 clients on the Mac CPU: 15 families and 256 samples, with the question and token counts matching the requests sent.
+
 ## 0.0.13
 
 - A model name like `laya` resolves in any snapshot of its repo, newest first, when the snapshot `refs/main` names does not have it. `kime pull laya-typed-decisions` at a newer commit used to hide `laya` and `laya-multilingual` pulled earlier.

@@ -95,6 +95,22 @@ The decision is returned in `kime.routing` when extensions are on, and as a top 
 - Prometheus metrics: request counts by status and model; latency histograms per stage (queue, tokenize, state, question, total) with buckets from 50 us to 5 s; batch size and token histograms per bucket; cache hit ratios; truncations; router decisions by model and reason; device memory; rejected requests by reason.
 - `GET /ready` returns JSON with the loaded models, device names, queue depths and the EWMA per bucket.
 
+The metrics `/metrics` has today. Times are histograms with buckets from 50 µs to 5 s, and the per pass sizes have power of two buckets.
+
+| Metric | Labels | What |
+|---|---|---|
+| `kime_requests_total` | route, status | requests answered |
+| `kime_rejected_total` | reason | turned away: auth, too_large, rate_limit, deadline, overloaded |
+| `kime_request_duration_seconds` | route | request line to response |
+| `kime_questions_total`, `kime_input_tokens_total`, `kime_forward_passes_total` | model | work done |
+| `kime_queue_depth` | model | requests queued or running |
+| `kime_device_seconds_per_request` | model | the estimate the overload and deadline checks use |
+| `kime_queue_seconds` | model | submission to the start of the forward pass |
+| `kime_tokenize_seconds`, `kime_device_seconds` | model | per forward pass |
+| `kime_pass_requests`, `kime_pass_questions`, `kime_pass_input_tokens`, `kime_pass_device_batches` | model | how full each forward pass was |
+
+Cache hit ratios, truncations, router decisions and device memory come with the caches, kime-route and the device stats.
+
 ## Configuration
 
 Every setting has a flag, a field in a TOML file (`--config kime.toml`, or `KIME_CONFIG`) and an env var named after the field in capitals (`max_queue_ms` is `--max-queue-ms` and `KIME_MAX_QUEUE_MS`). Sources override each other in this order, last one wins: the defaults, laya-serve's env vars, the file, the `KIME_*` env vars, the flags. A field the file does not know is an error that names it and its line, as is a value of the wrong type.
