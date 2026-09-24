@@ -83,7 +83,8 @@ pub struct AgentConfig {
 /// Both configs of a compat checkpoint.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LayaSpec {
-    /// The name kime serves it under, `laya` or `laya-multilingual` for the published ones.
+    /// The name kime serves it under, `laya`, `laya-multilingual` or `laya-typed-decisions` for
+    /// the published ones.
     pub id: String,
     /// The encoder.
     pub encoder: EncoderConfig,
@@ -207,16 +208,21 @@ impl AgentConfig {
 }
 
 impl LayaSpec {
-    /// Builds the spec from the two config files. The id follows the encoder: the two published
-    /// checkpoints get their Laya names and anything else is `laya-custom`.
+    /// Builds the spec from the two config files. The id follows the encoder: the published
+    /// checkpoints get their Laya names and anything else is `laya-custom`. The typed-decisions
+    /// checkpoint shares the English encoder and is told apart by its `model_name`.
     ///
     /// # Errors
     ///
     /// [`Error::Format`] from either config.
-    pub fn from_json(agent: &Value, encoder: &Value) -> Result<Self> {
-        let agent = AgentConfig::from_json(agent)?;
+    pub fn from_json(agent_json: &Value, encoder: &Value) -> Result<Self> {
+        let agent = AgentConfig::from_json(agent_json)?;
         let encoder = EncoderConfig::from_json(encoder)?;
+        let typed = agent_json.get("model_name").and_then(Value::as_str);
         let id = match agent.encoder.as_str() {
+            "answerdotai/ModernBERT-large" if typed == Some("laya-typed-decisions") => {
+                "laya-typed-decisions"
+            }
             "answerdotai/ModernBERT-large" => "laya",
             "jhu-clsp/mmBERT-base" => "laya-multilingual",
             _ => "laya-custom",

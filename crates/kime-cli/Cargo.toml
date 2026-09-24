@@ -20,8 +20,10 @@ path = "src/main.rs"
 kime-model.workspace = true
 kime.workspace = true
 kime-serve.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+toml.workspace = true
 
 [lints]
 workspace = true

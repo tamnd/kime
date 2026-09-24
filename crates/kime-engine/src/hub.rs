@@ -8,9 +8,10 @@
 use std::path::{Path, PathBuf};
 
 /// The published compat models: alias, repo and subfolder.
-pub const ALIASES: [(&str, &str, &str); 2] = [
+pub const ALIASES: [(&str, &str, &str); 3] = [
     ("laya", "convaiinnovations/laya", ""),
     ("laya-multilingual", "convaiinnovations/laya", "multilingual"),
+    ("laya-typed-decisions", "convaiinnovations/laya", "typed-decisions"),
 ];
 
 /// The files a compat checkpoint needs, relative to its folder in the repo.
