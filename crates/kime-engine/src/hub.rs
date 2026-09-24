@@ -55,13 +55,31 @@ impl HubRef {
         cache.join(format!("models--{}", self.repo.replace('/', "--")))
     }
 
-    /// The checkpoint folder of the snapshot `refs/main` points at, if there is one.
+    /// The checkpoint folder in the snapshot `refs/main` points at, or in the newest snapshot
+    /// that has it. A repo with several checkpoints in subfolders can have each one pulled at a
+    /// different commit, and `refs/main` only names the last.
     #[must_use]
     pub fn local(&self, cache: &Path) -> Option<PathBuf> {
         let repo = self.repo_dir(cache);
-        let rev = std::fs::read_to_string(repo.join("refs/main")).ok()?;
-        let dir = repo.join("snapshots").join(rev.trim()).join(&self.subfolder);
-        dir.join("model.safetensors").is_file().then_some(dir)
+        let snapshots = repo.join("snapshots");
+        let has = |snap: &Path| {
+            let dir = snap.join(&self.subfolder);
+            dir.join("model.safetensors").is_file().then_some(dir)
+        };
+        if let Ok(rev) = std::fs::read_to_string(repo.join("refs/main"))
+            && let Some(dir) = has(&snapshots.join(rev.trim()))
+        {
+            return Some(dir);
+        }
+        std::fs::read_dir(&snapshots)
+            .ok()?
+            .filter_map(|e| {
+                let e = e.ok()?;
+                let dir = has(&e.path())?;
+                Some((e.metadata().and_then(|m| m.modified()).ok()?, dir))
+            })
+            .max_by_key(|(t, _)| *t)
+            .map(|(_, dir)| dir)
     }
 }
 
@@ -117,5 +135,23 @@ mod tests {
         assert_eq!(HubRef::parse("hf://org"), None);
         assert_eq!(HubRef::parse("kime-v1-s-en"), None);
         assert_eq!(r.repo_dir(Path::new("/c")), Path::new("/c/models--org--repo"));
+    }
+
+    #[test]
+    fn subfolders_pulled_at_different_commits() {
+        let cache = std::env::temp_dir().join(format!("kime-hub-{}", std::process::id()));
+        let repo = cache.join("models--convaiinnovations--laya");
+        for (rev, sub) in [("old", ""), ("old", "multilingual"), ("new", "typed-decisions")] {
+            let dir = repo.join("snapshots").join(rev).join(sub);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("model.safetensors"), b"").unwrap();
+        }
+        std::fs::create_dir_all(repo.join("refs")).unwrap();
+        std::fs::write(repo.join("refs/main"), "new").unwrap();
+        let at = |name: &str| HubRef::parse(name).unwrap().local(&cache);
+        assert_eq!(at("laya-typed-decisions"), Some(repo.join("snapshots/new/typed-decisions")));
+        assert_eq!(at("laya-multilingual"), Some(repo.join("snapshots/old/multilingual")));
+        assert_eq!(at("laya"), Some(repo.join("snapshots/old/")));
+        let _ = std::fs::remove_dir_all(cache);
     }
 }
