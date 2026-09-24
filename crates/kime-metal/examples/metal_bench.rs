@@ -4,7 +4,8 @@
 //!
 //! It prints the load time, the latency of one question at a time (p50 and p99), the throughput
 //! when `batch` questions run together, and then, in a separate pass where every step waits for
-//! the GPU, where the time goes by kind of step.
+//! the GPU, where the time goes by kind of step. Before that it prints the energy per decision
+//! from the SMC over again as many runs, next to the machine's idle draw.
 
 #[cfg(target_os = "macos")]
 fn main() {
@@ -89,6 +90,34 @@ fn main() {
         qs.len() as f64 / b,
         tokens as f64 / b
     );
+
+    match kime_metal::energy::Meter::open() {
+        Ok(meter) => {
+            let idle = meter.idle_watts(5.0).unwrap();
+            println!("idle: {idle:.1} W");
+            let mut each = |name: &str, f: &mut dyn FnMut(&mut kime_tensor::Executor<_>)| {
+                let (_, s, j) = meter.measure(|| f(&mut exec)).unwrap();
+                let n = qs.len() as f64;
+                println!(
+                    "energy, {name}: {:.1} W over {s:.2} s, {:.1} mJ per decision, {:.1} mJ above idle",
+                    j / s,
+                    j * 1e3 / n,
+                    (j - idle * s) * 1e3 / n
+                );
+            };
+            each("one at a time", &mut |e| {
+                for q in &qs {
+                    run(e, std::slice::from_ref(q));
+                }
+            });
+            each(&format!("batches of {batch}"), &mut |e| {
+                for chunk in qs.chunks(batch) {
+                    run(e, chunk);
+                }
+            });
+        }
+        Err(e) => println!("no energy counter: {e}"),
+    }
 
     for p in exec.plans_mut() {
         p.profile();
