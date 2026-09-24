@@ -1,0 +1,721 @@
+[
+  {
+    "name": "not-json",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{",
+    "differs": "laya-serve lets the JSON error escape as a 500 in plain text; spec/03 says 400 and kime keeps it",
+    "laya": {
+      "status": 500,
+      "body": "Internal Server Error"
+    },
+    "kime": {
+      "status": 400,
+      "body": {
+        "detail": "request body is not JSON: EOF while parsing an object at line 1 column 1"
+      }
+    }
+  },
+  {
+    "name": "array",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "[]",
+    "laya": {
+      "status": 400,
+      "body": {
+        "detail": "request body must be an object with a 'questions' field"
+      }
+    },
+    "kime": {
+      "status": 400,
+      "body": {
+        "detail": "request body must be an object with a 'questions' field"
+      }
+    }
+  },
+  {
+    "name": "no-questions",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\"}",
+    "laya": {
+      "status": 400,
+      "body": {
+        "detail": "request body must be an object with a 'questions' field"
+      }
+    },
+    "kime": {
+      "status": 400,
+      "body": {
+        "detail": "request body must be an object with a 'questions' field"
+      }
+    }
+  },
+  {
+    "name": "questions-empty",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {}}",
+    "laya": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {},
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {},
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "questions-list",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": []}",
+    "laya": {
+      "status": 422,
+      "body": {
+        "detail": "'list' object has no attribute 'keys'"
+      }
+    },
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": "Input should be a valid dictionary"
+      }
+    }
+  },
+  {
+    "name": "bad-type",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"rank\", \"instructions\": \"i\", \"criteria\": {\"a\": \"a\"}}}}",
+    "laya": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': unknown type 'rank'; use one of ['choice', 'noul', 'score']"
+      }
+    },
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": "Input should be 'choice', 'score' or 'noul'"
+      }
+    }
+  },
+  {
+    "name": "no-type",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"instructions\": \"i\", \"criteria\": {\"a\": \"a\"}}}}",
+    "laya": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': unknown type None; use one of ['choice', 'noul', 'score']"
+      }
+    },
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": "Field required"
+      }
+    }
+  },
+  {
+    "name": "choice-no-options",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"i\", \"criteria\": {}}}}",
+    "laya": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': a choice question needs at least one criterion"
+      }
+    },
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": "choice question 'q' needs at least 1 option, got 0"
+      }
+    }
+  },
+  {
+    "name": "score-one-level",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"score\", \"instructions\": \"i\", \"criteria\": {\"1\": \"low\"}}}}",
+    "laya": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': a score question takes 'criteria' as a list of level descriptions, index 0 first"
+      }
+    },
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": "score question 'q' takes criteria as an array of level descriptions, level 0 first"
+      }
+    }
+  },
+  {
+    "name": "criteria-string",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"i\", \"criteria\": \"a\"}}}",
+    "laya": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': a choice question takes 'criteria' as a dict of label -> description, or a list of labels"
+      }
+    },
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": "choice question 'q' takes criteria as an object of label to description, or an array of labels"
+      }
+    }
+  },
+  {
+    "name": "noul-bad-key",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"i\", \"criteria\": {\"maybe\": \"m\"}}}}",
+    "laya": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "noul",
+            "noul": 0.1314,
+            "confidence": 0.8686,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 28,
+          "output_tokens": 0
+        }
+      }
+    },
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "noul",
+            "noul": 0.1314,
+            "confidence": 0.8686,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 28,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "noul-upper-key",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"i\", \"criteria\": {\"True\": \"yes\"}}}}",
+    "laya": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "noul",
+            "noul": 0.1427,
+            "confidence": 0.8573,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 24,
+          "output_tokens": 0
+        }
+      }
+    },
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "noul",
+            "noul": 0.1427,
+            "confidence": 0.8573,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 24,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "state-null",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": null, \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}}",
+    "laya": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "probabilities": {
+              "a": 0.816,
+              "b": 0.184
+            },
+            "confidence": 0.3113,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    },
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "probabilities": {
+              "a": 0.816,
+              "b": 0.184
+            },
+            "confidence": 0.3113,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "no-state",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}}",
+    "laya": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "probabilities": {
+              "a": 0.816,
+              "b": 0.184
+            },
+            "confidence": 0.3113,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    },
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "probabilities": {
+              "a": 0.816,
+              "b": 0.184
+            },
+            "confidence": 0.3113,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "unknown-model",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"model\": \"nope\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}}",
+    "differs": "laya-serve routes an unknown model name to the default; spec/03 says 404 so a typo is not answered by the wrong model",
+    "laya": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "probabilities": {
+              "a": 0.7799,
+              "b": 0.2201
+            },
+            "confidence": 0.2397,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    },
+    "kime": {
+      "status": 404,
+      "body": {
+        "detail": "model 'nope' not found"
+      }
+    }
+  },
+  {
+    "name": "get-systemone",
+    "method": "GET",
+    "path": "/v1/systemone",
+    "body": null,
+    "laya": {
+      "status": 405,
+      "body": {
+        "detail": "Method Not Allowed"
+      }
+    },
+    "kime": {
+      "status": 405,
+      "body": {
+        "detail": "Method Not Allowed"
+      }
+    }
+  },
+  {
+    "name": "unknown-path",
+    "method": "GET",
+    "path": "/nope",
+    "body": null,
+    "laya": {
+      "status": 404,
+      "body": {
+        "detail": "Not Found"
+      }
+    },
+    "kime": {
+      "status": 404,
+      "body": {
+        "detail": "Not Found"
+      }
+    }
+  },
+  {
+    "name": "post-health",
+    "method": "POST",
+    "path": "/health",
+    "body": "{}",
+    "laya": {
+      "status": 405,
+      "body": {
+        "detail": "Method Not Allowed"
+      }
+    },
+    "kime": {
+      "status": 405,
+      "body": {
+        "detail": "Method Not Allowed"
+      }
+    }
+  },
+  {
+    "name": "jev-no-questions",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"kime\": {}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "questions"
+            ],
+            "msg": "Field required",
+            "type": "missing",
+            "input": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-questions-empty",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {}, \"kime\": {}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "questions"
+            ],
+            "msg": "questions must have at least one question",
+            "type": "too_short",
+            "input": {}
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-state-null",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": null, \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "state"
+            ],
+            "msg": "state must not be null, send \"\" for an empty state",
+            "type": "value_error",
+            "input": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-no-state",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "state"
+            ],
+            "msg": "Field required",
+            "type": "missing",
+            "input": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-bad-type",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"rank\", \"instructions\": \"i\", \"criteria\": {\"a\": \"a\"}}}, \"kime\": {}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "questions",
+              "q",
+              "type"
+            ],
+            "msg": "Input should be 'choice', 'score' or 'noul'",
+            "type": "literal_error",
+            "input": "rank"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-score-one-level",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"score\", \"instructions\": \"i\", \"criteria\": [\"low\"]}}, \"kime\": {}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "questions",
+              "q",
+              "criteria"
+            ],
+            "msg": "score question 'q' needs at least 2 levels, got 1",
+            "type": "too_short",
+            "input": [
+              "low"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-noul-bad-key",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"i\", \"criteria\": {\"maybe\": \"m\"}}}, \"kime\": {}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "questions",
+              "q",
+              "criteria",
+              "maybe"
+            ],
+            "msg": "noul question 'q' takes only the keys true and false, got 'maybe'",
+            "type": "noul_key",
+            "input": "m"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-many-problems",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": null, \"questions\": {\"a\": {\"type\": \"choice\", \"criteria\": \"x\"}, \"b\": {\"type\": \"score\", \"instructions\": \"i\", \"criteria\": []}}, \"kime\": {}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "state"
+            ],
+            "msg": "state must not be null, send \"\" for an empty state",
+            "type": "value_error",
+            "input": null
+          },
+          {
+            "loc": [
+              "body",
+              "questions",
+              "a",
+              "criteria"
+            ],
+            "msg": "choice question 'a' takes criteria as an object of label to description, or an array of labels",
+            "type": "choice_criteria_type",
+            "input": "x"
+          },
+          {
+            "loc": [
+              "body",
+              "questions",
+              "b",
+              "criteria"
+            ],
+            "msg": "score question 'b' needs at least 2 levels, got 0",
+            "type": "too_short",
+            "input": []
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-bad-kime",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {\"precision\": 99}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "kime",
+              "precision"
+            ],
+            "msg": "precision must be 0 to 6 or null",
+            "type": "int_range",
+            "input": 99
+          }
+        ]
+      }
+    }
+  }
+]

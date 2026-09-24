@@ -100,7 +100,7 @@ pub struct Question {
 /// A validated request.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Request {
-    /// The state, as sent. Never null.
+    /// The state, as sent. Null only under [`Limits::LAYA`], for a null or missing state.
     pub state: Value,
     /// The requested model, if any.
     pub model: Option<String>,
@@ -278,6 +278,10 @@ pub struct Limits {
     /// Whether an empty `questions` object is allowed. Jev rejects it and Laya answers it with no
     /// answers.
     pub allow_no_questions: bool,
+    /// Whether to take what Laya takes without a word: a null or missing `state`, which Laya
+    /// renders as the text `null`, and noul criteria keys other than true and false, which Laya
+    /// ignores.
+    pub lenient: bool,
 }
 
 impl Limits {
@@ -288,6 +292,7 @@ impl Limits {
         min_levels: 2,
         max_levels: 32,
         allow_no_questions: false,
+        lenient: false,
     };
 
     /// What Laya accepts, for requests to a compat model that did not send a `kime` object.
@@ -297,6 +302,7 @@ impl Limits {
         min_levels: 1,
         max_levels: 32,
         allow_no_questions: true,
+        lenient: true,
     };
 }
 
@@ -373,6 +379,7 @@ pub fn parse(body: &Value, limits: &Limits) -> Result<Request, Vec<Problem>> {
     };
 
     let state = match obj.get("state") {
+        None | Some(Value::Null) if limits.lenient => Value::Null,
         None => {
             p.add(&["state".into()], "missing", "Field required", &Value::Null);
             Value::Null
@@ -480,7 +487,7 @@ fn question(id: &str, q: &Value, limits: &Limits, p: &mut Problems) -> Option<Qu
     let criteria = match qtype {
         QType::Choice => choice(id, crit, limits, &crit_loc, p),
         QType::Score => score(id, crit, limits, &crit_loc, p),
-        QType::Noul => noul(id, crit, &crit_loc, p),
+        QType::Noul => noul(id, crit, &crit_loc, limits, p),
     };
     if p.0.len() > before {
         return None;
@@ -614,7 +621,13 @@ fn score(
     Criteria::Score(levels)
 }
 
-fn noul(id: &str, crit: Option<&Value>, loc: &[Loc], p: &mut Problems) -> Criteria {
+fn noul(
+    id: &str,
+    crit: Option<&Value>,
+    loc: &[Loc],
+    limits: &Limits,
+    p: &mut Problems,
+) -> Criteria {
     let mut when_false = None;
     let mut when_true = None;
     match crit {
@@ -626,6 +639,7 @@ fn noul(id: &str, crit: Option<&Value>, loc: &[Loc], p: &mut Problems) -> Criter
                 match k.to_lowercase().as_str() {
                     "true" => when_true = Some(v.clone()),
                     "false" => when_false = Some(v.clone()),
+                    _ if limits.lenient => {}
                     _ => p.add(
                         &with(loc, Loc::Key(k.clone())),
                         "noul_key",
@@ -721,6 +735,18 @@ mod tests {
         let one = json!({"state": "x", "questions": {"s": {"type": "score", "criteria": ["a"]}}});
         assert!(parse(&one, &Limits::JEV).is_err());
         assert!(parse(&one, &Limits::LAYA).is_ok());
+        // Laya renders a null or missing state as the text null.
+        for body in [json!({"state": null, "questions": {}}), json!({"questions": {}})] {
+            assert!(parse(&body, &Limits::JEV).is_err());
+            assert_eq!(parse(&body, &Limits::LAYA).unwrap().state, Value::Null);
+        }
+        // Laya ignores noul keys other than true and false.
+        let noul = json!({"state": "x", "questions": {"n": {"type": "noul", "instructions": "i", "criteria": {"maybe": "m", "True": "yes"}}}});
+        assert!(parse(&noul, &Limits::JEV).is_err());
+        assert_eq!(
+            parse(&noul, &Limits::LAYA).unwrap().questions[0].criteria,
+            Criteria::Noul { when_false: None, when_true: Some(json!("yes")) }
+        );
     }
 
     #[test]

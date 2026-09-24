@@ -165,9 +165,12 @@ Validation rules:
 - `type` must be one of the three types.
 - `choice` needs at least 1 option. Labels must be unique after trimming whitespace. The maximum is 255 unless shortlisting is on.
 - `score` needs 2 to 32 levels.
-- `noul` criteria may only have the keys true and false, in any case.
+- `noul` criteria may only have the keys true and false, in any case. The Laya compat mode ignores other keys, as laya-serve does.
 - A missing `instructions` is allowed (Jev allows it and the Jev JS builder defaults it to null), and it renders as an empty question.
-- The state must not be null. An empty string is allowed and is answered from priors.
+- The state must not be null. An empty string is allowed and is answered from priors. The Laya compat mode takes a null or missing state and renders it as the text `null`, as laya-serve does.
+- An unknown `model` is a 404 in both modes. laya-serve 0.3.9 routes it to the default model instead, and kime does not, so a typo is never answered by the wrong model.
+
+Every error above and the cases where the two modes differ are snapshotted in `crates/kime-serve/tests/errors/cases.json`, next to what laya-serve 0.3.9 answered to the same request.
 
 ## Limits and defaults
 
