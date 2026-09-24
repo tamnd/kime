@@ -8,16 +8,19 @@ The design is in [`spec/`](spec/). [`spec/01-overview.md`](spec/01-overview.md) 
 
 ## Status
 
-Nothing works yet. The specification is written, the workspace, CI and release pipeline are in place, and the first milestone is under way. The table below is what the project has to hit, not what it does today. When a row is measured, the number goes here with the command that produced it.
+Early. kime runs the published Laya checkpoints on the CPU, CUDA and Apple GPUs with the same answers as Laya, and `kime serve` answers the System One API over HTTP. The native kime models, the router, the caches and the SDKs are still to come. The table below is what the project has to hit, not what it does today. When a row is measured, the number goes here with the command that produced it.
 
 ## What it looks like
 
 ```sh
+kime pull laya
+kime serve --port 8000 &
 curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
+  "model": "kime-latest",
   "state": "Hi, we were billed twice for March. Refund the duplicate today or we cancel.",
   "questions": {
     "team":   {"type": "choice", "instructions": "Which team should handle this",
-               "options": {"billing": "Payment issues", "technical": "Bugs", "sales": "Plans", "other": "Anything else"}},
+               "criteria": {"billing": "Payment issues", "technical": "Bugs", "sales": "Plans", "other": "Anything else"}},
     "urgency": {"type": "score", "instructions": "How urgent is it",
                "criteria": ["not urgent", "this week", "today", "right now"]},
     "churn":  {"type": "noul", "instructions": "The customer threatens to leave"}
@@ -25,7 +28,7 @@ curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
 }'
 ```
 
-The same request works against Jev's API unchanged, and Laya's Python API works against the kime package with an import change. [`spec/03-api.md`](spec/03-api.md) has the full wire format.
+It answers `{"model": "laya", "answers": {"team": {"type": "choice", "choice": "billing", "confidence": 0.95, "probabilities": {"billing": 0.96, ...}}, ...}, "usage": {"input_tokens": 150, "output_tokens": 0}}`. A request that names a Laya model or no model at all gets laya-serve's response shape instead, so Laya clients work unchanged too. The same request works against Jev's API unchanged, and Laya's Python API works against the kime package with an import change. [`spec/03-api.md`](spec/03-api.md) has the full wire format.
 
 ## The bar
 

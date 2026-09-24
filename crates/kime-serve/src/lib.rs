@@ -73,6 +73,7 @@ pub async fn serve(
     let state = Arc::new(api::State {
         models: models::Models::new(cfg.models, cfg.jev_aliases, cfg.max_batch),
         max_body: cfg.max_body,
+        metrics: api::Metrics::default(),
     });
     let listener = listener.tap_io(|tcp| {
         // Answers are small and latency is the product, so Nagle only gets in the way.

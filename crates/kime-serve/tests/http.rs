@@ -165,6 +165,14 @@ async fn serve_laya() {
     assert!(head.contains("x-request-id: req_"));
     assert_eq!(v["loaded"], json!(["english"]));
 
+    // Metrics count what was just answered.
+    let mut s = tokio::net::TcpStream::connect(addr).await.unwrap();
+    s.write_all(b"GET /metrics HTTP/1.1\r\nhost: x\r\nconnection: close\r\n\r\n").await.unwrap();
+    let mut text = String::new();
+    let _ = s.read_to_string(&mut text).await;
+    assert!(text.contains("kime_requests_total{route=\"/v1/systemone\",status=\"200\"}"), "{text}");
+    assert!(text.contains("kime_requests_total{route=\"other\",status=\"404\"} 1"), "{text}");
+
     // The batch endpoint: items fail alone and the good ones match the single endpoint.
     let item = |c: &Value, id: &str| {
         let mut c = c.clone();
