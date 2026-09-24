@@ -127,7 +127,9 @@ mod tests {
         for n in 1..300 {
             let items: Vec<(usize, usize)> = (0..n)
                 .map(|_| {
-                    x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+                    x = x
+                        .wrapping_mul(6_364_136_223_846_793_005)
+                        .wrapping_add(1_442_695_040_888_963_407);
                     (20 + (x >> 33) as usize % 490, 2 + (x >> 20) as usize % 5)
                 })
                 .collect();

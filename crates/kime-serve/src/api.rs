@@ -170,6 +170,18 @@ fn internal(e: &Error, id: &RequestId) -> HttpResponse {
     )
 }
 
+/// Jev's 529, for when the queue would keep a new request waiting longer than `--max-queue-ms`.
+/// `retry-after-ms` is the current wait estimate.
+fn overloaded(wait: Duration) -> HttpResponse {
+    let ms = wait.as_millis().max(1);
+    let mut r = reply(
+        StatusCode::from_u16(529).expect("529 is a valid status"),
+        &json!({"detail": {"error_type": "overloaded_error", "message": format!("the server is overloaded, the queue would take about {ms} ms")}}),
+    );
+    r.headers_mut().insert(HeaderName::from_static("retry-after-ms"), HeaderValue::from(ms as u64));
+    r
+}
+
 /// Reads and parses a JSON object body, or the 400 laya-serve and Jev both give.
 async fn object(body: Body, max: usize) -> Result<Map<String, Value>, HttpResponse> {
     let bytes = axum::body::to_bytes(body, max).await.map_err(|_| {
@@ -362,7 +374,10 @@ async fn systemone(
         Ok(o) => o,
         Err(p) => return invalid(&p),
     };
-    let mut done = s.models.decide(resolved.at, vec![req]).await;
+    let mut done = match s.models.decide(resolved.at, vec![req]).await {
+        Ok(d) => d,
+        Err(wait) => return overloaded(wait),
+    };
     let res = match done.results.pop() {
         Some(Ok(r)) => r,
         Some(Err(e)) => return engine_error(&e, laya, &id),
@@ -469,7 +484,10 @@ async fn batch(
             Err(p) => Err(json!({"status": 422, "detail": p.iter().map(Problem::to_json).collect::<Vec<_>>()})),
         });
     }
-    let mut done = s.models.decide(resolved.at, good).await;
+    let mut done = match s.models.decide(resolved.at, good).await {
+        Ok(d) => d,
+        Err(wait) => return overloaded(wait),
+    };
     let mut answered: Vec<Option<Result<Response, Error>>> =
         std::mem::take(&mut done.results).into_iter().map(Some).collect();
     let model = &s.models.list[resolved.at].id;

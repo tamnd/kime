@@ -9,6 +9,7 @@
 
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use kime_engine::Kime;
 
@@ -30,13 +31,24 @@ pub struct Config {
     pub max_batch: usize,
     /// Threads for the async runtime, which only parses, validates and writes JSON.
     pub io_threads: usize,
+    /// New requests get 529 when the queue ahead of them would take longer than this. Zero
+    /// turns the check off.
+    pub max_queue: Duration,
 }
 
 impl Config {
     /// The defaults from spec/03-api.md for these models.
     #[must_use]
     pub fn new(addr: SocketAddr, models: Vec<Kime>) -> Self {
-        Config { addr, models, jev_aliases: true, max_body: 8 << 20, max_batch: 256, io_threads: 2 }
+        Config {
+            addr,
+            models,
+            jev_aliases: true,
+            max_body: 8 << 20,
+            max_batch: 256,
+            io_threads: 2,
+            max_queue: Duration::from_millis(500),
+        }
     }
 }
 
@@ -71,7 +83,7 @@ pub async fn serve(
 ) -> std::io::Result<()> {
     use axum::serve::ListenerExt;
     let state = Arc::new(api::State {
-        models: models::Models::new(cfg.models, cfg.jev_aliases, cfg.max_batch),
+        models: models::Models::new(cfg.models, cfg.jev_aliases, cfg.max_batch, cfg.max_queue),
         max_body: cfg.max_body,
         metrics: api::Metrics::default(),
     });

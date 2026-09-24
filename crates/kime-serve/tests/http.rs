@@ -71,6 +71,8 @@ async fn serve_laya() {
     // Small enough that the server has read the whole oversized body below when it answers, so
     // the connection closes cleanly instead of with a reset that can eat the response.
     cfg.max_body = 64 << 10;
+    // Every parity case at once has to be answered, not turned away.
+    cfg.max_queue = std::time::Duration::ZERO;
     let server = tokio::spawn(kime_serve::serve(listener, cfg, async {
         let _ = stopped.await;
     }));
@@ -195,6 +197,59 @@ async fn serve_laya() {
         assert_eq!(r[k]["answers"], single["answers"]);
     }
 
+    let _ = stop.send(());
+    server.await.unwrap().unwrap();
+
+    overload(kime, &cases).await;
+}
+
+/// With a queue budget of a microsecond, a burst gets some 529s with Jev's body and a
+/// `retry-after-ms`, every other request its answer, and the server is healthy afterwards.
+async fn overload(kime: Kime, cases: &[Value]) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let mut cfg = kime_serve::Config::new(addr, vec![kime]);
+    cfg.max_queue = std::time::Duration::from_micros(1);
+    let server = tokio::spawn(kime_serve::serve(listener, cfg, async {
+        let _ = stopped.await;
+    }));
+    let body = |c: &Value| {
+        let mut b = c.clone();
+        b.as_object_mut().unwrap().remove("id");
+        b.to_string()
+    };
+    // One request first, so the server knows how long a request takes.
+    let (s, _, _) = call(addr, "POST", "/v1/systemone", &body(&cases[0]), "").await;
+    assert_eq!(s, 200);
+    let sent: Vec<_> = cases
+        .iter()
+        .take(40)
+        .map(|c| {
+            let b = body(c);
+            tokio::spawn(async move { call(addr, "POST", "/v1/systemone", &b, "").await })
+        })
+        .collect();
+    let (mut ok, mut busy) = (0, 0);
+    for h in sent {
+        let (s, head, v) = h.await.unwrap();
+        match s {
+            200 => ok += 1,
+            529 => {
+                busy += 1;
+                assert_eq!(v["detail"]["error_type"], "overloaded_error", "{v}");
+                let ms = head
+                    .lines()
+                    .find_map(|l| l.strip_prefix("retry-after-ms:"))
+                    .and_then(|v| v.trim().parse::<u64>().ok());
+                assert!(ms.is_some_and(|ms| ms >= 1), "{head}");
+            }
+            s => panic!("status {s}: {v}"),
+        }
+    }
+    assert!(ok >= 1 && busy >= 1, "{ok} answered and {busy} turned away");
+    let (s, _, _) = call(addr, "POST", "/v1/systemone", &body(&cases[1]), "").await;
+    assert_eq!(s, 200, "healthy again once the queue has drained");
     let _ = stop.send(());
     server.await.unwrap().unwrap();
 }

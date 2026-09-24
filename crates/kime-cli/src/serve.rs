@@ -11,7 +11,8 @@ use crate::predict::{device, precision};
 const USAGE: &str =
     "usage: kime serve [--host 127.0.0.1] [--port 8000] [--models laya,laya-multilingual]
 options: --device auto|cpu|cuda[:N]  --threads N  --precision f16|f32|int8
-         --max-batch N  --max-body BYTES  --io-threads N  --no-jev-aliases
+         --max-batch N  --max-body BYTES  --max-queue-ms MS (0 is off)  --io-threads N
+         --no-jev-aliases
 The first model answers requests that name no model.";
 
 fn config(args: &[String]) -> Result<kime_serve::Config, String> {
@@ -19,6 +20,7 @@ fn config(args: &[String]) -> Result<kime_serve::Config, String> {
     let mut names = vec!["laya".to_string()];
     let (mut dev, mut prec, mut threads) = (Device::Auto, Precision::F16, None);
     let (mut max_batch, mut max_body, mut io, mut jev) = (None, None, None, true);
+    let mut max_queue = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut val = || it.next().cloned().ok_or_else(|| format!("{a} needs a value"));
@@ -38,6 +40,7 @@ fn config(args: &[String]) -> Result<kime_serve::Config, String> {
             "--threads" => threads = Some(num(val()?)?),
             "--max-batch" => max_batch = Some(num(val()?)?),
             "--max-body" => max_body = Some(num(val()?)?),
+            "--max-queue-ms" => max_queue = Some(num(val()?)?),
             "--io-threads" => io = Some(num(val()?)?),
             "--no-jev-aliases" => jev = false,
             "--help" | "-h" => return Err(USAGE.into()),
@@ -71,6 +74,9 @@ fn config(args: &[String]) -> Result<kime_serve::Config, String> {
     cfg.max_batch = max_batch.unwrap_or(cfg.max_batch);
     cfg.max_body = max_body.unwrap_or(cfg.max_body);
     cfg.io_threads = io.unwrap_or(cfg.io_threads);
+    if let Some(ms) = max_queue {
+        cfg.max_queue = std::time::Duration::from_millis(ms as u64);
+    }
     Ok(cfg)
 }
 
