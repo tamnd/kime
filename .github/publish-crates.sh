@@ -19,6 +19,15 @@ if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
   exit 1
 fi
 
+# A crate on crates.io cannot be fixed, only followed by the next version, and `cargo publish` only builds for the machine it runs on. 0.0.8 went out from a Mac with code that did not compile on Linux, so the other targets that rustup has installed get a clippy run first.
+host=$(rustc -vV | sed -n 's/^host: //p')
+for target in x86_64-unknown-linux-gnu aarch64-apple-darwin; do
+  if [ "$target" != "$host" ] && rustup target list --installed 2>/dev/null | grep -qx "$target"; then
+    echo "checking $target"
+    cargo clippy --quiet --workspace --all-targets --target "$target" -- -D warnings
+  fi
+done
+
 # Ten minutes and ten seconds for a new crate, seventy seconds for an existing one. The extra ten seconds cover clock skew between here and the registry.
 new_pause=610
 existing_pause=70

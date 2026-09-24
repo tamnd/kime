@@ -241,7 +241,13 @@ fn packed_len(n: usize, k: usize) -> usize {
 /// Floats of scratch each task of a GEMM with these sizes needs.
 #[must_use]
 pub fn scratch_len(k: usize, n: usize) -> usize {
-    if cfg!(target_os = "macos") { blas::ROWS * (k + 3 * n.min(blas::COLS)) + 1 } else { 0 }
+    #[cfg(target_os = "macos")]
+    return blas::ROWS * (k + 3 * n.min(blas::COLS)) + 1;
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (k, n);
+        0
+    }
 }
 
 /// `w` in panels: `[n.div_ceil(16)][k][16]`, with the rows past `n` zero.
