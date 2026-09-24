@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+## 0.0.13
+
 - A model name like `laya` resolves in any snapshot of its repo, newest first, when the snapshot `refs/main` names does not have it. `kime pull laya-typed-decisions` at a newer commit used to hide `laya` and `laya-multilingual` pulled earlier.
 
 - `kime serve` reads a kime.toml (`--config` or `KIME_CONFIG`) where every flag is a field, and a `KIME_*` env var for every field. A field the file does not know is an error with its name and line. laya-serve's env vars are read as laya-serve reads them, and kime run under the name `laya-serve` also takes its defaults (every address, all three checkpoints). The typed-decisions checkpoint loads as `laya-typed-decisions` and answers to Laya's names for it. On the Mac, laya-serve 0.3.9 and kime linked as `laya-serve` started from the same env (`LAYA_HOST`, `LAYA_PORT`, `LAYA_DEVICE=cpu`, `LAYA_LOG_LEVEL`) load the same three models, give the same `/health` apart from the device text, and give the same answers and token counts on all 77 English parity requests with no model named and with each of the three named. kime was ready in 3.0 s and laya-serve in 7.1 s.
