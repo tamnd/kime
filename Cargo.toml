@@ -35,6 +35,8 @@ kime-tok = { version = "=0.0.11", path = "crates/kime-tok" }
 kime-train = { version = "=0.0.11", path = "crates/kime-train" }
 
 # Outside crates. Each one is here because writing it ourselves would be worse, and the list is meant to stay short enough to read.
+# The HTTP server's router, on hyper and tokio.
+axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "tokio"] }
 blake3 = { version = "1.8.7", features = ["rayon"] }
 # The CUDA driver, NVRTC and cuBLASLt, loaded at run time so the build needs no toolkit.
 cudarc = { version = "0.19.9", default-features = false, features = ["std", "driver", "nvrtc", "cublaslt", "dynamic-loading", "cuda-12090"] }
@@ -50,6 +52,7 @@ objc2-metal = { version = "0.3.2", default-features = false, features = ["std", 
 serde = { version = "1.0.229", features = ["derive"] }
 # SHA-256 for checking downloaded weights against the hub.
 sha2 = "0.11.0"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "net", "signal", "macros", "sync", "time"] }
 serde_json = { version = "1.0.151", features = ["preserve_order", "float_roundtrip"] }
 unicode-normalization = "0.1.25"
 unicode-properties = { version = "0.1.4", default-features = false, features = ["general-category"] }

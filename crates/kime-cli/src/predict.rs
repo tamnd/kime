@@ -57,29 +57,11 @@ fn opts(args: &[String]) -> Result<Opts, String> {
                     f => return Err(format!("unknown format {f:?}")),
                 }
             }
-            "--device" => {
-                let d = val()?;
-                o.device = match d.as_str() {
-                    "auto" => Device::Auto,
-                    "cpu" => Device::Cpu { threads: 0 },
-                    "cuda" => Device::Cuda(0),
-                    d => match d.strip_prefix("cuda:").and_then(|n| n.parse().ok()) {
-                        Some(n) => Device::Cuda(n),
-                        None => return Err(format!("unknown device {d:?}")),
-                    },
-                }
-            }
+            "--device" => o.device = device(&val()?)?,
             "--threads" => {
                 threads = Some(val()?.parse::<usize>().map_err(|e| format!("--threads: {e}"))?);
             }
-            "--precision" => {
-                o.precision = match val()?.as_str() {
-                    "f16" | "fp16" => Precision::F16,
-                    "f32" | "fp32" => Precision::F32,
-                    "int8" => Precision::Int8,
-                    p => return Err(format!("unknown precision {p:?}")),
-                }
-            }
+            "--precision" => o.precision = precision(&val()?)?,
             other => return Err(format!("unknown option {other:?}")),
         }
     }
@@ -90,6 +72,29 @@ fn opts(args: &[String]) -> Result<Opts, String> {
         }
     }
     Ok(o)
+}
+
+/// A `--device` value.
+pub(crate) fn device(d: &str) -> Result<Device, String> {
+    Ok(match d {
+        "auto" => Device::Auto,
+        "cpu" => Device::Cpu { threads: 0 },
+        "cuda" => Device::Cuda(0),
+        d => match d.strip_prefix("cuda:").and_then(|n| n.parse().ok()) {
+            Some(n) => Device::Cuda(n),
+            None => return Err(format!("unknown device {d:?}")),
+        },
+    })
+}
+
+/// A `--precision` value.
+pub(crate) fn precision(p: &str) -> Result<Precision, String> {
+    Ok(match p {
+        "f16" | "fp16" => Precision::F16,
+        "f32" | "fp32" => Precision::F32,
+        "int8" => Precision::Int8,
+        p => return Err(format!("unknown precision {p:?}")),
+    })
 }
 
 /// The text of `@file`, `@-` for stdin, or the argument itself.

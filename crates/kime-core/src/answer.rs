@@ -9,6 +9,7 @@
 use serde_json::{Map, Value, json};
 
 use crate::request::{Criteria, QType, Question};
+use crate::round::round_distribution;
 
 /// The `model` field of a compat response.
 pub const LAYA_MODEL: &str = "laya-rl-agent";
@@ -144,6 +145,50 @@ impl Answer {
                 "confidence": r(*confidence),
                 "action": {"act_probability": r(*act_probability)},
             }),
+        }
+    }
+}
+
+impl Answer {
+    /// The answer in Jev's JSON shape, from spec/03-api.md: probabilities rounded to `precision`
+    /// places so that they still sum to exactly 1, scores and confidences rounded the same way,
+    /// no `action` block, and no confidence on a noul answer. `None` keeps the raw values.
+    /// `entropy` picks Laya's normalized entropy confidence over Jev's formula.
+    #[must_use]
+    pub fn to_jev_json(&self, precision: Option<u32>, entropy: bool) -> Value {
+        let r = |x: f64| match precision {
+            Some(d) => py_round(x, d as usize),
+            None => f64::from(x as f32),
+        };
+        let dist = |p: &[f64]| -> Vec<f64> {
+            match precision {
+                Some(d) => round_distribution(p, d),
+                None => p.iter().map(|&x| f64::from(x as f32)).collect(),
+            }
+        };
+        match self {
+            Answer::Choice { choice, probabilities, confidence, .. } => {
+                let raw: Vec<f64> = probabilities.iter().map(|p| p.1).collect();
+                let conf = if entropy { *confidence } else { crate::confidence::choice_jev(&raw) };
+                json!({
+                    "type": "choice",
+                    "choice": choice,
+                    "confidence": r(conf),
+                    "probabilities": probabilities.iter().zip(dist(&raw)).map(|((k, _), p)| (k.clone(), json!(p))).collect::<Map<_, _>>(),
+                })
+            }
+            Answer::Score { score, legend, probabilities, confidence, .. } => {
+                let conf =
+                    if entropy { *confidence } else { crate::confidence::score_jev(probabilities) };
+                json!({
+                    "type": "score",
+                    "score": r(*score),
+                    "confidence": r(conf),
+                    "legend": legend.iter().enumerate().map(|(i, v)| (i.to_string(), v.clone())).collect::<Map<_, _>>(),
+                    "probabilities": dist(probabilities).into_iter().enumerate().map(|(i, p)| (i.to_string(), json!(p))).collect::<Map<_, _>>(),
+                })
+            }
+            Answer::Noul { noul, .. } => json!({"type": "noul", "noul": r(*noul)}),
         }
     }
 }
@@ -414,5 +459,36 @@ mod tests {
         assert_eq!(t.get(QType::Choice, 4), 1.5);
         assert_eq!(temperature_bucket(QType::Score, 6), "score:6-10");
         assert_eq!(clamp_temperature(f64::NAN), 1.0);
+    }
+
+    #[test]
+    fn jev_shape() {
+        let a = Answer::Choice {
+            choice: "b".into(),
+            probabilities: vec![("a".into(), 0.334), ("b".into(), 0.335), ("c".into(), 0.331)],
+            confidence: 0.1,
+            act_probability: 0.9,
+        };
+        let v = a.to_jev_json(Some(2), false);
+        let p = &v["probabilities"];
+        assert_eq!(
+            (p["a"].as_f64(), p["b"].as_f64(), p["c"].as_f64()),
+            (Some(0.33), Some(0.34), Some(0.33))
+        );
+        assert_eq!(v["choice"], "b");
+        assert!(v.get("action").is_none());
+        let s = Answer::Score {
+            score: 1.2345,
+            legend: vec![json!("lo"), json!("mid"), json!("hi")],
+            probabilities: vec![0.105, 0.555, 0.34],
+            confidence: 0.5,
+            act_probability: 1.0,
+        };
+        let v = s.to_jev_json(Some(1), false);
+        assert_eq!(v["score"], 1.2);
+        assert_eq!(v["legend"]["2"], "hi");
+        let n = Answer::Noul { noul: 0.876, confidence: 0.876, act_probability: 1.0 };
+        assert_eq!(n.to_jev_json(Some(2), false), json!({"type": "noul", "noul": 0.88}));
+        assert_eq!(n.to_jev_json(None, false)["noul"], f64::from(0.876f32));
     }
 }
