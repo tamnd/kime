@@ -347,6 +347,21 @@ impl Kime {
         self.inner.runner.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// The tokens a request holds before anything is cut: its state once plus every question
+    /// with its options. The server refuses a request over its limit with this count, before it
+    /// is queued.
+    #[must_use]
+    pub fn count_tokens(&self, req: &Request) -> usize {
+        let inner = &*self.inner;
+        let mut n = inner.tok.encode(&compat_state(&req.state, &inner.mask)).len();
+        for q in &req.questions {
+            let text = compat_question(q, &inner.mask);
+            n += inner.tok.encode(&text.head).len();
+            n += text.options.iter().map(|o| inner.tok.encode(o).len()).sum::<usize>();
+        }
+        n
+    }
+
     /// Answers one request.
     ///
     /// # Errors

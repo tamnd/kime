@@ -152,7 +152,7 @@ The server config maps aliases to concrete ids. By default `jev-latest`, `jev-pr
 | 401, 403 | Auth, see above | Jev auth shape |
 | 404 | Unknown path, or unknown `model` after alias resolution | `{"detail":"Not Found"}` or `{"detail":"model 'x' not found"}` |
 | 405 | Wrong method | `{"detail":"Method Not Allowed"}` |
-| 413 | Request over 64k tokens, or state plus longest question over 32k | `{"detail":[{"loc":["body","state"],"msg":"...","type":"too_long"}]}` |
+| 413 | A Jev request that holds more than `--max-request-tokens` (64k) tokens before anything is cut. Laya requests are cut and answered, as laya-serve does. In a batch the item fails alone. | `{"detail":[{"loc":["body"],"msg":"...","type":"too_long"}]}` |
 | 422 | Validation | FastAPI list format, one entry per problem, with `loc`, `msg`, `type` and `input` |
 | 429 | Rate limit | `{"detail":{"error_type":"rate_limit_error","message":"..."}}` with `retry-after` and `retry-after-ms` |
 | 504 | `deadline_ms` would be missed | `{"detail":{"error_type":"deadline_exceeded","message":"..."}}` |

@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- kime-serve gives Jev's 413 for a Jev request over `--max-request-tokens` (65,536 by default) tokens before any cut, and a batch item over it fails alone. Laya requests are still cut and answered, as laya-serve does. Only bodies over half the limit in bytes are counted, on a blocking thread. On the Mac, a 70,000 word state gets its 413 in 2.1 ms and a 500,000 word one in 14.6 ms, where answering it would have taken about 490 ms of CPU. A 60,000 word state under the limit is answered in the same time as a 1,000 word one.
+
 - `kime serve --log-requests` writes one line per request to stdout with the request id, route, status, time taken, the body's size and blake3 hash, and for an answer the model, questions and input tokens. `--log-format json` writes JSON lines. Bodies are never logged. Off by default, and off it only adds one branch per request: on the Mac, interleaved runs of 0.0.13 and this build with the log off gave the same `/v1/models` and 422 throughput within run to run noise (122k to 178k requests a second for both).
 
 - `/metrics` has the per stage histograms from spec/11: queue, tokenize and device time, and how many requests, questions, input tokens and device batches each forward pass took, per model, plus request time by route, questions and input tokens answered, queue depth, the device time estimate, and rejections by reason. Recording is a few relaxed atomic adds per forward pass and per request. Checked with prometheus_client's parser on a live server after 30 s of 8 clients on the Mac CPU: 15 families and 256 samples, with the question and token counts matching the requests sent.
