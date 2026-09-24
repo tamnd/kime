@@ -355,6 +355,8 @@ fn worker(
             questions: answered.clone().map(|r| r.answers.len()).sum(),
             tokens: answered.map(|r| r.input_tokens).sum(),
             batches: pass.batches,
+            truncated: pass.truncated,
+            cut_tokens: pass.cut_tokens,
             tokenize: pass.tokenize,
             device: pass.device,
         });

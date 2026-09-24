@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `/metrics` counts truncations (#25): `kime_truncations_total{model}` is the questions whose state was cut to fit the model's sequence length, and `kime_truncated_tokens_total{model}` the state tokens cut. `kime_engine::Timing` has them as `truncated` and `cut_tokens`. On the Mac, 2,000 generated support emails with two questions each (median 106 characters) had 7 of 4,000 questions cut, and 500 LeetCode statements had 273 of 1,000 cut, losing 39,737 of their tokens.
+
 - `kime serve` routes each item of a batch on its own (#26). A batch to `kime-latest` or another routed name is split by model, the groups run at once, and each result carries its `model` when more than one model answered; the top level `model` is the first group's. On the Mac, with a load average of 20 to 65 from other builds, a batch of 96 states (32 English, 8 each of German, Spanish, Russian, Indonesian, Japanese, Malay, Dutch and Hindi from the MASSIVE and AG News test splits) sent 34 items to `laya` and 62 to `laya-multilingual`, and took 5.15 s against 14.49 s when all went to `laya` and 2.83 s when all went to `laya-multilingual`. The two non-English items that went to `laya` are a German line quoting George Eliot and a Dutch line about president Trump.
 
 - `/metrics` has `kime_route_decisions_total{model,reason}` (#25), the requests the router sent to each model by the rule that decided: `lang`, `lang_guess`, `no_letters`, `script`, `word_lists` or `identifier`. `kime_route::router::Decision` carries the rule as `by`.
