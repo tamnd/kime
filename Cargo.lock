@@ -516,6 +516,7 @@ name = "kime-serve"
 version = "0.0.12"
 dependencies = [
  "axum",
+ "blake3",
  "kime-core",
  "kime-engine",
  "serde_json",

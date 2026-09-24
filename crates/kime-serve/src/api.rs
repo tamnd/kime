@@ -24,6 +24,7 @@ use kime_core::request::{Limits, Loc, Problem, parse};
 use kime_engine::Error;
 use serde_json::{Map, Value, json};
 
+use crate::auth::{Auth, Bucket, Denied};
 use crate::models::{Done, Models, Named, Refused, Resolved};
 
 /// Everything the handlers share.
@@ -32,6 +33,8 @@ pub(crate) struct State {
     pub(crate) models: Models,
     pub(crate) max_body: usize,
     pub(crate) metrics: Metrics,
+    pub(crate) auth: Auth,
+    pub(crate) buckets: Vec<Bucket>,
 }
 
 /// Request counts and time spent, by route and status, for `/metrics`. The per stage histograms
@@ -92,11 +95,14 @@ type Shared = Arc<State>;
 const MAX_BATCH_ITEMS: usize = 1024;
 
 pub(crate) fn router(state: Shared) -> Router {
-    Router::new()
+    let api = Router::new()
         .route("/v1/systemone", post(systemone))
         .route("/v1/systemone/batch", post(batch))
         .route("/v1/models", get(list_models))
         .route("/v1/models/{*id}", get(one_model))
+        .route_layer(middleware::from_fn(guard));
+    Router::new()
+        .merge(api)
         .route("/health", get(health))
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
@@ -146,6 +152,77 @@ async fn request_id(mut req: HttpRequest, next: Next) -> HttpResponse {
         res.headers_mut().insert(HeaderName::from_static("x-typesafe-request-id"), v);
     }
     res
+}
+
+/// The input tokens a response charged, for the tokens per second limit.
+#[derive(Debug, Clone, Copy)]
+struct Tokens(u64);
+
+/// Checks the key and the rate limits in front of the `/v1` routes, and charges the tokens of the
+/// answer afterwards.
+async fn guard(req: HttpRequest, next: Next) -> HttpResponse {
+    let Some(s) = req.extensions().get::<Shared>().cloned() else { return next.run(req).await };
+    let header = req.headers().get(header::AUTHORIZATION).map(HeaderValue::as_bytes);
+    let at = s.auth.check(header).and_then(|at| s.buckets[at].admit().map(|()| at));
+    let at = match at {
+        Ok(at) => at,
+        Err(d) => {
+            // Read the body before refusing. Unread, it makes the server close the connection,
+            // and a client that retries a 429 on its pooled connection gets a broken pipe.
+            let _ = axum::body::to_bytes(req.into_body(), s.max_body).await;
+            return denied(d, s.auth.laya_style());
+        }
+    };
+    let res = next.run(req).await;
+    if let Some(Tokens(n)) = res.extensions().get::<Tokens>() {
+        s.buckets[at].charge(*n);
+    }
+    res
+}
+
+/// Jev's 403, 401 and 429, or laya-serve's 401 when the key came from `LAYA_API_KEY`.
+fn denied(d: Denied, laya: bool) -> HttpResponse {
+    let auth = |status, message: &str| {
+        reply(
+            status,
+            &json!({"detail": {"error_type": "authentication_error", "message": message}}),
+        )
+    };
+    let limited = |wait: Duration, message: String| {
+        let ms = wait.as_millis().max(1) as u64;
+        let mut r = reply(
+            StatusCode::TOO_MANY_REQUESTS,
+            &json!({"detail": {"error_type": "rate_limit_error", "message": message}}),
+        );
+        let h = r.headers_mut();
+        h.insert(HeaderName::from_static("retry-after-ms"), HeaderValue::from(ms));
+        h.insert(header::RETRY_AFTER, HeaderValue::from(ms.div_ceil(1000)));
+        r
+    };
+    match d {
+        Denied::Missing | Denied::Unknown if laya => {
+            detail(StatusCode::UNAUTHORIZED, "invalid or missing bearer token")
+        }
+        Denied::Missing => {
+            auth(StatusCode::FORBIDDEN, "Must supply an API key! Check your request and try again.")
+        }
+        Denied::Unknown => auth(
+            StatusCode::UNAUTHORIZED,
+            "Cannot authenticate with the server. Please check your API key and try again.",
+        ),
+        Denied::Requests(n, wait) => limited(
+            wait,
+            format!(
+                "Rate limit exceeded: this key allows {n} requests per minute. Retry after retry-after-ms."
+            ),
+        ),
+        Denied::Tokens(n, wait) => limited(
+            wait,
+            format!(
+                "Rate limit exceeded: this key allows {n} input tokens per second. Retry after retry-after-ms."
+            ),
+        ),
+    }
 }
 
 fn reply(status: StatusCode, body: &Value) -> HttpResponse {
@@ -445,6 +522,7 @@ async fn systemone(
     };
     let mut r = reply(StatusCode::OK, &out);
     timing(r.headers_mut(), &done, total);
+    r.extensions_mut().insert(Tokens(res.input_tokens as u64));
     r
 }
 
@@ -560,6 +638,7 @@ async fn batch(
         &json!({"model": model, "results": results, "usage": {"input_tokens": tokens, "output_tokens": 0}}),
     );
     timing(r.headers_mut(), &done, start.elapsed());
+    r.extensions_mut().insert(Tokens(tokens as u64));
     r
 }
 
