@@ -24,8 +24,9 @@ use serde_json::{Map, Value, json};
 
 use crate::auth::{Auth, Bucket, Denied};
 use crate::log::{Line, Log, Served};
-use crate::metrics::{Metrics, ModelView, route};
+use crate::metrics::{Metrics, ModelView, ROUTES, route};
 use crate::models::{Done, Models, Named, Refused, Resolved};
+use crate::otel::{self, Context, Span, Tracer};
 
 /// Everything the handlers share.
 #[derive(Debug)]
@@ -37,6 +38,7 @@ pub(crate) struct State {
     pub(crate) auth: Auth,
     pub(crate) buckets: Vec<Bucket>,
     pub(crate) log: Log,
+    pub(crate) tracer: Option<Tracer>,
 }
 
 type Shared = Arc<State>;
@@ -108,15 +110,44 @@ async fn request_id(mut req: HttpRequest, next: Next) -> HttpResponse {
         }
         _ => None,
     };
+    // Tracing needs the caller's traceparent, the method and the wall clock start.
+    let traced = match &state {
+        Some(s) if s.tracer.is_some() => {
+            let parent = req
+                .headers()
+                .get("traceparent")
+                .and_then(|v| v.to_str().ok())
+                .and_then(Context::parse);
+            Some((otel::start(parent), req.method().to_string(), SystemTime::now()))
+        }
+        _ => None,
+    };
     let mut res = next.run(req).await;
     let took = start.elapsed();
     if let Some(s) = &state {
         s.metrics.record(route, res.status().as_u16(), took);
+        let served = (traced.is_some() || logged.is_some())
+            .then(|| res.extensions().get::<Served>())
+            .flatten()
+            .map(|v| (s.models.list[v.model].id.as_str(), v.questions, v.tokens));
+        if let (Some(t), Some(((ctx, parent), method, at))) = (&s.tracer, traced) {
+            let span = Span {
+                ctx,
+                parent,
+                route: ROUTES[route],
+                method,
+                start: at,
+                took,
+                status: res.status().as_u16(),
+                request_id: id.clone(),
+                served: served.map(|(m, q, n)| (m.to_string(), q, n)),
+            };
+            t.send(span);
+            if let Ok(v) = HeaderValue::from_str(&ctx.header()) {
+                res.headers_mut().insert(HeaderName::from_static("traceparent"), v);
+            }
+        }
         if let Some((method, path, bytes, hash, at)) = &logged {
-            let served = res
-                .extensions()
-                .get::<Served>()
-                .map(|v| (s.models.list[v.model].id.as_str(), v.questions, v.tokens));
             Line {
                 at: *at,
                 id: &id,
@@ -808,7 +839,20 @@ async fn health(Extension(s): Extension<Shared>) -> HttpResponse {
 
 async fn metrics(Extension(s): Extension<Shared>) -> HttpResponse {
     let views: Vec<ModelView<'_>> = s.models.list.iter().map(|m| m.view()).collect();
-    let mut r = s.metrics.render(&views).into_response();
+    let mut text = s.metrics.render(&views);
+    if let Some(t) = &s.tracer {
+        text += "# HELP kime_otel_spans_total Spans sent to the OTLP collector, dropped because the queue was full, or lost to a failed post.\n# TYPE kime_otel_spans_total counter\n";
+        let c = &t.counts;
+        for (outcome, n) in
+            [("exported", &c.exported), ("dropped", &c.dropped), ("failed", &c.failed)]
+        {
+            text += &format!(
+                "kime_otel_spans_total{{outcome=\"{outcome}\"}} {}\n",
+                n.load(Ordering::Relaxed)
+            );
+        }
+    }
+    let mut r = text.into_response();
     r.headers_mut()
         .insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; version=0.0.4"));
     r

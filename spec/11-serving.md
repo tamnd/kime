@@ -94,7 +94,7 @@ The decision is returned in `kime.routing` when extensions are on, and as a top 
 ## Observability
 
 - A request log on stdout, off by default. `--log-requests` (`log_requests = true`, `KIME_LOG_REQUESTS=1`) writes one line per request with the time, the request id, the method, path and status, the time taken, the body's size and the first 16 hex digits of its blake3 hash, and for an answered request the model, the number of questions and the input tokens. `--log-format json` writes the same as one JSON object per line. Request bodies are never logged. Off, the server does not read the body in the middleware and the cost is one branch per request.
-- OpenTelemetry spans per request with the request id, off unless an exporter is set. Not built yet.
+- OpenTelemetry spans, one per request, off unless an endpoint is set with `--otlp-endpoint`, `KIME_OTLP_ENDPOINT` or the standard `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` and `OTEL_EXPORTER_OTLP_ENDPOINT`. They go as OTLP/HTTP JSON over plain http, in batches of up to 512 every half second, from a queue of 8,192 that drops spans rather than slow a request. A span carries the method, route, status, request id, model, question count and input tokens. A request with a W3C `traceparent` header joins that trace, and every traced response has a `traceparent` naming its span.
 - Prometheus metrics: request counts by status and model; latency histograms per stage (queue, tokenize, state, question, total) with buckets from 50 us to 5 s; batch size and token histograms per bucket; cache hit ratios; truncations; router decisions by model and reason; device memory; rejected requests by reason.
 - `GET /ready` returns JSON with the loaded models, device names, queue depths and the EWMA per bucket.
 
@@ -113,6 +113,7 @@ The metrics `/metrics` has today. Times are histograms with buckets from 50 µs 
 | `kime_pass_requests`, `kime_pass_questions`, `kime_pass_input_tokens`, `kime_pass_device_batches` | model | how full each forward pass was |
 | `kime_truncations_total`, `kime_truncated_tokens_total` | model | questions whose state was cut to fit the sequence length, and the state tokens cut |
 | `kime_device_memory_bytes` | model, kind | bytes on the device: `weights`, and `plans` for the arenas of the buckets used so far |
+| `kime_otel_spans_total` | outcome | spans `exported`, `dropped` because the queue was full and `failed` because the collector did not answer 2xx, when tracing is on |
 | `kime_route_decisions_total` | model, reason | requests the router sent to a model, by the rule that decided: lang, lang_guess, no_letters, script, word_lists, identifier |
 
 Cache hit ratios come with the caches.
