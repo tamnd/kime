@@ -543,6 +543,14 @@ impl Backend for CudaBackend {
         Caps { name: "cuda", threads: 1, graphs: true, unified_memory: false }
     }
 
+    fn weight_bytes(&self, w: &Weights) -> usize {
+        w.0.iter().map(|t| 4 * t.f32.len() + t.f16.get().map_or(0, |h| 2 * h.len())).sum()
+    }
+
+    fn plan_bytes(&self, p: &CudaPlan) -> usize {
+        p.arena.len() + 2 * p._stage.len()
+    }
+
     fn upload(&self, tensors: &[HostTensor<'_>], _graph: &Graph) -> Result<Weights> {
         let mut out = Vec::with_capacity(tensors.len());
         let mut host = Vec::new();

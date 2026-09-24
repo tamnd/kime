@@ -176,6 +176,16 @@ pub trait Backend: Send + Sync {
     ///
     /// When the device fails.
     fn run(&self, plan: &mut Self::Plan, batch: &Batch<'_>, out: &mut Outputs) -> Result<()>;
+
+    /// Bytes the weights take on the device.
+    fn weight_bytes(&self, _w: &Self::Weights) -> usize {
+        0
+    }
+
+    /// Bytes a plan takes on the device, its arena and staging buffers.
+    fn plan_bytes(&self, _p: &Self::Plan) -> usize {
+        0
+    }
 }
 
 /// A graph, its weights on one backend, and a plan per bucket built on first use.
@@ -228,6 +238,12 @@ impl<B: Backend> Executor<B> {
     /// The buckets with a plan built.
     pub fn warm(&self) -> impl Iterator<Item = Bucket> + '_ {
         self.plans.iter().map(|p| p.0)
+    }
+
+    /// Bytes on the device: the weights, and the plans built so far.
+    pub fn memory(&self) -> (usize, usize) {
+        let plans = self.plans.iter().map(|p| self.backend.plan_bytes(&p.1)).sum();
+        (self.backend.weight_bytes(&self.weights), plans)
     }
 
     /// The plans built so far, to inspect or profile.

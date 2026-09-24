@@ -112,9 +112,10 @@ The metrics `/metrics` has today. Times are histograms with buckets from 50 µs 
 | `kime_tokenize_seconds`, `kime_device_seconds` | model | per forward pass |
 | `kime_pass_requests`, `kime_pass_questions`, `kime_pass_input_tokens`, `kime_pass_device_batches` | model | how full each forward pass was |
 | `kime_truncations_total`, `kime_truncated_tokens_total` | model | questions whose state was cut to fit the sequence length, and the state tokens cut |
+| `kime_device_memory_bytes` | model, kind | bytes on the device: `weights`, and `plans` for the arenas of the buckets used so far |
 | `kime_route_decisions_total` | model, reason | requests the router sent to a model, by the rule that decided: lang, lang_guess, no_letters, script, word_lists, identifier |
 
-Cache hit ratios and device memory come with the caches and the device stats.
+Cache hit ratios come with the caches.
 
 ## Configuration
 

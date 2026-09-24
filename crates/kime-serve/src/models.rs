@@ -79,6 +79,7 @@ impl Model {
             stats: &self.stats,
             pending: self.load.pending.load(Ordering::Relaxed),
             per_request: Duration::from_nanos(self.load.per_request.load(Ordering::Relaxed)),
+            memory: self.kime.memory(),
         }
     }
 }

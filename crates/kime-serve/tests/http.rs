@@ -177,6 +177,14 @@ async fn serve_laya() {
     assert!(text.contains("kime_forward_passes_total{model=\"laya\"}"), "{text}");
     assert!(text.contains("kime_truncations_total{model=\"laya\"}"), "{text}");
     assert!(text.contains("kime_truncated_tokens_total{model=\"laya\"}"), "{text}");
+    let bytes = |kind: &str| -> u64 {
+        let key = format!("kime_device_memory_bytes{{model=\"laya\",kind=\"{kind}\"}} ");
+        let line = text.lines().find(|l| l.starts_with(&key)).unwrap_or_else(|| panic!("{text}"));
+        line[key.len()..].parse().unwrap()
+    };
+    // Laya's 149M parameters as f32, and at least the one bucket the requests above used.
+    assert!(bytes("weights") > 500 << 20, "{text}");
+    assert!(bytes("plans") > 0, "{text}");
     assert!(text.contains("kime_device_seconds_bucket{model=\"laya\",le=\"+Inf\"}"), "{text}");
 
     // The batch endpoint: items fail alone and the good ones match the single endpoint.
