@@ -13,7 +13,18 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+kime-model.workspace = true
 kime-tensor.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+half.workspace = true
+objc2.workspace = true
+objc2-foundation.workspace = true
+objc2-metal.workspace = true
+
+[dev-dependencies]
+kime-cpu.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true
