@@ -123,6 +123,35 @@ impl Step {
             Step::ActFeatures { .. } => "act features",
         }
     }
+
+    /// Where the step writes.
+    fn out(&self) -> Loc {
+        match *self {
+            Step::Embed { out, .. }
+            | Step::LayerNorm { out, .. }
+            | Step::Gemm { out, .. }
+            | Step::Gemm8 { out, .. }
+            | Step::Attention { out, .. }
+            | Step::GeGlu { out, .. }
+            | Step::Gather { out, .. }
+            | Step::ActFeatures { out, .. } => out,
+            Step::Rope { qkv, .. } => qkv,
+            Step::AddType { h, .. } => h,
+        }
+    }
+}
+
+/// What one step wrote in one run, from [`CpuPlan::dumps`].
+#[derive(Debug, Clone)]
+pub struct Dump {
+    /// The kind of step.
+    pub name: &'static str,
+    /// Whether the rows are tokens, sequences or markers.
+    pub rows: Rows,
+    /// Values per row.
+    pub width: usize,
+    /// The live rows, row major.
+    pub data: Vec<f32>,
 }
 
 /// One slot per worker, each touched only by its own worker.
@@ -161,6 +190,8 @@ pub struct CpuPlan {
     scratch: PerWorker<Vec<f32>>,
     /// Nanoseconds per step, summed over runs, when profiling.
     profile: Option<Vec<u64>>,
+    /// Every step's output from the last run, when dumping.
+    dumps: Option<Vec<Dump>>,
 }
 
 impl std::fmt::Debug for CpuPlan {
@@ -189,6 +220,18 @@ impl CpuPlan {
     /// Starts timing every step, which costs two clock reads per step.
     pub fn profile(&mut self) {
         self.profile = Some(vec![0; self.steps.len()]);
+    }
+
+    /// Keeps a copy of what every step writes from now on, for finding the first step where two
+    /// runs differ. It allocates on every run, so it is for tests and debugging only.
+    pub fn dump(&mut self) {
+        self.dumps = Some(Vec::new());
+    }
+
+    /// What every step wrote in the last run since [`CpuPlan::dump`], in order.
+    #[must_use]
+    pub fn dumps(&self) -> &[Dump] {
+        self.dumps.as_deref().unwrap_or_default()
     }
 
     /// Time per kind of step since [`CpuPlan::profile`], in nanoseconds, largest first.
@@ -453,6 +496,7 @@ impl Backend for CpuBackend {
                 (0..threads).map(|_| UnsafeCell::new(Vec::with_capacity(scratch))).collect(),
             ),
             profile: None,
+            dumps: None,
         })
     }
 
@@ -485,6 +529,9 @@ impl Backend for CpuBackend {
             scratch: &plan.scratch,
             counts: [t, s, m],
         };
+        if let Some(d) = plan.dumps.as_mut() {
+            d.clear();
+        }
         for (i, step) in plan.steps.iter().enumerate() {
             match plan.profile.as_mut() {
                 None => ctx.step(step),
@@ -494,7 +541,21 @@ impl Backend for CpuBackend {
                     p[i] += u64::try_from(at.elapsed().as_nanos()).unwrap_or(u64::MAX);
                 }
             }
+            // Copied now, because a later step may reuse the same part of the arena.
+            if let Some(d) = plan.dumps.as_mut() {
+                let l = step.out();
+                // SAFETY: the step is done and the next has not started, so nothing else
+                // touches the arena.
+                let live = unsafe { ctx.arena.slice(l.off, ctx.rows(l.rows) * l.width) };
+                d.push(Dump {
+                    name: step.name(),
+                    rows: l.rows,
+                    width: l.width,
+                    data: live.to_vec(),
+                });
+            }
         }
+
         // SAFETY: the steps are done, so nothing else touches the arena.
         let logits = unsafe { ctx.arena.slice(plan.logits.off, m) };
         // SAFETY: as above.

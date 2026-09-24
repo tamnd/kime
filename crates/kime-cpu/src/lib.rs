@@ -15,4 +15,4 @@ pub mod qgemm;
 mod testing;
 
 pub use compat::{Compat, Input, Output, executor, executor_from, executor_with};
-pub use plan::{CpuBackend, CpuPlan};
+pub use plan::{CpuBackend, CpuPlan, Dump};
