@@ -59,7 +59,7 @@ The engine alone, running Laya's own weights, is worth three to five times: unpa
 | [tamnd/kime-bench](https://github.com/tamnd/kime-bench) | The benchmark harness: kime against Laya, laya-mlx, laya-coreml and Jev, on named machines, with the reporting rules |
 | [tamnd/kime-compat](https://github.com/tamnd/kime-compat) | The compatibility harness: the TypeSafe API and SDKs, jev-ultrafast and Laya's clients, run against kime |
 
-The Python, TypeScript and Swift SDKs will get repositories of their own under `tamnd/kime-*` when they exist.
+The Python package lives in [`python/`](python) for now. It and the TypeScript and Swift SDKs will get repositories of their own under `tamnd/kime-*` once they need their own release cadence.
 
 ## Building
 
