@@ -53,12 +53,38 @@ struct Load {
     pending: AtomicUsize,
     /// Device time per request over the recent forward passes, in nanoseconds.
     per_request: AtomicU64,
+    /// When the last forward pass ended, in nanoseconds since [`epoch`].
+    last_pass: AtomicU64,
+}
+
+/// The clock `Load::last_pass` counts from.
+fn epoch() -> Instant {
+    static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+    *EPOCH.get_or_init(Instant::now)
+}
+
+fn since_epoch() -> u64 {
+    u64::try_from(epoch().elapsed().as_nanos()).unwrap_or(u64::MAX)
 }
 
 impl Load {
     /// How long a request queued now would wait for the ones ahead of it.
+    /// Whether a request should run whatever the estimate says. Nothing runs while every request
+    /// is refused, so an estimate a burst left high would never come down. Once the device has
+    /// sat idle for longer than the estimate, one request goes through and refreshes it.
+    fn probe(&self) -> bool {
+        let per = self.per_request.load(Ordering::Relaxed);
+        self.pending.load(Ordering::Relaxed) == 0
+            && since_epoch().saturating_sub(self.last_pass.load(Ordering::Relaxed)) > per
+    }
+
     fn wait(&self) -> Duration {
-        let n = self.pending.load(Ordering::Relaxed) as u64;
+        self.ready(0)
+    }
+
+    /// How long until `n` requests queued now are answered: the wait plus their own share.
+    fn ready(&self, n: usize) -> Duration {
+        let n = (self.pending.load(Ordering::Relaxed) + n) as u64;
         Duration::from_nanos(n.saturating_mul(self.per_request.load(Ordering::Relaxed)))
     }
 
@@ -69,6 +95,7 @@ impl Load {
         let old = self.per_request.load(Ordering::Relaxed);
         let new = if old == 0 { now } else { old - old / 8 + now / 8 };
         self.per_request.store(new, Ordering::Relaxed);
+        self.last_pass.store(since_epoch(), Ordering::Relaxed);
     }
 }
 
@@ -173,16 +200,25 @@ impl Models {
     }
 
     /// Queues requests on a model's worker and waits for their answers without blocking the
-    /// async runtime. When the requests already queued would keep these waiting longer than
-    /// `max_queue`, it queues nothing and returns the estimated wait instead.
-    pub(crate) async fn decide(&self, at: usize, reqs: Vec<Request>) -> Result<Done, Duration> {
+    /// async runtime. It queues nothing when the requests already queued would keep these waiting
+    /// longer than `max_queue`, or when the answers would be ready after `deadline`.
+    pub(crate) async fn decide(
+        &self,
+        at: usize,
+        reqs: Vec<Request>,
+        deadline: Option<Duration>,
+    ) -> Result<Done, Refused> {
         let m = &self.list[at];
+        let n = reqs.len();
         let wait = m.load.wait();
         if !self.max_queue.is_zero() && wait > self.max_queue {
-            return Err(wait);
+            return Err(Refused::Overloaded(wait));
+        }
+        let ready = m.load.ready(n);
+        if deadline.is_some_and(|d| ready > d) && !m.load.probe() {
+            return Err(Refused::Deadline(ready));
         }
         let (tx, rx) = oneshot::channel();
-        let n = reqs.len();
         m.load.pending.fetch_add(n, Ordering::Relaxed);
         let job = Job { reqs, at: Instant::now(), done: tx };
         if m.queue.send(job).is_err() {
@@ -191,6 +227,15 @@ impl Models {
         }
         Ok(rx.await.unwrap_or_else(|_| gone(n)))
     }
+}
+
+/// Why requests were turned away before they were queued.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Refused {
+    /// The queue ahead would take longer than `max_queue`. The estimated wait.
+    Overloaded(Duration),
+    /// The answers would be ready after the deadline. The estimate of when.
+    Deadline(Duration),
 }
 
 fn gone(n: usize) -> Done {
@@ -340,8 +385,23 @@ mod tests {
         l.record(Duration::from_millis(80), 40);
         l.pending.store(300, Ordering::Relaxed);
         assert_eq!(l.wait(), Duration::from_millis(600));
+        assert_eq!(l.ready(10), Duration::from_millis(620));
+        // Just after a pass, with work queued, there is no probe.
+        assert!(!l.probe());
         // A slow pass moves the average an eighth of the way.
         l.record(Duration::from_millis(10), 1);
         assert_eq!(l.wait(), Duration::from_nanos(300 * (2_000_000 - 250_000 + 1_250_000)));
+    }
+
+    #[test]
+    fn an_idle_device_probes_once_the_estimate_has_passed() {
+        let l = Load::default();
+        l.record(Duration::from_secs(10), 1);
+        assert!(!l.probe(), "idle for less than the 10 s estimate");
+        l.per_request.store(1_000, Ordering::Relaxed);
+        std::thread::sleep(Duration::from_millis(2));
+        assert!(l.probe(), "idle for longer than the 1 us estimate");
+        l.pending.store(1, Ordering::Relaxed);
+        assert!(!l.probe(), "busy");
     }
 }
