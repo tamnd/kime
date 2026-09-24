@@ -6,11 +6,10 @@
 //! sequence `s`, and no token sees another sequence. A window `w` limits each token to keys at most
 //! `w` positions away on either side, which is ModernBERT's local attention with `w = 64`.
 //!
-//! Scores go through the same dot as the GEMMs. The softmax sum and the probability weighted sum
-//! of values are taken in f64 in key order and rounded once, so the result does not depend on the
-//! thread count either.
+//! Everything is f32, the way PyTorch's attention computes it, and each sum runs in a fixed order
+//! inside one task, so the result does not depend on the thread count either.
 
-use crate::gemm::dot;
+use crate::ops::exp_neg;
 use crate::par::{self, Shared};
 
 /// Width of one head. Every model kime runs uses 64.
@@ -62,8 +61,18 @@ pub fn attention(
 }
 
 /// Attention for query rows `q0..q0 + QB` of head `h` of the sequence in rows `lo..hi`, with `p`
-/// as scratch for the scores. This is one task of [`attention`], exposed so a plan can run it
-/// with scratch it owns.
+/// as scratch. This is one task of [`attention`], exposed so a plan can run it with scratch it
+/// owns.
+///
+/// Queries go `QT` at a time. Their scores are taken against `KT` keys at once, with all sixteen
+/// running sums in registers, and the weighted sum of values keeps a `QT` by `CT` tile of the
+/// output in registers while it walks the keys, so each key and value row is loaded once per
+/// group of queries instead of once per query. The softmax is in f32 with a vectorized exp, the
+/// sums in eight lanes, in key order, so the result does not depend on the thread count.
+///
+/// # Panics
+///
+/// If `qkv` does not hold the rows it names.
 ///
 /// # Safety
 ///
@@ -83,34 +92,123 @@ pub unsafe fn block(
     let d = heads * HEAD;
     let stride = 3 * d;
     let scale = 1.0 / (HEAD as f32).sqrt();
-    let mut acc = [0f64; HEAD];
-    for i in q0..(q0 + QB).min(hi) {
-        let (a, b) = match window {
-            Some(w) => (i.saturating_sub(w).max(lo), (i + w + 1).min(hi)),
-            None => (lo, hi),
-        };
-        let q = &qkv[i * stride + h * HEAD..][..HEAD];
-        p.clear();
-        p.extend((a..b).map(|j| dot(q, &qkv[j * stride + d + h * HEAD..][..HEAD]) * scale));
-        let mx = p.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        let mut sum = 0f64;
-        for x in p.iter_mut() {
-            *x = (*x - mx).exp();
-            sum += f64::from(*x);
+    let q1 = (q0 + QB).min(hi);
+    if q0 >= q1 {
+        return;
+    }
+    let span = |i: usize| match window {
+        Some(w) => (i.saturating_sub(w).max(lo), (i + w + 1).min(hi)),
+        None => (lo, hi),
+    };
+    let (ka, kb) = (span(q0).0, span(q1 - 1).1);
+    // Keys rounded up to whole tiles. Past kb a tile reads the last key again, with weight zero.
+    let np = (kb - ka).next_multiple_of(KT);
+    let key = |j: usize| (ka + j).min(kb - 1) * stride + h * HEAD;
+    p.clear();
+    p.resize(QT * np, 0.0);
+    let s = &mut p[..];
+    for i0 in (q0..q1).step_by(QT) {
+        let m = (q1 - i0).min(QT);
+        // The keys any of these queries sees, in whole tiles.
+        let t0 = (span(i0).0 - ka) / KT * KT;
+        let t1 = (span(i0 + m - 1).1 - ka).next_multiple_of(KT);
+        let mut qs = [[0f32; HEAD]; QT];
+        for (r, q) in qs.iter_mut().enumerate().take(m) {
+            let src = &qkv[(i0 + r) * stride + h * HEAD..][..HEAD];
+            q.iter_mut().zip(src).for_each(|(q, &x)| *q = x * scale);
         }
-        acc.fill(0.0);
-        for (j, &e) in (a..b).zip(p.iter()) {
-            let pj = f64::from(e) / sum;
-            let v = &qkv[j * stride + 2 * d + h * HEAD..][..HEAD];
-            for c in 0..HEAD {
-                acc[c] = pj.mul_add(f64::from(v[c]), acc[c]);
+        for j in (t0..t1).step_by(KT) {
+            let ks = std::array::from_fn(|t| qkv[d + key(j + t)..][..HEAD].try_into().unwrap());
+            let t = scores(&qs, ks);
+            for (r, t) in t.iter().enumerate() {
+                s[r * np + j..][..KT].copy_from_slice(t);
             }
         }
-        for (c, &v) in acc.iter().enumerate() {
-            // SAFETY: the caller owns row i of head h.
-            unsafe { out.set(i * d + h * HEAD + c, v as f32) };
+        // Softmax over each query's own keys, with zeros elsewhere in the tiles.
+        let mut inv = [0f32; QT];
+        for (r, inv) in inv.iter_mut().enumerate() {
+            let row = &mut s[r * np + t0..r * np + t1];
+            if r >= m {
+                row.fill(0.0);
+                continue;
+            }
+            let (a, b) = span(i0 + r);
+            let (a, b) = (a - ka - t0, b - ka - t0);
+            row[..a].fill(0.0);
+            row[b..].fill(0.0);
+            let row = &mut row[a..b];
+            let mx = lanes(row, f32::NEG_INFINITY, f32::max)
+                .into_iter()
+                .fold(f32::NEG_INFINITY, f32::max);
+            row.iter_mut().for_each(|x| *x = exp_neg(*x - mx));
+            *inv = 1.0 / lanes(row, 0.0, |a, b| a + b).iter().sum::<f32>();
+        }
+        for c in (0..HEAD).step_by(CT) {
+            let mut o = [[0f32; CT]; QT];
+            for j in t0..t1 {
+                let v: &[f32; CT] = qkv[2 * d + key(j) + c..][..CT].try_into().unwrap();
+                for (r, or) in o.iter_mut().enumerate() {
+                    let e = s[r * np + j];
+                    or.iter_mut().zip(v).for_each(|(o, &v)| *o = madd(*o, e, v));
+                }
+            }
+            for (r, (o, inv)) in o.iter().zip(inv).enumerate().take(m) {
+                for (x, &v) in o.iter().enumerate() {
+                    // SAFETY: the caller owns row i0 + r of head h.
+                    unsafe { out.set((i0 + r) * d + h * HEAD + c + x, v * inv) };
+                }
+            }
         }
     }
+}
+
+/// Queries taken together.
+const QT: usize = 4;
+/// Keys per tile.
+const KT: usize = 4;
+/// Value channels per tile.
+const CT: usize = 16;
+
+/// Scores of the `QT` queries in `qs` against the `KT` keys in `ks`, four channels at a time in
+/// each of the sixteen pairs, then the four lanes added.
+#[inline(always)]
+fn scores(qs: &[[f32; HEAD]; QT], ks: [&[f32; HEAD]; KT]) -> [[f32; KT]; QT] {
+    let mut t = [[[0f32; 4]; KT]; QT];
+    for c in (0..HEAD).step_by(4) {
+        for (tr, q) in t.iter_mut().zip(qs) {
+            for (tk, k) in tr.iter_mut().zip(ks) {
+                for l in 0..4 {
+                    tk[l] = madd(tk[l], q[c + l], k[c + l]);
+                }
+            }
+        }
+    }
+    t.map(|tr| tr.map(|[a, b, c, d]| (a + c) + (b + d)))
+}
+
+/// `x` folded with `f` into eight running values, one per lane, so the loop vectorizes where a
+/// single running value would wait on itself every step.
+#[inline(always)]
+fn lanes(x: &[f32], init: f32, f: impl Fn(f32, f32) -> f32) -> [f32; 8] {
+    let mut acc = [init; 8];
+    let (chunks, rest) = x.as_chunks::<8>();
+    for c in chunks {
+        acc.iter_mut().zip(c).for_each(|(a, &v)| *a = f(*a, v));
+    }
+    for (a, &v) in acc.iter_mut().zip(rest) {
+        *a = f(*a, v);
+    }
+    acc
+}
+
+/// `c + a * b`, fused where the machine always has it and two roundings elsewhere, since x86
+/// builds without FMA would turn `mul_add` into a call.
+#[inline(always)]
+fn madd(c: f32, a: f32, b: f32) -> f32 {
+    #[cfg(target_arch = "aarch64")]
+    return a.mul_add(b, c);
+    #[cfg(not(target_arch = "aarch64"))]
+    return c + a * b;
 }
 
 #[cfg(test)]

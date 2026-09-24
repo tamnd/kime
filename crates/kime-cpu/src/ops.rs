@@ -73,6 +73,14 @@ fn erfc_sqrt_half(a: f32) -> f32 {
     k * exp(-0.5 * ah * ah, 0.5 * (ah - a) * (ah + a) + r)
 }
 
+/// `e^y` for `y <= 0` without calls, so softmax loops vectorize. Below `-87` it gives about
+/// `1.6e-38` instead of going on down to zero.
+#[inline]
+#[must_use]
+pub fn exp_neg(y: f32) -> f32 {
+    exp(y.max(-87.0), 0.0)
+}
+
 /// `e^(hi + lo)` without calls, for `|lo|` a few units at most and `hi` exact: `2^n e^r` with `|r| <= ln2/2` and a
 /// degree 6 polynomial for `e^r`. Keeping `lo` apart until after the reduction saves the bits a
 /// single f32 argument near `-20` would lose. The sum has to stay between `-87` and `88`, since
