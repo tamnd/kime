@@ -212,7 +212,9 @@ pub fn model() -> &'static Model {
 
 /// Whether a request's state goes to the English checkpoint. For Latin script text of two words
 /// or more the identifier has to say English, and Laya's rules too unless the identifier is sure
-/// past [`OVERRULE`]. Everything else keeps the answer of Laya's rules.
+/// past [`OVERRULE`]. When Laya's rules object only to the accented letters, as they do to `café`
+/// and `naïve`, the identifier can also be that sure of the text with the accents taken off.
+/// Everything else keeps the answer of Laya's rules.
 #[must_use]
 pub fn english_model(state: &Value) -> bool {
     english_model_text(&state_text(state, MAX_CHARS))
@@ -227,7 +229,19 @@ pub fn english_model_text(text: &str) -> bool {
     }
     let m = model();
     let p = m.p_english(text);
-    p >= m.threshold && (a.is_english || p >= OVERRULE)
+    if a.is_english {
+        p >= m.threshold
+    } else {
+        p >= OVERRULE || (a.language.is_none() && m.p_english(&strip_accents(text)) >= OVERRULE)
+    }
+}
+
+/// The text with its accents taken off, `café` as `cafe`.
+#[must_use]
+pub fn strip_accents(text: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    use unicode_normalization::char::is_combining_mark;
+    text.nfd().filter(|&c| !is_combining_mark(c)).collect()
 }
 
 #[cfg(test)]
@@ -259,6 +273,7 @@ mod tests {
             "EUR",
             "Apple releases Mac OS X 10.3.7 Update, a maintenance release for its operating system.",
             "Given an array of integers nums, return the indices of the two numbers that add up to target.",
+            "The café on the corner serves a great crème brûlée",
         ] {
             assert!(english_model_text(t), "{t}");
         }
@@ -269,6 +284,8 @@ mod tests {
             "gusto kong mag-order ng pizza ngayong gabi",
             "wek mij morgen om zeven uur",
             "vekk meg klokken syv i morgen",
+            "Le café est fermé aujourd'hui",
+            "Chci zrušit své předplatné a vrátit peníze",
         ] {
             assert!(!english_model_text(t), "{t}");
         }

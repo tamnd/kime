@@ -53,3 +53,59 @@ fn matches_laya_router() {
     assert!(n > 2000);
     assert!(lid_right * 100 >= lid_labelled * 95);
 }
+
+/// The labelled routing set `tools/route/routing-set.py` writes: MASSIVE, papluca, AG News and
+/// LeetCode test texts, MASSIVE with the accents stripped, the cases from Laya's routing issues,
+/// Latin script languages the identifier never saw and English that shares words with other
+/// languages. A server whose default is English answers `default` with the English checkpoint.
+#[test]
+fn routing_set() {
+    use std::collections::BTreeMap;
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/lang/routing-set.jsonl");
+    let mut by: BTreeMap<String, [usize; 3]> = BTreeMap::new();
+    let mut wrong = Vec::new();
+    for line in BufReader::new(std::fs::File::open(path).unwrap()).lines() {
+        let case: Value = serde_json::from_str(&line.unwrap()).unwrap();
+        let want = case["want"].as_str().unwrap();
+        let got = match detect(&case["text"], true).english {
+            Some(true) => "english",
+            Some(false) => "multilingual",
+            None => "default",
+        };
+        let right = |got: &str| got == want || (want == "english" && got == "default");
+        let laya = case["laya"].as_str().unwrap();
+        let source = case["source"].as_str().unwrap();
+        let group = if source.starts_with("laya#") { "laya issues" } else { source };
+        let e = by.entry(group.to_string()).or_default();
+        e[0] += 1;
+        e[1] += usize::from(right(laya));
+        e[2] += usize::from(right(got));
+        if !right(got) {
+            wrong.push(format!("{source} {want} {got}: {}", case["text"]));
+        }
+    }
+    let mut total = [0; 3];
+    for (group, c) in &by {
+        let pct = |n: usize| 100.0 * n as f64 / c[0] as f64;
+        eprintln!("{group:<18} {:>5} laya {:>6.2}% kime {:>6.2}%", c[0], pct(c[1]), pct(c[2]));
+        for k in 0..3 {
+            total[k] += c[k];
+        }
+    }
+    let pct = |n: usize| 100.0 * n as f64 / total[0] as f64;
+    eprintln!(
+        "{:<18} {:>5} laya {:>6.2}% kime {:>6.2}%",
+        "all",
+        total[0],
+        pct(total[1]),
+        pct(total[2])
+    );
+    for w in &wrong {
+        eprintln!("{w}");
+    }
+    assert!(total[0] >= 5000);
+    assert!(total[2] * 100 >= total[0] * 99, "{} of {} right", total[2], total[0]);
+    for group in ["laya issues", "collision", "leetcode"] {
+        assert_eq!(by[group][2], by[group][0], "{group}");
+    }
+}

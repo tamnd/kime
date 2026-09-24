@@ -15,7 +15,7 @@ use std::io::{BufRead, BufReader};
 use std::time::Instant;
 
 use kime_route::lang::analyse_text;
-use kime_route::lid::{BUCKETS, MIN_WORDS, Model, OVERRULE, features, model, words};
+use kime_route::lid::{BUCKETS, MIN_WORDS, Model, OVERRULE, features, model, strip_accents, words};
 use serde_json::Value;
 
 struct Row {
@@ -29,6 +29,8 @@ struct Row {
     latin: bool,
     words: usize,
     feats: Vec<(u32, f32)>,
+    /// The features without the accents, when Laya's rules object only to accented letters.
+    stripped: Option<Vec<(u32, f32)>>,
 }
 
 fn row(text: &str, lang: &str, source: &str, split: &str) -> Row {
@@ -42,6 +44,7 @@ fn row(text: &str, lang: &str, source: &str, split: &str) -> Row {
         latin: a.script == "latin",
         words: words(text),
         feats: features(text),
+        stripped: (!a.is_english && a.language.is_none()).then(|| features(&strip_accents(text))),
     }
 }
 
@@ -144,7 +147,12 @@ fn train(rows: &[&Row], epochs: usize) -> Model {
 fn routes_english(m: &Model, r: &Row, threshold: f32) -> bool {
     if r.latin && r.words >= MIN_WORDS {
         let p = sigmoid(m.logit(&r.feats));
-        p >= threshold && (r.laya_english || p >= OVERRULE)
+        let sure = |f: &[(u32, f32)]| sigmoid(m.logit(f)) >= OVERRULE;
+        if r.laya_english {
+            p >= threshold
+        } else {
+            p >= OVERRULE || r.stripped.as_deref().is_some_and(sure)
+        }
     } else {
         r.laya_english
     }
