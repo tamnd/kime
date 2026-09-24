@@ -1,0 +1,22 @@
+[package]
+name = "kime-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.12"
+kime-core = { path = "../crates/kime-core" }
+
+# Not part of the kime workspace: the targets build with nightly and a sanitizer.
+[workspace]
+
+[[bin]]
+name = "email"
+path = "fuzz_targets/email.rs"
+test = false
+doc = false
+bench = false

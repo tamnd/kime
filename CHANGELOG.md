@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime_core::email` is a port of Laya's email cleaner (`clean_email_body` and `email_state`), and `kime_core::presets` has Laya's five presets (triage, email, guard, moderation and router) with their questions and options in the same order. The cleaner gives the same output as Laya 0.3.20 on the 86 calls in Laya's own email tests and 1,000 generated emails, all recorded in `crates/kime-core/tests/email/laya.json` by `tools/email/record.py`, and on a separate recording of 50,086 that is too big to commit. On the Mac it takes 22 to 24 us per body against 31 to 43 us for Laya on the same 50,086 bodies. `fuzz/` has a cargo-fuzz target for it that checks it never panics and never makes a body longer than it was or longer than the limit, and a 20 minute run on the Mac went through 992,359 inputs clean.
+
 ## 0.0.14
 
 - kime-serve gives Jev's 413 for a Jev request over `--max-request-tokens` (65,536 by default) tokens before any cut, and a batch item over it fails alone. Laya requests are still cut and answered, as laya-serve does. Only bodies over half the limit in bytes are counted, on a blocking thread. On the Mac, a 70,000 word state gets its 413 in 2.1 ms and a 500,000 word one in 14.6 ms, where answering it would have taken about 490 ms of CPU. A 60,000 word state under the limit is answered in the same time as a 1,000 word one.

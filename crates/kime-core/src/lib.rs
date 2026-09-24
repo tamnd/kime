@@ -9,6 +9,8 @@
 
 pub mod answer;
 pub mod confidence;
+pub mod email;
+pub mod presets;
 pub mod pyjson;
 pub mod render;
 pub mod request;
