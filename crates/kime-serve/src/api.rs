@@ -4,12 +4,10 @@
 // answer with it anyway.
 #![allow(clippy::result_large_err)]
 
-use std::collections::BTreeMap;
 use std::collections::hash_map::RandomState;
-use std::fmt::Write as _;
 use std::hash::BuildHasher;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
@@ -25,6 +23,7 @@ use kime_engine::Error;
 use serde_json::{Map, Value, json};
 
 use crate::auth::{Auth, Bucket, Denied};
+use crate::metrics::{Metrics, ModelView, route};
 use crate::models::{Done, Models, Named, Refused, Resolved};
 
 /// Everything the handlers share.
@@ -35,58 +34,6 @@ pub(crate) struct State {
     pub(crate) metrics: Metrics,
     pub(crate) auth: Auth,
     pub(crate) buckets: Vec<Bucket>,
-}
-
-/// Request counts and time spent, by route and status, for `/metrics`. The per stage histograms
-/// in spec/11-serving.md come with the scheduler.
-#[derive(Debug, Default)]
-pub(crate) struct Metrics {
-    by: Mutex<Counts>,
-}
-
-/// Requests and seconds by route and status.
-type Counts = BTreeMap<(&'static str, u16), (u64, f64)>;
-
-impl Metrics {
-    fn record(&self, route: &'static str, status: u16, took: Duration) {
-        let mut by = self.by.lock().unwrap_or_else(PoisonError::into_inner);
-        let e = by.entry((route, status)).or_default();
-        e.0 += 1;
-        e.1 += took.as_secs_f64();
-    }
-
-    fn render(&self) -> String {
-        let by = self.by.lock().unwrap_or_else(PoisonError::into_inner);
-        let mut out = String::from(
-            "# HELP kime_requests_total Requests answered, by route and status.\n# TYPE kime_requests_total counter\n",
-        );
-        for ((route, status), (n, _)) in by.iter() {
-            let _ =
-                writeln!(out, "kime_requests_total{{route=\"{route}\",status=\"{status}\"}} {n}");
-        }
-        out.push_str("# HELP kime_request_seconds_total Time spent answering, by route and status.\n# TYPE kime_request_seconds_total counter\n");
-        for ((route, status), (_, secs)) in by.iter() {
-            let _ = writeln!(
-                out,
-                "kime_request_seconds_total{{route=\"{route}\",status=\"{status}\"}} {secs}"
-            );
-        }
-        out
-    }
-}
-
-/// The route label for a path, from a fixed set so clients cannot grow the metrics.
-fn route_label(path: &str) -> &'static str {
-    match path {
-        "/v1/systemone" => "/v1/systemone",
-        "/v1/systemone/batch" => "/v1/systemone/batch",
-        "/v1/models" => "/v1/models",
-        p if p.starts_with("/v1/models/") => "/v1/models/{id}",
-        "/health" => "/health",
-        "/ready" => "/ready",
-        "/metrics" => "/metrics",
-        _ => "other",
-    }
 }
 
 type Shared = Arc<State>;
@@ -141,7 +88,7 @@ async fn request_id(mut req: HttpRequest, next: Next) -> HttpResponse {
         .filter(|v| echoable(v))
         .map_or_else(new_id, str::to_string);
     req.extensions_mut().insert(RequestId(id.clone()));
-    let (start, route) = (Instant::now(), route_label(req.uri().path()));
+    let (start, route) = (Instant::now(), route(req.uri().path()));
     let state = req.extensions().get::<Shared>().cloned();
     let mut res = next.run(req).await;
     if let Some(s) = state {
@@ -690,7 +637,8 @@ async fn health(Extension(s): Extension<Shared>) -> HttpResponse {
 }
 
 async fn metrics(Extension(s): Extension<Shared>) -> HttpResponse {
-    let mut r = s.metrics.render().into_response();
+    let views: Vec<ModelView<'_>> = s.models.list.iter().map(|m| m.view()).collect();
+    let mut r = s.metrics.render(&views).into_response();
     r.headers_mut()
         .insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; version=0.0.4"));
     r
