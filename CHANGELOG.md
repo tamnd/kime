@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+## 0.0.12
+
 - `kime serve` runs the HTTP server from `kime-serve`: `POST /v1/systemone` and `/v1/systemone/batch`, `GET /v1/models`, `/v1/models/{id}`, `/health`, `/ready` and `/metrics`, over HTTP/1.1 and h2 on axum. A request that names a Laya model or no model and sends no `kime` object gets laya-serve's shape, with `action` and `routing`. A request for `kime-latest` or any `jev-*` id gets Jev's shape, with probabilities rounded to 2 places by largest remainder so they sum to exactly 1, and `kime.precision`, `kime.confidence` and `kime.extensions` work. Errors follow the table in spec/03-api.md. Each model has its own worker thread, and requests that arrive while it is busy share the next forward pass. On the RTX 4090 in one session, with the 77 English parity requests and the same keep-alive client, kime answers one request at a time in 2.62 ms at p50 against 17.74 ms for laya-serve 0.3.7 on CUDA, and 1,411 questions/s at 64 concurrent clients against 188 for laya-serve, whose p99 there is 12.3 s against kime's 178 ms.
 - `kime-cpu` has a determinism test on the Laya weights: every parity question gives the same logits bit for bit alone, in 20 rounds of random batches and after unrelated work, and a mismatch prints the first plan step that differs.
 - `kime_metal::energy::Meter` reads the machine's total power from the SMC's `PSTR` key, which needs no root, samples it every 5 ms around a run and adds it up, and the `metal_bench` example prints the energy per decision next to the idle draw. The key covers the whole machine, so the idle draw has to come from the same session.
