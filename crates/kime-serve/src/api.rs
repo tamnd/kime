@@ -630,72 +630,133 @@ async fn batch(
             Err(p) => Err(json!({"status": 422, "detail": p.iter().map(Problem::to_json).collect::<Vec<_>>()})),
         });
     }
-    if counted(&s, bytes) {
-        let (n, all) = match count(&s, resolved.at, good).await {
-            Ok(v) => v,
-            Err(r) => return r,
-        };
-        // Items over the limit fail alone, like items that do not parse.
-        good = Vec::with_capacity(all.len());
-        let mut at = vec![None; all.len()];
-        for (k, r) in all.into_iter().enumerate() {
-            if n[k] <= s.max_request_tokens {
-                at[k] = Some(good.len());
-                good.push(r);
-            }
-        }
-        for slot in &mut slots {
-            if let Ok(k) = *slot {
-                *slot = at[k].ok_or_else(|| {
-                    let mut e = too_long_body(n[k], s.max_request_tokens);
-                    e["status"] = 413.into();
-                    e
-                });
-            }
+    // A name that leaves the choice to the server is routed item by item, and each model
+    // answers its own items, all at once.
+    let mut groups: Vec<(usize, Vec<usize>)> = Vec::new();
+    let mut place = Vec::with_capacity(good.len());
+    for r in &good {
+        let mut one = resolved.clone();
+        s.models.route(&mut one, r);
+        let g = groups.iter().position(|(at, _)| *at == one.at).unwrap_or_else(|| {
+            groups.push((one.at, Vec::new()));
+            groups.len() - 1
+        });
+        place.push((g, groups[g].1.len()));
+        groups[g].1.push(place.len() - 1);
+    }
+    if groups.is_empty() {
+        groups.push((resolved.at, Vec::new()));
+    }
+    let mut reqs: Vec<Vec<Request>> = groups.iter().map(|_| Vec::new()).collect();
+    for (r, &(g, _)) in good.into_iter().zip(&place) {
+        reqs[g].push(r);
+    }
+    let counted = counted(&s, bytes);
+    let tasks: Vec<_> = groups
+        .iter()
+        .zip(reqs)
+        .map(|(&(at, _), reqs)| tokio::spawn(answer(s.clone(), at, reqs, counted)))
+        .collect();
+    let mut answers = Vec::with_capacity(tasks.len());
+    for t in tasks {
+        match t.await {
+            Ok(Ok(a)) => answers.push(a),
+            Ok(Err(r)) => return r,
+            Err(e) => return detail(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         }
     }
-    let mut done = match s.models.decide(resolved.at, good, None).await {
-        Ok(d) => d,
-        Err(r) => return refused(r, None),
-    };
-    let mut answered: Vec<Option<Result<Response, Error>>> =
-        std::mem::take(&mut done.results).into_iter().map(Some).collect();
-    let model = &s.models.list[resolved.at].id;
+    let mixed = groups.len() > 1;
     let (mut tokens, mut questions) = (0, 0);
     let results: Vec<Value> = ids
         .into_iter()
         .zip(slots)
-        .map(|(item_id, slot)| match slot {
-            Err(e) => json!({"id": item_id, "error": e}),
-            Ok(k) => match answered[k].take() {
-                Some(Ok(r)) => {
+        .map(|(item_id, slot)| {
+            let k = match slot {
+                Err(e) => return json!({"id": item_id, "error": e}),
+                Ok(k) => k,
+            };
+            let (g, j) = place[k];
+            let model = &s.models.list[groups[g].0].id;
+            match std::mem::replace(&mut answers[g].0[j], Item::Missing) {
+                Item::Answer(Ok(r)) => {
                     tokens += r.input_tokens;
                     questions += r.answers.len();
                     let mut v = jev(model, &r, o, None);
                     if let Some(m) = v.as_object_mut() {
-                        m.shift_remove("model");
+                        let routed = m.shift_remove("model");
                         let mut out = Map::new();
                         out.insert("id".into(), item_id);
+                        if mixed && let Some(model) = routed {
+                            out.insert("model".into(), model);
+                        }
                         out.extend(std::mem::take(m));
                         *m = out;
                     }
                     v
                 }
-                Some(Err(e)) => {
+                Item::Answer(Err(e)) => {
                     let r = engine_error(&e, false, &id);
                     json!({"id": item_id, "error": {"status": r.status().as_u16(), "message": e.to_string()}})
                 }
-                None => json!({"id": item_id, "error": {"status": 500, "message": "no answer"}}),
-            },
+                Item::TooLong(e) => json!({"id": item_id, "error": e}),
+                Item::Missing => {
+                    json!({"id": item_id, "error": {"status": 500, "message": "no answer"}})
+                }
+            }
         })
         .collect();
+    let (at, done) = (groups[0].0, &answers[0].1);
+    let model = &s.models.list[at].id;
     let mut r = reply(
         StatusCode::OK,
         &json!({"model": model, "results": results, "usage": {"input_tokens": tokens, "output_tokens": 0}}),
     );
-    timing(r.headers_mut(), &done, start.elapsed());
-    r.extensions_mut().insert(Served { model: resolved.at, questions, tokens: tokens as u64 });
+    timing(r.headers_mut(), done, start.elapsed());
+    r.extensions_mut().insert(Served { model: at, questions, tokens: tokens as u64 });
     r
+}
+
+/// One batch item's outcome on its model.
+enum Item {
+    Answer(Result<Response, Error>),
+    /// Over `max_request_tokens`, with the error to report.
+    TooLong(Value),
+    Missing,
+}
+
+/// Answers one model's share of a batch: items over the token limit fail alone, like items that
+/// do not parse, and the rest share the forward passes.
+async fn answer(
+    s: Shared,
+    at: usize,
+    reqs: Vec<Request>,
+    counted: bool,
+) -> Result<(Vec<Item>, Done), HttpResponse> {
+    let (n, reqs) = if counted { count(&s, at, reqs).await? } else { (vec![0; reqs.len()], reqs) };
+    let mut good = Vec::with_capacity(reqs.len());
+    let mut slot = Vec::with_capacity(reqs.len());
+    for (k, r) in reqs.into_iter().enumerate() {
+        slot.push((n[k] <= s.max_request_tokens).then_some(good.len()));
+        if n[k] <= s.max_request_tokens {
+            good.push(r);
+        }
+    }
+    let mut done = s.models.decide(at, good, None).await.map_err(|r| refused(r, None))?;
+    let mut answered: Vec<Option<Result<Response, Error>>> =
+        std::mem::take(&mut done.results).into_iter().map(Some).collect();
+    let items = slot
+        .iter()
+        .enumerate()
+        .map(|(k, j)| match j {
+            Some(j) => answered[*j].take().map_or(Item::Missing, Item::Answer),
+            None => {
+                let mut e = too_long_body(n[k], s.max_request_tokens);
+                e["status"] = 413.into();
+                Item::TooLong(e)
+            }
+        })
+        .collect();
+    Ok((items, done))
 }
 
 fn entry(name: &str, description: String) -> Value {

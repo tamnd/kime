@@ -8,6 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
+use kime_route::router::By;
+
 /// Bucket bounds for times, from 50 µs to 5 s, in seconds.
 const SECONDS: [f64; 16] = [
     50e-6, 100e-6, 250e-6, 500e-6, 1e-3, 2.5e-3, 5e-3, 10e-3, 25e-3, 50e-3, 100e-3, 250e-3, 0.5,
@@ -95,6 +97,8 @@ pub(crate) struct Stats {
     pass_questions: Histogram,
     pass_tokens: Histogram,
     pass_batches: Histogram,
+    /// Requests the router sent here, by the rule that decided.
+    routed: [AtomicU64; By::ALL.len()],
 }
 
 impl Default for Stats {
@@ -110,6 +114,7 @@ impl Default for Stats {
             pass_questions: Histogram::counts(),
             pass_tokens: Histogram::tokens(),
             pass_batches: Histogram::counts(),
+            routed: Default::default(),
         }
     }
 }
@@ -126,6 +131,10 @@ pub(crate) struct Pass {
 }
 
 impl Stats {
+    pub(crate) fn routed(&self, by: By) {
+        self.routed[by as usize].fetch_add(1, Ordering::Relaxed);
+    }
+
     pub(crate) fn pass(&self, p: Pass) {
         self.passes.fetch_add(1, Ordering::Relaxed);
         self.questions.fetch_add(p.questions as u64, Ordering::Relaxed);
@@ -295,6 +304,25 @@ impl Metrics {
                 m.id,
                 m.per_request.as_secs_f64()
             );
+        }
+        head(
+            &mut out,
+            "kime_route_decisions_total",
+            "counter",
+            "Requests the router sent to a model, by the rule that decided: lang, lang_guess, no_letters, script, word_lists, identifier.",
+        );
+        for m in models {
+            for by in By::ALL {
+                let n = m.stats.routed[by as usize].load(Ordering::Relaxed);
+                if n > 0 {
+                    let _ = writeln!(
+                        out,
+                        "kime_route_decisions_total{{model=\"{}\",reason=\"{}\"}} {n}",
+                        m.id,
+                        by.as_str()
+                    );
+                }
+            }
         }
         let hists: [Named<Histogram>; 7] = [
             ("kime_queue_seconds", "Wait from submission to the forward pass.", |s| &s.queue),

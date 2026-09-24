@@ -85,13 +85,18 @@ fn start(
     (addr, stop, server)
 }
 
-/// Two requests on one connection, the first refused before its body is read.
+/// Two requests on one connection, the first refused before its body is read. `t2` is put in
+/// debt first, since `t1`'s debt from the cases may be paid off by now on a slow machine.
 async fn keep_alive(addr: SocketAddr) {
     use tokio::io::AsyncBufReadExt;
+    let answered = r#"{"state":"a few words to read","questions":{"q":{"type":"choice","instructions":"i","criteria":{"a":"","b":""}}}}"#;
+    let (status, _, _) =
+        call(addr, "POST", "/v1/systemone", Some(answered), "authorization: Bearer t2\r\n").await;
+    assert_eq!(status, 200);
     let s = tokio::net::TcpStream::connect(addr).await.unwrap();
     let mut s = tokio::io::BufReader::new(s);
     let body = r#"{"state":"x","questions":{"q":{"type":"noul","instructions":"i"}},"kime":{}}"#;
-    for (key, want) in [("nope", "401"), ("t1", "429"), ("nope", "401")] {
+    for (key, want) in [("nope", "401"), ("t2", "429"), ("nope", "401")] {
         let head = format!(
             "POST /v1/systemone HTTP/1.1\r\nhost: x\r\nauthorization: Bearer {key}\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n",
             body.len()
@@ -147,10 +152,10 @@ async fn error_snapshots() {
             return;
         }
     };
-    // `open` has no keys. `keys` has Jev style keys: k1 at 2 requests a minute and t1 at 10 input
-    // tokens a second. `laya-key` is laya-serve's LAYA_API_KEY.
+    // `open` has no keys. `keys` has Jev style keys: k1 at 2 requests a minute, t1 at 10 input
+    // tokens a second and t2 at 1. `laya-key` is laya-serve's LAYA_API_KEY.
     let mut keys = kime_serve::Auth::off();
-    keys.add_keys_file("k1 ops 2\nt1 tokens - 10\n").unwrap();
+    keys.add_keys_file("k1 ops 2\nt1 tokens - 10\nt2 tokens - 1\n").unwrap();
     let servers = [
         ("open", start(&kime, kime_serve::Auth::off(), 65_536)),
         ("keys", start(&kime, keys, 65_536)),
@@ -180,7 +185,11 @@ async fn error_snapshots() {
         .await;
         let mut got = json!({"status": status, "body": body});
         if let Some(r) = retry {
-            got["retry_after"] = r.into();
+            // The wait counts down from the first request of the window, so a slow machine sees
+            // less of it left. Anything from a second to the snapshot's wait is right.
+            let snap =
+                c["kime"]["retry_after"].as_u64().filter(|&w| !bless && (1..=w).contains(&r));
+            got["retry_after"] = snap.unwrap_or(r).into();
         }
         if bless {
             c["kime"] = got.clone();

@@ -83,7 +83,7 @@ Detection runs on up to the first 4,000 characters of the rendered state, walkin
 2. **Latin language id.** For Latin script text of two words or more, `kime_route::lid`, a logistic regression over hashed character 1 to 4 grams and words (2^18 buckets, 16 bit weights, a 512 KB file built into the crate). Tokens that look like paths, identifiers, emails or dotted names are skipped, as are words with letters of other scripts. It is trained on MASSIVE, papluca/language-identification and AG News (38 Latin script languages) and answers one question, whether the text is English, in 2 to 8 microseconds per state on the Mac. Text goes to the English model when its English probability is 0.41 or more and Laya's rules say English too, or when the probability is 0.99 or more whatever Laya's stopwords say. When Laya's rules only object to accented letters, as with `café` or `naïve`, a probability of 0.99 or more for the text with the accents taken off also counts.
 3. **Laya's rules.** A single word, and whatever step 2 leaves undecided, gets Laya's stopword and diacritic rules, ported exactly (URLs, emails and dotted names ignored, a non-English language needs a unique word and a margin of 2, a diacritic rate of 0.02 or more breaks ties). Undecided text goes to the default.
 
-`kime serve` routes this way when a request names no model, or names `convaiinnovations/laya`, `kime-latest` or a `jev-*` alias, and both `laya` and `laya-multilingual` are loaded. The reasons in `routing` are Laya's own, word for word, except where the language identifier made the call, and then they say so. Steps 2 to 4 of the precedence list are not built yet.
+`kime serve` routes this way when a request names no model, or names `convaiinnovations/laya`, `kime-latest` or a `jev-*` alias, and both `laya` and `laya-multilingual` are loaded. Each item of a batch is routed on its own, the items are grouped by model and the groups run at once, and each item then carries its `model` when the batch went to more than one. The reasons in `routing` are Laya's own, word for word, except where the language identifier made the call, and then they say so. Steps 2 to 4 of the precedence list are not built yet.
 
 This fixes the routing bugs Laya's issue tracker lists: German (#54, #130, #178), accent stripped Spanish, Italian and Portuguese (#168), Armenian (#20) and unlisted scripts falling through to English (#172). All are in the routing test set (see 15), `crates/kime-route/tests/lang/routing-set.jsonl`.
 
@@ -111,8 +111,9 @@ The metrics `/metrics` has today. Times are histograms with buckets from 50 µs 
 | `kime_queue_seconds` | model | submission to the start of the forward pass |
 | `kime_tokenize_seconds`, `kime_device_seconds` | model | per forward pass |
 | `kime_pass_requests`, `kime_pass_questions`, `kime_pass_input_tokens`, `kime_pass_device_batches` | model | how full each forward pass was |
+| `kime_route_decisions_total` | model, reason | requests the router sent to a model, by the rule that decided: lang, lang_guess, no_letters, script, word_lists, identifier |
 
-Cache hit ratios, truncations, router decisions and device memory come with the caches, kime-route and the device stats.
+Cache hit ratios, truncations and device memory come with the caches and the device stats.
 
 ## Configuration
 
