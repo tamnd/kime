@@ -39,6 +39,24 @@ pub(crate) struct Resolved {
     /// Index into [`Models::list`].
     pub(crate) at: usize,
     pub(crate) named: Named,
+    /// Whether the name leaves the choice to the server: no model, `convaiinnovations/laya`,
+    /// `kime-latest` or a Jev alias.
+    pub(crate) auto: bool,
+    /// Why the router picked the model, when it did.
+    pub(crate) route: Option<Route>,
+}
+
+/// The router's reason and Laya's `analyse` of the state, for the `routing` block.
+#[derive(Debug, Clone)]
+pub(crate) struct Route {
+    pub(crate) reason: String,
+    pub(crate) detection: Value,
+}
+
+impl Resolved {
+    fn new(at: usize, named: Named, auto: bool) -> Self {
+        Resolved { at, named, auto, route: None }
+    }
 }
 
 /// One loaded model and the queue into its worker.
@@ -184,14 +202,14 @@ impl Models {
 
     /// Resolves a request's `model` field, or `None` for a name no loaded model answers to.
     pub(crate) fn resolve(&self, name: Option<&str>) -> Option<Resolved> {
-        let Some(raw) = name else { return Some(Resolved { at: 0, named: Named::Default }) };
+        let Some(raw) = name else { return Some(Resolved::new(0, Named::Default, true)) };
         let n = raw.trim().to_ascii_lowercase();
         let find = |id: &str| self.list.iter().position(|m| m.id == id);
         let laya = |key: &str, id: &str| {
-            find(id).map(|at| Resolved { at, named: Named::Laya(key.to_string()) })
+            find(id).map(|at| Resolved::new(at, Named::Laya(key.to_string()), false))
         };
         match n.as_str() {
-            "" | "convaiinnovations/laya" => Some(Resolved { at: 0, named: Named::Default }),
+            "" | "convaiinnovations/laya" => Some(Resolved::new(0, Named::Default, true)),
             "laya" | "english" | "en" | "default" => laya("english", "laya"),
             "laya-multilingual"
             | "multilingual"
@@ -206,11 +224,11 @@ impl Models {
             | "convaiinnovations/laya-typed-decisions" => {
                 laya("typed-decisions", "laya-typed-decisions")
             }
-            "kime-latest" => Some(Resolved { at: 0, named: Named::Kime }),
+            "kime-latest" => Some(Resolved::new(0, Named::Kime, true)),
             n if self.jev_aliases && (n == "jev" || n.starts_with("jev-")) => {
-                Some(Resolved { at: 0, named: Named::Kime })
+                Some(Resolved::new(0, Named::Kime, true))
             }
-            n => find(n).map(|at| Resolved { at, named: Named::Kime }),
+            n => find(n).map(|at| Resolved::new(at, Named::Kime, false)),
         }
     }
 
@@ -221,11 +239,33 @@ impl Models {
             .iter()
             .find(|(i, _, _)| i == id)
             .map_or((id.as_str(), id.as_str()), |(_, k, repo)| (*k, *repo));
-        let reason = match &r.named {
-            Named::Laya(k) => format!("explicit model='{k}'"),
-            _ => format!("using default ({key})"),
+        let (reason, detection) = match (&r.named, &r.route) {
+            (Named::Laya(k), _) => (format!("explicit model='{k}'"), Value::Null),
+            (_, Some(route)) => (route.reason.clone(), route.detection.clone()),
+            _ => (format!("using default ({key})"), Value::Null),
         };
-        json!({"model": key, "repo": repo, "reason": reason, "detection": null, "workflow": null})
+        json!({"model": key, "repo": repo, "reason": reason, "detection": detection, "workflow": null})
+    }
+
+    /// Picks the English or the multilingual checkpoint for a request that leaves the choice to
+    /// the server, when both are loaded. `kime.route.lang` and `kime.route.lang_guess` are Laya's
+    /// `lang` and `lang_guess`, and detection comes after them.
+    pub(crate) fn route(&self, r: &mut Resolved, req: &Request) {
+        if !r.auto {
+            return;
+        }
+        let find = |id: &str| self.list.iter().position(|m| m.id == id);
+        let (Some(en), Some(ml)) = (find("laya"), find("laya-multilingual")) else { return };
+        let hints = req.kime.as_ref().and_then(|k| k.get("route"));
+        let hint = |k: &str| hints.and_then(|h| h.get(k));
+        let d = kime_route::router::route(&req.state, hint("lang"), hint("lang_guess"), en == 0);
+        r.at = match d.english {
+            Some(true) => en,
+            Some(false) => ml,
+            None => 0,
+        };
+        let detection = d.detection.map_or(Value::Null, |a| a.to_json());
+        r.route = Some(Route { reason: d.reason, detection });
     }
 
     /// Queues requests on a model's worker and waits for their answers without blocking the

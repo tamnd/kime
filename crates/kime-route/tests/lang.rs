@@ -42,3 +42,17 @@ fn recording_matches_laya() {
         eprintln!("{} cases", check(&path));
     }
 }
+
+/// The router's detection sends every recorded state where `lid::english_model` does.
+#[test]
+fn router_agrees_with_english_model() {
+    for name in ["laya.jsonl", "laya-tests.jsonl"] {
+        let path = format!("{}/tests/lang/{name}", env!("CARGO_MANIFEST_DIR"));
+        for line in BufReader::new(std::fs::File::open(&path).unwrap()).lines() {
+            let case: Value = serde_json::from_str(&line.unwrap()).unwrap();
+            let state = &case["state"];
+            let d = kime_route::router::detect(state, true);
+            assert_eq!(d.english.unwrap_or(true), kime_route::lid::english_model(state), "{state}");
+        }
+    }
+}

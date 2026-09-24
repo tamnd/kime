@@ -481,7 +481,7 @@ async fn systemone(
         Ok(b) => b,
         Err(r) => return r,
     };
-    let resolved = match resolve(&s, &body) {
+    let mut resolved = match resolve(&s, &body) {
         Ok(r) => r,
         Err(r) => return r,
     };
@@ -503,6 +503,7 @@ async fn systemone(
         Ok(o) => o,
         Err(p) => return invalid(&p),
     };
+    s.models.route(&mut resolved, &req);
     // Laya cuts the state and answers whatever the size, so only Jev requests are counted.
     if !laya && counted(&s, bytes) {
         let n;

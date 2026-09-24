@@ -535,6 +535,7 @@ dependencies = [
  "blake3",
  "kime-core",
  "kime-engine",
+ "kime-route",
  "serde_json",
  "tokio",
 ]
