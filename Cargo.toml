@@ -55,6 +55,8 @@ sha2 = "0.11.0"
 # kime.toml for `kime serve`.
 toml = { version = "1.1.6", default-features = false, features = ["parse", "serde", "std"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "net", "signal", "macros", "sync", "time"] }
+# The email cleaner in kime-core, a port of Laya's Python regexes.
+regex = "1.13.1"
 serde_json = { version = "1.0.151", features = ["preserve_order", "float_roundtrip"] }
 unicode-normalization = "0.1.25"
 unicode-properties = { version = "0.1.4", default-features = false, features = ["general-category"] }
