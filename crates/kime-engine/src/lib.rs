@@ -369,6 +369,13 @@ impl Kime {
         self.lock().runner.describe()
     }
 
+    /// The most tokens one question's row can hold: the state, the question and its options.
+    /// Longer states are cut to fit.
+    #[must_use]
+    pub fn max_row_tokens(&self) -> usize {
+        self.inner.budget.max_len
+    }
+
     /// The bytes the model holds on its device, as of the last forward pass.
     #[must_use]
     pub fn memory(&self) -> Memory {

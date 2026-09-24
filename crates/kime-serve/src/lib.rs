@@ -22,6 +22,8 @@ mod otel;
 
 pub use auth::Auth;
 pub use log::Log;
+#[doc(hidden)]
+pub use models::Faults;
 pub use otel::Otlp;
 
 /// How the server runs.
@@ -39,17 +41,27 @@ pub struct Config {
     pub max_request_tokens: usize,
     /// The most requests one forward pass takes from a model's queue.
     pub max_batch: usize,
+    /// About the most tokens one forward pass takes from a model's queue, guessed from the size
+    /// of the requests, so a pass stays short and the queue is looked at often. Zero turns the
+    /// limit off. A request over it alone runs alone.
+    pub max_batch_tokens: usize,
     /// Threads for the async runtime, which only parses, validates and writes JSON.
     pub io_threads: usize,
     /// New requests get 529 when the queue ahead of them would take longer than this. Zero
     /// turns the check off.
     pub max_queue: Duration,
+    /// New requests also get 529 when a model already holds this many queued or running, so
+    /// memory stays bounded whatever the wait estimate says. Zero turns the check off.
+    pub max_pending: usize,
     /// API keys and rate limits. Off unless set.
     pub auth: Auth,
     /// The request log on stdout. Off unless set.
     pub log: Log,
     /// Where OpenTelemetry spans go. Off unless set.
     pub otlp: Option<Otlp>,
+    /// Faults for the workers to fail with, for the chaos tests.
+    #[doc(hidden)]
+    pub faults: Arc<Faults>,
 }
 
 impl Config {
@@ -63,11 +75,14 @@ impl Config {
             max_body: 8 << 20,
             max_request_tokens: 65_536,
             max_batch: 256,
+            max_batch_tokens: 16_384,
             io_threads: 2,
             max_queue: Duration::from_millis(500),
+            max_pending: 4096,
             auth: Auth::off(),
             log: Log::Off,
             otlp: None,
+            faults: Arc::default(),
         }
     }
 }
@@ -109,7 +124,15 @@ pub async fn serve(
 ) -> std::io::Result<()> {
     use axum::serve::ListenerExt;
     let state = Arc::new(api::State {
-        models: models::Models::new(cfg.models, cfg.jev_aliases, cfg.max_batch, cfg.max_queue),
+        models: models::Models::new(
+            cfg.models,
+            cfg.jev_aliases,
+            cfg.max_batch,
+            cfg.max_batch_tokens,
+            cfg.max_queue,
+            cfg.max_pending,
+            &cfg.faults,
+        ),
         buckets: cfg.auth.buckets(),
         auth: cfg.auth,
         max_body: cfg.max_body,
