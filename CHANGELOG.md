@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- GELU runs in f32 without calls, so the GeGLU loop vectorizes. It was an f64 `erf` call per element. The op is 5.8x to 8x faster on the M4 and 3.2x on an EPYC with the default x86 target, and Laya parity still agrees on all 625 questions for both checkpoints.
+
 ## 0.0.9
 
 - `kime-cpu` builds on Linux and Windows again. 0.0.8 sized the GEMM scratch with a name from the macOS only Accelerate module inside `cfg!`, which still type checks on every OS, so 0.0.8 only compiled on macOS. Use 0.0.9 instead of 0.0.8.

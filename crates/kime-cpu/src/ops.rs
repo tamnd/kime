@@ -58,14 +58,14 @@ fn erfc_sqrt_half(a: f32) -> f32 {
     let mut r = 0.170_872_77f32;
     for c in [
         -0.822_152_23,
-        1.488_515_87,
-        -1.135_203_98,
+        1.488_515_9,
+        -1.135_204,
         0.278_868_07,
         -0.186_288_06,
         0.096_784_18,
         0.374_091_96,
-        1.000_023_68,
-        -1.265_512_23,
+        1.000_023_7,
+        -1.265_512_2,
     ] {
         r = r * k + c;
     }
@@ -241,7 +241,8 @@ mod tests {
         let (mut worst, mut at) = (0f64, 0f32);
         let mut x = -12f32;
         while x < 12.0 {
-            let want = 0.5 * f64::from(x) * libm::erfc(-f64::from(x) * std::f64::consts::FRAC_1_SQRT_2);
+            let want =
+                0.5 * f64::from(x) * libm::erfc(-f64::from(x) * std::f64::consts::FRAC_1_SQRT_2);
             let got = f64::from(gelu(x));
             let err = (got - want).abs() / want.abs().max(1e-30);
             let err = if x < -8.0 { (got - want).abs() * 1e6 } else { err };
@@ -252,7 +253,7 @@ mod tests {
         }
         assert!(worst < 6e-7, "worst {worst:e} at {at}");
         for x in [13.0, 20.0, 100.0, 1e30, f32::MAX, f32::INFINITY] {
-            assert_eq!(gelu(x), x, "{x}");
+            assert_eq!(gelu(x).to_bits(), x.to_bits(), "{x}");
             let g = gelu(-x);
             assert!(g <= 0.0 && g > -1e-30, "{}: {g}", -x);
         }
