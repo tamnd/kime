@@ -20,6 +20,10 @@ pub const BUCKETS: usize = 1 << 18;
 /// Texts with fewer words than this keep the answer of Laya's rules: one word says too little.
 pub const MIN_WORDS: usize = 2;
 
+/// The English probability from which the identifier overrules Laya's rules when they take Latin
+/// script text for another language, which they do for English with a word like `os` or `van`.
+pub const OVERRULE: f32 = 0.99;
+
 /// The most words of a text that are read. Past this the answer does not change.
 pub const MAX_WORDS: usize = 256;
 
@@ -183,8 +187,9 @@ pub fn model() -> &'static Model {
     })
 }
 
-/// Whether a request's state goes to the English checkpoint: Laya's rules say English and so
-/// does the identifier. Everything else goes to the multilingual one.
+/// Whether a request's state goes to the English checkpoint. For Latin script text of two words
+/// or more the identifier has to say English, and Laya's rules too unless the identifier is sure
+/// past [`OVERRULE`]. Everything else keeps the answer of Laya's rules.
 #[must_use]
 pub fn english_model(state: &Value) -> bool {
     english_model_text(&state_text(state, MAX_CHARS))
@@ -193,7 +198,13 @@ pub fn english_model(state: &Value) -> bool {
 /// [`english_model`] for text already flattened by [`state_text`].
 #[must_use]
 pub fn english_model_text(text: &str) -> bool {
-    analyse_text(text).is_english && (words(text) < MIN_WORDS || model().is_english(text))
+    let a = analyse_text(text);
+    if a.script != "latin" || words(text) < MIN_WORDS {
+        return a.is_english;
+    }
+    let m = model();
+    let p = m.p_english(text);
+    p >= m.threshold && (a.is_english || p >= OVERRULE)
 }
 
 #[cfg(test)]
@@ -223,6 +234,7 @@ mod tests {
             "I was charged twice for my subscription, please refund the second payment",
             "wake me up at seven tomorrow",
             "EUR",
+            "Apple releases Mac OS X 10.3.7 Update, a maintenance release for its operating system.",
             "Given an array of integers nums, return the indices of the two numbers that add up to target.",
         ] {
             assert!(english_model_text(t), "{t}");
