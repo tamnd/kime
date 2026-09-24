@@ -27,6 +27,7 @@ use kime_tok::layout::{CompatBudget, CompatSequence, Cut};
 use serde_json::Value;
 
 pub mod hub;
+mod split;
 
 /// Where the model runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -180,12 +181,7 @@ impl Builder {
                 runner.prepare(*b)?;
             }
         }
-        let buckets = Buckets::default();
-        let largest = buckets.stage("compat").last().copied().unwrap_or(kime_tensor::Bucket {
-            tokens: 16384,
-            seqs: 1024,
-            markers: 8192,
-        });
+        let buckets = Buckets::default().stage("compat").to_vec();
         Ok(Kime {
             inner: Arc::new(Inner {
                 id: model.spec.id.clone(),
@@ -193,7 +189,7 @@ impl Builder {
                 tok,
                 budget,
                 temps,
-                limits: (largest.tokens, largest.seqs, largest.markers),
+                buckets,
                 runner: Mutex::new(Session {
                     runner,
                     buf: BatchBuf::default(),
@@ -291,8 +287,8 @@ struct Inner {
     mask: String,
     budget: CompatBudget,
     temps: Temperatures,
-    /// The largest bucket: tokens, sequences and markers one batch can hold.
-    limits: (usize, usize, usize),
+    /// The compat buckets, smallest first.
+    buckets: Vec<kime_tensor::Bucket>,
     runner: Mutex<Session>,
 }
 
@@ -422,41 +418,30 @@ impl Kime {
         Ok((out, timing))
     }
 
-    /// Runs every item in as few batches as the largest bucket allows, in order, and says how
-    /// many it took.
+    /// Runs every item in the batches [`split::split`] picks, and says how many it took.
     fn run(&self, items: &mut [Item<'_>]) -> Result<usize, Error> {
-        let (max_t, max_s, max_m) = self.inner.limits;
+        let sizes: Vec<(usize, usize)> =
+            items.iter().map(|it| (it.seq.ids.len(), it.seq.markers.len())).collect();
+        let batches = split::split(&self.inner.buckets, &sizes);
         let mut s = self.lock();
         let Session { runner, buf, out } = &mut *s;
-        let (mut start, mut batches) = (0, 0);
-        while start < items.len() {
-            batches += 1;
-            let (mut t, mut m, mut end) = (0, 0, start);
-            while end < items.len() && end - start < max_s {
-                let it = &items[end];
-                if end > start && (t + it.seq.ids.len() > max_t || m + it.seq.markers.len() > max_m)
-                {
-                    break;
-                }
-                t += it.seq.ids.len();
-                m += it.seq.markers.len();
-                end += 1;
-            }
+        for batch in &batches {
             buf.clear();
-            for it in &items[start..end] {
+            for &i in batch {
+                let it = &items[i];
                 buf.push(&it.seq.ids, &it.seq.markers, it.q.qtype.index() as u8);
             }
             runner.run(buf, out)?;
             let mut at = 0;
-            for (it, a) in items[start..end].iter_mut().zip(&out.act) {
+            for (&i, a) in batch.iter().zip(&out.act) {
+                let it = &mut items[i];
                 let k = it.seq.markers.len();
                 it.logits = out.logits[at..at + k].to_vec();
                 it.act = *a;
                 at += k;
             }
-            start = end;
         }
-        Ok(batches)
+        Ok(batches.len())
     }
 
     /// [`Kime::decide`] on a thread of its own, for async callers. It works with any executor,
