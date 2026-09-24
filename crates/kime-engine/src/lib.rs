@@ -313,6 +313,10 @@ pub struct Timing {
     pub device: Duration,
     /// How many device batches the questions took.
     pub batches: usize,
+    /// Questions whose state was cut to fit the model's sequence length.
+    pub truncated: usize,
+    /// State tokens left out of those questions.
+    pub cut_tokens: usize,
 }
 
 /// One laid out question and where its answer goes.
@@ -419,7 +423,14 @@ impl Kime {
         let tokenize = t0.elapsed();
         let t1 = Instant::now();
         let batches = self.run(&mut items)?;
-        let timing = Timing { tokenize, device: t1.elapsed(), batches };
+        let cut = items.iter().map(|it| it.seq.state_tokens - it.seq.state_tokens_used);
+        let timing = Timing {
+            tokenize,
+            device: t1.elapsed(),
+            batches,
+            truncated: cut.clone().filter(|&n| n > 0).count(),
+            cut_tokens: cut.sum(),
+        };
         let mut out: Vec<Response> = parsed
             .iter()
             .map(|_| Response { model: LAYA_MODEL.into(), answers: Vec::new(), input_tokens: 0 })

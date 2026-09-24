@@ -89,6 +89,8 @@ pub(crate) struct Stats {
     questions: AtomicU64,
     input_tokens: AtomicU64,
     passes: AtomicU64,
+    truncated: AtomicU64,
+    cut_tokens: AtomicU64,
     /// From submission to the start of the forward pass that answered it.
     pub(crate) queue: Histogram,
     tokenize: Histogram,
@@ -107,6 +109,8 @@ impl Default for Stats {
             questions: AtomicU64::new(0),
             input_tokens: AtomicU64::new(0),
             passes: AtomicU64::new(0),
+            truncated: AtomicU64::new(0),
+            cut_tokens: AtomicU64::new(0),
             queue: Histogram::seconds(),
             tokenize: Histogram::seconds(),
             device: Histogram::seconds(),
@@ -126,6 +130,8 @@ pub(crate) struct Pass {
     pub(crate) questions: usize,
     pub(crate) tokens: usize,
     pub(crate) batches: usize,
+    pub(crate) truncated: usize,
+    pub(crate) cut_tokens: usize,
     pub(crate) tokenize: Duration,
     pub(crate) device: Duration,
 }
@@ -139,6 +145,8 @@ impl Stats {
         self.passes.fetch_add(1, Ordering::Relaxed);
         self.questions.fetch_add(p.questions as u64, Ordering::Relaxed);
         self.input_tokens.fetch_add(p.tokens as u64, Ordering::Relaxed);
+        self.truncated.fetch_add(p.truncated as u64, Ordering::Relaxed);
+        self.cut_tokens.fetch_add(p.cut_tokens as u64, Ordering::Relaxed);
         self.tokenize.time(p.tokenize);
         self.device.time(p.device);
         self.pass_requests.count(p.requests);
@@ -269,12 +277,18 @@ impl Metrics {
                 );
             }
         }
-        let counters: [Named<AtomicU64>; 3] = [
+        let counters: [Named<AtomicU64>; 5] = [
             ("kime_questions_total", "Questions answered.", |s| &s.questions),
             ("kime_input_tokens_total", "Input tokens read, the usage.input_tokens unit.", |s| {
                 &s.input_tokens
             }),
             ("kime_forward_passes_total", "Forward passes run.", |s| &s.passes),
+            (
+                "kime_truncations_total",
+                "Questions whose state was cut to fit the model's sequence length.",
+                |s| &s.truncated,
+            ),
+            ("kime_truncated_tokens_total", "State tokens cut to fit.", |s| &s.cut_tokens),
         ];
         for (name, help, get) in counters {
             head(&mut out, name, "counter", help);

@@ -89,3 +89,32 @@ fn laya_english() {
 fn laya_multilingual() {
     check("laya-multilingual");
 }
+
+/// A state too long for the model is cut, and [`Kime::decide_batch_timed`] counts the questions
+/// and tokens that lost some of it.
+#[test]
+fn truncation() {
+    let kime = match Kime::builder().model("laya").device(Device::Cpu { threads: 0 }).build() {
+        Ok(k) => k,
+        Err(e) => {
+            assert!(std::env::var_os("KIME_REQUIRE_WEIGHTS").is_none(), "{e}");
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let q = serde_json::json!({
+        "a": {"type": "choice", "instructions": "What does the customer want?",
+            "criteria": {"cancel": "", "refund": ""}},
+        "b": {"type": "noul", "instructions": "Is the customer angry?"}});
+    let long = "I was charged twice for my subscription and nobody answers my emails. ".repeat(80);
+    let req = |state: &str| {
+        parse(&serde_json::json!({"state": state, "questions": q}), &Limits::LAYA).unwrap()
+    };
+    let (_, t) = kime.decide_batch_timed(&[req("please refund me")]).unwrap();
+    assert_eq!((t.truncated, t.cut_tokens), (0, 0));
+    let (_, t) = kime.decide_batch_timed(&[req(&long), req("please refund me")]).unwrap();
+    assert_eq!(t.truncated, 2);
+    eprintln!("{} state tokens cut", t.cut_tokens);
+    // Over a thousand state tokens, and the model reads at most 512 in all.
+    assert!(t.cut_tokens > 2 * 500, "{}", t.cut_tokens);
+}
