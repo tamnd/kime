@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
+use kime_engine::Memory;
 use kime_route::router::By;
 
 /// Bucket bounds for times, from 50 µs to 5 s, in seconds.
@@ -163,6 +164,7 @@ pub(crate) struct ModelView<'a> {
     pub(crate) stats: &'a Stats,
     pub(crate) pending: usize,
     pub(crate) per_request: Duration,
+    pub(crate) memory: Memory,
 }
 
 /// The routes, a fixed set so clients cannot grow the metrics.
@@ -318,6 +320,21 @@ impl Metrics {
                 m.id,
                 m.per_request.as_secs_f64()
             );
+        }
+        head(
+            &mut out,
+            "kime_device_memory_bytes",
+            "gauge",
+            "Bytes a model holds on its device: kind weights, or plans for the arenas of the buckets used so far.",
+        );
+        for m in models {
+            for (kind, n) in [("weights", m.memory.weights), ("plans", m.memory.plans)] {
+                let _ = writeln!(
+                    out,
+                    "kime_device_memory_bytes{{model=\"{}\",kind=\"{kind}\"}} {n}",
+                    m.id
+                );
+            }
         }
         head(
             &mut out,

@@ -13,6 +13,7 @@
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
@@ -182,6 +183,7 @@ impl Builder {
             }
         }
         let buckets = Buckets::default().stage("compat").to_vec();
+        let (weights, plans) = runner.memory();
         Ok(Kime {
             inner: Arc::new(Inner {
                 id: model.spec.id.clone(),
@@ -190,6 +192,7 @@ impl Builder {
                 budget,
                 temps,
                 buckets,
+                memory: [AtomicUsize::new(weights), AtomicUsize::new(plans)],
                 runner: Mutex::new(Session {
                     runner,
                     buf: BatchBuf::default(),
@@ -254,6 +257,14 @@ impl Runner {
         Ok(())
     }
 
+    fn memory(&self) -> (usize, usize) {
+        match self {
+            Runner::Cpu(e) => e.memory(),
+            #[cfg(feature = "cuda")]
+            Runner::Cuda(e) => e.memory(),
+        }
+    }
+
     fn describe(&self) -> String {
         match self {
             Runner::Cpu(e) => {
@@ -290,6 +301,8 @@ struct Inner {
     /// The compat buckets, smallest first.
     buckets: Vec<kime_tensor::Bucket>,
     runner: Mutex<Session>,
+    /// [`Memory`], kept up to date after every forward pass so reading it needs no lock.
+    memory: [AtomicUsize; 2],
 }
 
 /// A loaded model on a device. Clones share it, and it can be used from any thread.
@@ -319,6 +332,15 @@ pub struct Timing {
     pub cut_tokens: usize,
 }
 
+/// Bytes a model holds on its device.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Memory {
+    /// The weights, in the device's layout.
+    pub weights: usize,
+    /// The plans built so far, one per bucket used: their arenas and staging buffers.
+    pub plans: usize,
+}
+
 /// One laid out question and where its answer goes.
 struct Item<'a> {
     req: usize,
@@ -345,6 +367,13 @@ impl Kime {
     #[must_use]
     pub fn device(&self) -> String {
         self.lock().runner.describe()
+    }
+
+    /// The bytes the model holds on its device, as of the last forward pass.
+    #[must_use]
+    pub fn memory(&self) -> Memory {
+        let m = &self.inner.memory;
+        Memory { weights: m[0].load(Ordering::Relaxed), plans: m[1].load(Ordering::Relaxed) }
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Session> {
@@ -467,6 +496,9 @@ impl Kime {
                 at += k;
             }
         }
+        let (weights, plans) = runner.memory();
+        self.inner.memory[0].store(weights, Ordering::Relaxed);
+        self.inner.memory[1].store(plans, Ordering::Relaxed);
         Ok(batches.len())
     }
 

@@ -289,6 +289,19 @@ impl Backend for CpuBackend {
         Caps { name: "cpu", threads: self.threads(), graphs: false, unified_memory: true }
     }
 
+    fn weight_bytes(&self, w: &Weights) -> usize {
+        w.0.iter()
+            .map(|t| {
+                let q = t.quant.as_ref().map_or(0, |q| q.q.len() + 4 * q.scale.len());
+                4 * (t.data.len() + t.packed.len()) + q
+            })
+            .sum()
+    }
+
+    fn plan_bytes(&self, p: &CpuPlan) -> usize {
+        p.arena_bytes()
+    }
+
     fn upload(&self, tensors: &[HostTensor<'_>], graph: &Graph) -> Result<Weights> {
         // Weights the GEMMs read are packed or rounded once here, and kept row major only if
         // something else reads them too.
