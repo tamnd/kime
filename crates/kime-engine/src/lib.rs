@@ -15,6 +15,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::task::{Context, Poll, Waker};
+use std::time::{Duration, Instant};
 
 use kime_core::answer::{LAYA_MODEL, Response, Temperatures, laya_answer};
 use kime_core::render::{compat_question, compat_state};
@@ -26,6 +27,7 @@ use kime_tok::layout::{CompatBudget, CompatSequence, Cut};
 use serde_json::Value;
 
 pub mod hub;
+mod split;
 
 /// Where the model runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -179,12 +181,7 @@ impl Builder {
                 runner.prepare(*b)?;
             }
         }
-        let buckets = Buckets::default();
-        let largest = buckets.stage("compat").last().copied().unwrap_or(kime_tensor::Bucket {
-            tokens: 16384,
-            seqs: 1024,
-            markers: 8192,
-        });
+        let buckets = Buckets::default().stage("compat").to_vec();
         Ok(Kime {
             inner: Arc::new(Inner {
                 id: model.spec.id.clone(),
@@ -192,7 +189,7 @@ impl Builder {
                 tok,
                 budget,
                 temps,
-                limits: (largest.tokens, largest.seqs, largest.markers),
+                buckets,
                 runner: Mutex::new(Session {
                     runner,
                     buf: BatchBuf::default(),
@@ -290,8 +287,8 @@ struct Inner {
     mask: String,
     budget: CompatBudget,
     temps: Temperatures,
-    /// The largest bucket: tokens, sequences and markers one batch can hold.
-    limits: (usize, usize, usize),
+    /// The compat buckets, smallest first.
+    buckets: Vec<kime_tensor::Bucket>,
     runner: Mutex<Session>,
 }
 
@@ -305,6 +302,17 @@ impl fmt::Debug for Kime {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Kime").field("model", &self.inner.id).finish_non_exhaustive()
     }
+}
+
+/// Where the time of one [`Kime::decide_batch_timed`] call went.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Timing {
+    /// Validating the requests and laying their questions out as token ids.
+    pub tokenize: Duration,
+    /// The device batches, from the first upload to the last result copied back.
+    pub device: Duration,
+    /// How many device batches the questions took.
+    pub batches: usize,
 }
 
 /// One laid out question and where its answer goes.
@@ -356,7 +364,17 @@ impl Kime {
     ///
     /// As [`Kime::decide`]. One bad request fails the whole call.
     pub fn decide_batch(&self, reqs: &[Request]) -> Result<Vec<Response>, Error> {
+        Ok(self.decide_batch_timed(reqs)?.0)
+    }
+
+    /// [`Kime::decide_batch`], and where the time went.
+    ///
+    /// # Errors
+    ///
+    /// As [`Kime::decide_batch`].
+    pub fn decide_batch_timed(&self, reqs: &[Request]) -> Result<(Vec<Response>, Timing), Error> {
         let inner = &*self.inner;
+        let t0 = Instant::now();
         let mut parsed = Vec::with_capacity(reqs.len());
         for r in reqs {
             parsed.push(parse(&r.to_json(), &Limits::LAYA).map_err(Error::Invalid)?);
@@ -383,7 +401,10 @@ impl Kime {
                 items.push(Item { req: i, q, seq, logits: Vec::new(), act: [0.0; 2] });
             }
         }
-        self.run(&mut items)?;
+        let tokenize = t0.elapsed();
+        let t1 = Instant::now();
+        let batches = self.run(&mut items)?;
+        let timing = Timing { tokenize, device: t1.elapsed(), batches };
         let mut out: Vec<Response> = parsed
             .iter()
             .map(|_| Response { model: LAYA_MODEL.into(), answers: Vec::new(), input_tokens: 0 })
@@ -394,42 +415,33 @@ impl Kime {
             res.answers
                 .push((it.q.id.clone(), laya_answer(it.q, &it.logits, it.act, &inner.temps)));
         }
-        Ok(out)
+        Ok((out, timing))
     }
 
-    /// Runs every item in as few batches as the largest bucket allows, in order.
-    fn run(&self, items: &mut [Item<'_>]) -> Result<(), Error> {
-        let (max_t, max_s, max_m) = self.inner.limits;
+    /// Runs every item in the batches [`split::split`] picks, and says how many it took.
+    fn run(&self, items: &mut [Item<'_>]) -> Result<usize, Error> {
+        let sizes: Vec<(usize, usize)> =
+            items.iter().map(|it| (it.seq.ids.len(), it.seq.markers.len())).collect();
+        let batches = split::split(&self.inner.buckets, &sizes);
         let mut s = self.lock();
         let Session { runner, buf, out } = &mut *s;
-        let mut start = 0;
-        while start < items.len() {
-            let (mut t, mut m, mut end) = (0, 0, start);
-            while end < items.len() && end - start < max_s {
-                let it = &items[end];
-                if end > start && (t + it.seq.ids.len() > max_t || m + it.seq.markers.len() > max_m)
-                {
-                    break;
-                }
-                t += it.seq.ids.len();
-                m += it.seq.markers.len();
-                end += 1;
-            }
+        for batch in &batches {
             buf.clear();
-            for it in &items[start..end] {
+            for &i in batch {
+                let it = &items[i];
                 buf.push(&it.seq.ids, &it.seq.markers, it.q.qtype.index() as u8);
             }
             runner.run(buf, out)?;
             let mut at = 0;
-            for (it, a) in items[start..end].iter_mut().zip(&out.act) {
+            for (&i, a) in batch.iter().zip(&out.act) {
+                let it = &mut items[i];
                 let k = it.seq.markers.len();
                 it.logits = out.logits[at..at + k].to_vec();
                 it.act = *a;
                 at += k;
             }
-            start = end;
         }
-        Ok(())
+        Ok(batches.len())
     }
 
     /// [`Kime::decide`] on a thread of its own, for async callers. It works with any executor,

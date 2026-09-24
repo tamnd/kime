@@ -1,11 +1,13 @@
 //! The loaded models, their aliases, and the worker thread each one answers on.
 
-use std::sync::mpsc;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
 use kime_core::answer::Response;
 use kime_core::request::Request;
-use kime_engine::{Error, Kime};
+use kime_engine::{Error, Kime, Timing};
 use serde_json::{Value, json};
 use tokio::sync::oneshot;
 
@@ -41,6 +43,33 @@ pub(crate) struct Model {
     pub(crate) id: String,
     pub(crate) device: String,
     queue: mpsc::Sender<Job>,
+    load: Arc<Load>,
+}
+
+/// What a model's queue holds and how fast it drains, for the overload check.
+#[derive(Debug, Default)]
+struct Load {
+    /// Requests queued or running, not yet answered.
+    pending: AtomicUsize,
+    /// Device time per request over the recent forward passes, in nanoseconds.
+    per_request: AtomicU64,
+}
+
+impl Load {
+    /// How long a request queued now would wait for the ones ahead of it.
+    fn wait(&self) -> Duration {
+        let n = self.pending.load(Ordering::Relaxed) as u64;
+        Duration::from_nanos(n.saturating_mul(self.per_request.load(Ordering::Relaxed)))
+    }
+
+    /// Folds one forward pass into the average, one eighth at a time so a single slow pass does
+    /// not swing it.
+    fn record(&self, took: Duration, requests: usize) {
+        let now = u64::try_from(took.as_nanos()).unwrap_or(u64::MAX) / requests.max(1) as u64;
+        let old = self.per_request.load(Ordering::Relaxed);
+        let new = if old == 0 { now } else { old - old / 8 + now / 8 };
+        self.per_request.store(new, Ordering::Relaxed);
+    }
 }
 
 /// The loaded models. The first one is the default.
@@ -48,6 +77,8 @@ pub(crate) struct Model {
 pub(crate) struct Models {
     pub(crate) list: Vec<Model>,
     pub(crate) jev_aliases: bool,
+    /// The longest estimated wait a new request is queued behind. Zero turns the check off.
+    max_queue: Duration,
 }
 
 /// What the worker hands back for one submission.
@@ -56,6 +87,10 @@ pub(crate) struct Done {
     pub(crate) results: Vec<Result<Response, Error>>,
     /// Time between submission and the start of the forward pass that answered it.
     pub(crate) queue: Duration,
+    /// Where the time of that forward pass went. It is shared with whatever else was in it.
+    pub(crate) pass: Timing,
+    /// Requests in that forward pass, this one included.
+    pub(crate) shared: usize,
 }
 
 #[derive(Debug)]
@@ -67,21 +102,36 @@ struct Job {
 
 impl Models {
     /// Starts a worker thread for each engine. `max_batch` caps the requests one forward pass
-    /// takes from the queue.
-    pub(crate) fn new(engines: Vec<Kime>, jev_aliases: bool, max_batch: usize) -> Self {
+    /// takes from the queue, and `max_queue` is the wait past which requests are turned away.
+    pub(crate) fn new(
+        engines: Vec<Kime>,
+        jev_aliases: bool,
+        max_batch: usize,
+        max_queue: Duration,
+    ) -> Self {
         let list = engines
             .into_iter()
             .map(|k| {
                 let (tx, rx) = mpsc::channel();
                 let (id, device) = (k.model_id().to_string(), k.device());
+                let load = Arc::new(Load::default());
+                let l = load.clone();
                 std::thread::Builder::new()
                     .name(format!("kime-{id}"))
-                    .spawn(move || worker(&k, &rx, max_batch.max(1)))
+                    .spawn(move || {
+                        worker(
+                            &rx,
+                            max_batch.max(1),
+                            &l,
+                            |r| k.decide_batch_timed(r),
+                            |r| k.decide(r),
+                        );
+                    })
                     .expect("spawning a worker thread");
-                Model { id, device, queue: tx }
+                Model { id, device, queue: tx, load }
             })
             .collect();
-        Models { list, jev_aliases }
+        Models { list, jev_aliases, max_queue }
     }
 
     /// Resolves a request's `model` field, or `None` for a name no loaded model answers to.
@@ -123,15 +173,23 @@ impl Models {
     }
 
     /// Queues requests on a model's worker and waits for their answers without blocking the
-    /// async runtime.
-    pub(crate) async fn decide(&self, at: usize, reqs: Vec<Request>) -> Done {
+    /// async runtime. When the requests already queued would keep these waiting longer than
+    /// `max_queue`, it queues nothing and returns the estimated wait instead.
+    pub(crate) async fn decide(&self, at: usize, reqs: Vec<Request>) -> Result<Done, Duration> {
+        let m = &self.list[at];
+        let wait = m.load.wait();
+        if !self.max_queue.is_zero() && wait > self.max_queue {
+            return Err(wait);
+        }
         let (tx, rx) = oneshot::channel();
         let n = reqs.len();
+        m.load.pending.fetch_add(n, Ordering::Relaxed);
         let job = Job { reqs, at: Instant::now(), done: tx };
-        if self.list[at].queue.send(job).is_err() {
-            return gone(n);
+        if m.queue.send(job).is_err() {
+            m.load.pending.fetch_sub(n, Ordering::Relaxed);
+            return Ok(gone(n));
         }
-        rx.await.unwrap_or_else(|_| gone(n))
+        Ok(rx.await.unwrap_or_else(|_| gone(n)))
     }
 }
 
@@ -139,12 +197,22 @@ fn gone(n: usize) -> Done {
     let results = (0..n)
         .map(|_| Err(Error::Unsupported("the model's worker thread stopped".into())))
         .collect();
-    Done { results, queue: Duration::ZERO }
+    Done { results, queue: Duration::ZERO, pass: Timing::default(), shared: 0 }
 }
+
+type Batch<'a> = &'a dyn Fn(&[Request]) -> Result<(Vec<Response>, Timing), Error>;
 
 /// Answers jobs until the server drops the queue. Whatever has queued up while the last forward
 /// pass ran goes into the next one together, which is where concurrent requests share the device.
-fn worker(kime: &Kime, rx: &mpsc::Receiver<Job>, max: usize) {
+/// `batch` answers a whole pass and `one` a single request. A panic in either becomes an error
+/// for the requests of that pass, and the worker goes on with the next.
+fn worker(
+    rx: &mpsc::Receiver<Job>,
+    max: usize,
+    load: &Load,
+    batch: impl Fn(&[Request]) -> Result<(Vec<Response>, Timing), Error>,
+    one: impl Fn(&Request) -> Result<Response, Error>,
+) {
     while let Ok(first) = rx.recv() {
         let mut n = first.reqs.len();
         let mut jobs = vec![first];
@@ -161,18 +229,119 @@ fn worker(kime: &Kime, rx: &mpsc::Receiver<Job>, max: usize) {
         let counts: Vec<usize> = jobs.iter().map(|j| j.reqs.len()).collect();
         let reqs: Vec<Request> =
             jobs.iter_mut().flat_map(|j| std::mem::take(&mut j.reqs)).collect();
-        // One bad request fails a whole engine batch, so on an error each request runs alone and
-        // gets its own result. The answers are the same bits either way.
-        let mut results: Vec<Result<Response, Error>> = match kime.decide_batch(&reqs) {
-            Ok(r) => r.into_iter().map(Ok).collect(),
-            Err(_) => reqs.iter().map(|r| kime.decide(r)).collect(),
-        };
+        let (mut results, pass) = answer(&reqs, &batch, &one);
+        load.record(start.elapsed(), reqs.len());
+        load.pending.fetch_sub(reqs.len(), Ordering::Relaxed);
         for (job, k) in jobs.into_iter().zip(counts) {
             let rest = results.split_off(k);
             let mine = std::mem::replace(&mut results, rest);
             let queue = start.saturating_duration_since(job.at);
             // The client may have gone away, and then nobody needs the answer.
-            let _ = job.done.send(Done { results: mine, queue });
+            let _ = job.done.send(Done { results: mine, queue, pass, shared: reqs.len() });
         }
+    }
+}
+
+/// One forward pass for `reqs`, with one result per request whatever goes wrong.
+fn answer(
+    reqs: &[Request],
+    batch: Batch<'_>,
+    one: &dyn Fn(&Request) -> Result<Response, Error>,
+) -> (Vec<Result<Response, Error>>, Timing) {
+    let panicked = || Error::Unsupported("the device worker panicked on this batch".into());
+    // One bad request fails a whole engine batch, so on an error each request runs alone and gets
+    // its own result. The answers are the same bits either way.
+    match catch_unwind(AssertUnwindSafe(|| batch(reqs))) {
+        Ok(Ok((r, t))) => (r.into_iter().map(Ok).collect(), t),
+        Ok(Err(_)) => {
+            let each = reqs
+                .iter()
+                .map(|r| {
+                    catch_unwind(AssertUnwindSafe(|| one(r))).unwrap_or_else(|_| Err(panicked()))
+                })
+                .collect();
+            (each, Timing::default())
+        }
+        Err(_) => (reqs.iter().map(|_| Err(panicked())).collect(), Timing::default()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kime_core::request::{Limits, parse};
+    use std::sync::atomic::AtomicBool;
+
+    fn req(state: &str) -> Request {
+        let body = json!({"state": state, "questions": {"q": {"type": "choice", "instructions": "Which?", "criteria": {"a": "a", "b": "b"}}}});
+        parse(&body, &Limits::LAYA).unwrap()
+    }
+
+    fn resp(r: &Request) -> Response {
+        Response {
+            model: r.state.as_str().unwrap_or_default().into(),
+            answers: Vec::new(),
+            input_tokens: 1,
+        }
+    }
+
+    fn submit(tx: &mpsc::Sender<Job>, load: &Load, state: &str) -> oneshot::Receiver<Done> {
+        let (done, rx) = oneshot::channel();
+        load.pending.fetch_add(1, Ordering::Relaxed);
+        tx.send(Job { reqs: vec![req(state)], at: Instant::now(), done }).unwrap();
+        rx
+    }
+
+    #[test]
+    fn a_panic_fails_its_pass_and_the_worker_goes_on() {
+        let (tx, rx) = mpsc::channel();
+        let load = Arc::new(Load::default());
+        let l = load.clone();
+        let fired = Arc::new(AtomicBool::new(false));
+        let f = fired.clone();
+        let t = std::thread::spawn(move || {
+            let batch = |r: &[Request]| {
+                if r.iter().any(|r| r.state == "boom") && !f.swap(true, Ordering::SeqCst) {
+                    panic!("injected device fault");
+                }
+                Ok((r.iter().map(resp).collect(), Timing::default()))
+            };
+            worker(&rx, 1, &l, batch, |r| Ok(resp(r)));
+        });
+        let first = submit(&tx, &load, "boom");
+        let d = first.blocking_recv().unwrap();
+        let err = d.results[0].as_ref().unwrap_err().to_string();
+        assert!(err.contains("panicked"), "{err}");
+        // The same request again, and another, both answered by the same worker.
+        for s in ["boom", "fine"] {
+            let d = submit(&tx, &load, s).blocking_recv().unwrap();
+            assert_eq!(d.results[0].as_ref().unwrap().model, s);
+        }
+        assert_eq!(load.pending.load(Ordering::Relaxed), 0);
+        drop(tx);
+        t.join().unwrap();
+    }
+
+    #[test]
+    fn a_failed_batch_answers_each_request_alone() {
+        let reqs = vec![req("good"), req("bad"), req("good")];
+        let batch = |_: &[Request]| Err(Error::Unsupported("one bad request".into()));
+        let one = |r: &Request| {
+            if r.state == "bad" { Err(Error::Unsupported("bad".into())) } else { Ok(resp(r)) }
+        };
+        let (out, _) = answer(&reqs, &batch, &one);
+        assert!(out[0].is_ok() && out[1].is_err() && out[2].is_ok());
+    }
+
+    #[test]
+    fn wait_estimate() {
+        let l = Load::default();
+        assert_eq!(l.wait(), Duration::ZERO);
+        l.record(Duration::from_millis(80), 40);
+        l.pending.store(300, Ordering::Relaxed);
+        assert_eq!(l.wait(), Duration::from_millis(600));
+        // A slow pass moves the average an eighth of the way.
+        l.record(Duration::from_millis(10), 1);
+        assert_eq!(l.wait(), Duration::from_nanos(300 * (2_000_000 - 250_000 + 1_250_000)));
     }
 }

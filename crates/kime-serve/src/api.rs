@@ -24,7 +24,7 @@ use kime_core::request::{Limits, Loc, Problem, parse};
 use kime_engine::Error;
 use serde_json::{Map, Value, json};
 
-use crate::models::{Models, Named, Resolved};
+use crate::models::{Done, Models, Named, Resolved};
 
 /// Everything the handlers share.
 #[derive(Debug)]
@@ -168,6 +168,18 @@ fn internal(e: &Error, id: &RequestId) -> HttpResponse {
         StatusCode::INTERNAL_SERVER_ERROR,
         &json!({"detail": {"error_type": "internal_error", "message": e.to_string(), "request_id": id.0}}),
     )
+}
+
+/// Jev's 529, for when the queue would keep a new request waiting longer than `--max-queue-ms`.
+/// `retry-after-ms` is the current wait estimate.
+fn overloaded(wait: Duration) -> HttpResponse {
+    let ms = wait.as_millis().max(1);
+    let mut r = reply(
+        StatusCode::from_u16(529).expect("529 is a valid status"),
+        &json!({"detail": {"error_type": "overloaded_error", "message": format!("the server is overloaded, the queue would take about {ms} ms")}}),
+    );
+    r.headers_mut().insert(HeaderName::from_static("retry-after-ms"), HeaderValue::from(ms as u64));
+    r
 }
 
 /// Reads and parses a JSON object body, or the 400 laya-serve and Jev both give.
@@ -362,7 +374,10 @@ async fn systemone(
         Ok(o) => o,
         Err(p) => return invalid(&p),
     };
-    let mut done = s.models.decide(resolved.at, vec![req]).await;
+    let mut done = match s.models.decide(resolved.at, vec![req]).await {
+        Ok(d) => d,
+        Err(wait) => return overloaded(wait),
+    };
     let res = match done.results.pop() {
         Some(Ok(r)) => r,
         Some(Err(e)) => return engine_error(&e, laya, &id),
@@ -379,7 +394,12 @@ async fn systemone(
         let extra = o.extensions.then(|| {
             json!({
                 "request_id": id.0,
-                "timing_us": {"queue": us(done.queue), "total": us(total)},
+                "timing_us": {
+                    "queue": us(done.queue),
+                    "tokenize": us(done.pass.tokenize),
+                    "device": us(done.pass.device),
+                    "total": us(total),
+                },
                 "routing": s.models.routing(&resolved),
                 "answers": extras(&res, o),
             })
@@ -387,13 +407,22 @@ async fn systemone(
         jev(&s.models.list[resolved.at].id, &res, o, extra)
     };
     let mut r = reply(StatusCode::OK, &out);
-    timing(r.headers_mut(), done.queue, total);
+    timing(r.headers_mut(), &done, total);
     r
 }
 
-fn timing(h: &mut HeaderMap, queue: Duration, total: Duration) {
+/// `server-timing`: the wait for the device, the tokenize and device time of the forward pass
+/// that answered, which other requests may have shared, and the whole request.
+fn timing(h: &mut HeaderMap, done: &Done, total: Duration) {
     let ms = |d: Duration| d.as_secs_f64() * 1e3;
-    let v = format!("queue;dur={:.3}, total;dur={:.3}", ms(queue), ms(total));
+    let v = format!(
+        "queue;dur={:.3}, tokenize;dur={:.3}, device;dur={:.3}, total;dur={:.3}, pass;desc={}",
+        ms(done.queue),
+        ms(done.pass.tokenize),
+        ms(done.pass.device),
+        ms(total),
+        done.shared
+    );
     if let Ok(v) = HeaderValue::from_str(&v) {
         h.insert(HeaderName::from_static("server-timing"), v);
     }
@@ -455,9 +484,12 @@ async fn batch(
             Err(p) => Err(json!({"status": 422, "detail": p.iter().map(Problem::to_json).collect::<Vec<_>>()})),
         });
     }
-    let done = s.models.decide(resolved.at, good).await;
+    let mut done = match s.models.decide(resolved.at, good).await {
+        Ok(d) => d,
+        Err(wait) => return overloaded(wait),
+    };
     let mut answered: Vec<Option<Result<Response, Error>>> =
-        done.results.into_iter().map(Some).collect();
+        std::mem::take(&mut done.results).into_iter().map(Some).collect();
     let model = &s.models.list[resolved.at].id;
     let mut tokens = 0;
     let results: Vec<Value> = ids
@@ -490,7 +522,7 @@ async fn batch(
         StatusCode::OK,
         &json!({"model": model, "results": results, "usage": {"input_tokens": tokens, "output_tokens": 0}}),
     );
-    timing(r.headers_mut(), done.queue, start.elapsed());
+    timing(r.headers_mut(), &done, start.elapsed());
     r
 }
 
