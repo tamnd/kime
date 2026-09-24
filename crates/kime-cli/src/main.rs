@@ -1,6 +1,6 @@
 //! The `kime` binary. One binary with subcommands, per spec/14-sdks-cli.md.
 //!
-//! Today it answers `--version`, `doctor`, `convert`, `predict` and `pull`, and names the milestone that brings each of the other
+//! Today it answers `--version`, `doctor`, `convert`, `predict`, `pull` and `serve`, and names the milestone that brings each of the other
 //! subcommands. A command that exists and says when it will work is more useful than one that is
 //! missing, because the help text is where people look first.
 
@@ -11,10 +11,10 @@ use std::process::ExitCode;
 mod convert;
 mod predict;
 mod pull;
+mod serve;
 
 /// Every subcommand in spec/14-sdks-cli.md and the milestone in spec/16-roadmap.md that brings it.
 const PLANNED: &[(&str, &str, &str)] = &[
-    ("serve", "run the HTTP server", "M1"),
     ("train", "fine tune a model on labelled decisions", "M5"),
     ("calibrate", "fit temperatures on a labelled file", "M3"),
     ("eval", "run the quality suites", "M2"),
@@ -37,6 +37,7 @@ fn main() -> ExitCode {
         Some("convert") => convert::run(&args[1..]),
         Some("predict") => predict::run(&args[1..]),
         Some("pull") => pull::run(&args[1..]),
+        Some("serve") => serve::run(&args[1..]),
         None | Some("--help" | "-h" | "help") => {
             help();
             ExitCode::SUCCESS
@@ -61,6 +62,7 @@ fn help() {
     println!("  {:<10} pack a Laya checkpoint to .kime, unpack one, or check one", "convert");
     println!("  {:<10} answer questions from the command line", "predict");
     println!("  {:<10} download a model into the cache", "pull");
+    println!("  {:<10} run the HTTP server", "serve");
     for (name, what, milestone) in PLANNED {
         println!("  {name:<10} {what} (arrives at {milestone})");
     }
