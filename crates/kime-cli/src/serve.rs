@@ -18,8 +18,8 @@ use crate::predict::{device, precision};
 const USAGE: &str =
     "usage: kime serve [--config kime.toml] [--host 127.0.0.1] [--port 8000] [--models laya,laya-multilingual]
 options: --device auto|cpu|cuda[:N]  --threads N  --precision f16|f32|int8
-         --max-batch N  --max-body BYTES  --max-queue-ms MS (0 is off)  --io-threads N
-         --no-jev-aliases  --api-keys-file PATH  --rpm N  --tps N  --log-level info
+         --max-batch N  --max-body BYTES  --max-request-tokens N  --max-queue-ms MS (0 is off)
+         --io-threads N  --no-jev-aliases  --api-keys-file PATH  --rpm N  --tps N  --log-level info
          --log-requests  --log-format text|json
 Every option is also a kime.toml field (--max-batch is max_batch) and a KIME_ variable
 (KIME_MAX_BATCH). Flags win over KIME_ variables, which win over the file, which wins over
@@ -40,6 +40,7 @@ struct Settings {
     precision: Option<String>,
     max_batch: Option<usize>,
     max_body: Option<usize>,
+    max_request_tokens: Option<usize>,
     max_queue_ms: Option<u64>,
     io_threads: Option<usize>,
     jev_aliases: Option<bool>,
@@ -63,6 +64,7 @@ impl Settings {
             precision: over.precision.or(self.precision),
             max_batch: over.max_batch.or(self.max_batch),
             max_body: over.max_body.or(self.max_body),
+            max_request_tokens: over.max_request_tokens.or(self.max_request_tokens),
             max_queue_ms: over.max_queue_ms.or(self.max_queue_ms),
             io_threads: over.io_threads.or(self.io_threads),
             jev_aliases: over.jev_aliases.or(self.jev_aliases),
@@ -122,6 +124,7 @@ impl Settings {
             precision: var("KIME_PRECISION"),
             max_batch: num("KIME_MAX_BATCH", var("KIME_MAX_BATCH"))?,
             max_body: num("KIME_MAX_BODY", var("KIME_MAX_BODY"))?,
+            max_request_tokens: num("KIME_MAX_REQUEST_TOKENS", var("KIME_MAX_REQUEST_TOKENS"))?,
             max_queue_ms: num("KIME_MAX_QUEUE_MS", var("KIME_MAX_QUEUE_MS"))?,
             io_threads: num("KIME_IO_THREADS", var("KIME_IO_THREADS"))?,
             jev_aliases: bool("KIME_JEV_ALIASES")?,
@@ -196,6 +199,7 @@ impl Settings {
                 "--threads" => s.threads = Some(num(a, &val()?)?),
                 "--max-batch" => s.max_batch = Some(num(a, &val()?)?),
                 "--max-body" => s.max_body = Some(num(a, &val()?)?),
+                "--max-request-tokens" => s.max_request_tokens = Some(num(a, &val()?)?),
                 "--max-queue-ms" => s.max_queue_ms = Some(num(a, &val()?)?),
                 "--io-threads" => s.io_threads = Some(num(a, &val()?)?),
                 "--api-keys-file" => s.api_keys_file = Some(val()?),
@@ -322,6 +326,10 @@ fn config(s: Settings) -> Result<kime_serve::Config, String> {
     cfg.jev_aliases = s.jev_aliases.unwrap_or(cfg.jev_aliases);
     cfg.max_batch = s.max_batch.unwrap_or(cfg.max_batch);
     cfg.max_body = s.max_body.unwrap_or(cfg.max_body);
+    if s.max_request_tokens == Some(0) {
+        return Err("max_request_tokens must be a whole number above 0".into());
+    }
+    cfg.max_request_tokens = s.max_request_tokens.unwrap_or(cfg.max_request_tokens);
     cfg.io_threads = s.io_threads.unwrap_or(cfg.io_threads);
     if let Some(ms) = s.max_queue_ms {
         cfg.max_queue = std::time::Duration::from_millis(ms);

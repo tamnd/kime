@@ -33,6 +33,8 @@ pub struct Config {
     pub jev_aliases: bool,
     /// The largest request body in bytes.
     pub max_body: usize,
+    /// The most tokens a request may hold before anything is cut. Over it is a 413.
+    pub max_request_tokens: usize,
     /// The most requests one forward pass takes from a model's queue.
     pub max_batch: usize,
     /// Threads for the async runtime, which only parses, validates and writes JSON.
@@ -55,6 +57,7 @@ impl Config {
             models,
             jev_aliases: true,
             max_body: 8 << 20,
+            max_request_tokens: 65_536,
             max_batch: 256,
             io_threads: 2,
             max_queue: Duration::from_millis(500),
@@ -105,6 +108,7 @@ pub async fn serve(
         buckets: cfg.auth.buckets(),
         auth: cfg.auth,
         max_body: cfg.max_body,
+        max_request_tokens: cfg.max_request_tokens,
         metrics: metrics::Metrics::default(),
         log: cfg.log,
     });

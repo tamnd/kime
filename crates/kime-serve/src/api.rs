@@ -18,7 +18,7 @@ use axum::response::{IntoResponse, Response as HttpResponse};
 use axum::routing::{get, post};
 use axum::{Extension, Router};
 use kime_core::answer::{Answer, Response};
-use kime_core::request::{Limits, Loc, Problem, parse};
+use kime_core::request::{Limits, Loc, Problem, Request, parse};
 use kime_engine::Error;
 use serde_json::{Map, Value, json};
 
@@ -32,6 +32,7 @@ use crate::models::{Done, Models, Named, Refused, Resolved};
 pub(crate) struct State {
     pub(crate) models: Models,
     pub(crate) max_body: usize,
+    pub(crate) max_request_tokens: usize,
     pub(crate) metrics: Metrics,
     pub(crate) auth: Auth,
     pub(crate) buckets: Vec<Bucket>,
@@ -252,6 +253,38 @@ fn late(deadline: Duration, ready: Duration) -> HttpResponse {
     r
 }
 
+/// Whether a body is big enough that its requests could be over the token limit. A token is at
+/// least one byte of the text it comes from, and the rendered text is never much longer than the
+/// JSON it came in, so a body under half the limit cannot be over it.
+fn counted(s: &State, bytes: usize) -> bool {
+    bytes > s.max_request_tokens / 2
+}
+
+/// The tokens in each request, counted on a blocking thread because a big body takes a while.
+async fn count(
+    s: &State,
+    at: usize,
+    reqs: Vec<Request>,
+) -> Result<(Vec<usize>, Vec<Request>), HttpResponse> {
+    let k = s.models.list[at].kime.clone();
+    tokio::task::spawn_blocking(move || (reqs.iter().map(|r| k.count_tokens(r)).collect(), reqs))
+        .await
+        .map_err(|e| detail(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+fn too_long_body(n: usize, max: usize) -> Value {
+    json!({"detail": [{
+        "loc": ["body"],
+        "msg": format!("the request holds {n} tokens, over the limit of {max}"),
+        "type": "too_long",
+    }]})
+}
+
+/// Jev's 413, for a request over `max_request_tokens`.
+fn too_many_tokens(n: usize, max: usize) -> HttpResponse {
+    reply(StatusCode::PAYLOAD_TOO_LARGE, &too_long_body(n, max))
+}
+
 fn refused(r: Refused, deadline: Option<Duration>) -> HttpResponse {
     match r {
         Refused::Overloaded(wait) => overloaded(wait),
@@ -266,11 +299,12 @@ fn too_large(max: usize) -> HttpResponse {
     )
 }
 
-/// Reads and parses a JSON object body, or the 400 laya-serve and Jev both give.
-async fn object(body: Body, max: usize) -> Result<Map<String, Value>, HttpResponse> {
+/// Reads and parses a JSON object body, with its size in bytes, or the 400 laya-serve and Jev
+/// both give.
+async fn object(body: Body, max: usize) -> Result<(Map<String, Value>, usize), HttpResponse> {
     let bytes = axum::body::to_bytes(body, max).await.map_err(|_| too_large(max))?;
     match serde_json::from_slice(&bytes) {
-        Ok(Value::Object(o)) => Ok(o),
+        Ok(Value::Object(o)) => Ok((o, bytes.len())),
         Ok(_) => Err(detail(
             StatusCode::BAD_REQUEST,
             "request body must be an object with a 'questions' field",
@@ -443,7 +477,7 @@ async fn systemone(
     body: Body,
 ) -> HttpResponse {
     let start = Instant::now();
-    let body = match object(body, s.max_body).await {
+    let (body, bytes) = match object(body, s.max_body).await {
         Ok(b) => b,
         Err(r) => return r,
     };
@@ -460,7 +494,7 @@ async fn systemone(
         );
     }
     let body = Value::Object(body);
-    let req = match parse(&body, if laya { &Limits::LAYA } else { &Limits::JEV }) {
+    let mut req = match parse(&body, if laya { &Limits::LAYA } else { &Limits::JEV }) {
         Ok(r) => r,
         Err(p) if laya => return detail(StatusCode::UNPROCESSABLE_ENTITY, messages(&p)),
         Err(p) => return invalid(&p),
@@ -469,6 +503,17 @@ async fn systemone(
         Ok(o) => o,
         Err(p) => return invalid(&p),
     };
+    // Laya cuts the state and answers whatever the size, so only Jev requests are counted.
+    if !laya && counted(&s, bytes) {
+        let n;
+        (n, req) = match count(&s, resolved.at, vec![req]).await {
+            Ok((n, mut r)) => (n[0], r.remove(0)),
+            Err(r) => return r,
+        };
+        if n > s.max_request_tokens {
+            return too_many_tokens(n, s.max_request_tokens);
+        }
+    }
     let mut done = match s.models.decide(resolved.at, vec![req], o.deadline).await {
         Ok(d) => d,
         Err(r) => return refused(r, o.deadline),
@@ -534,7 +579,7 @@ async fn batch(
     body: Body,
 ) -> HttpResponse {
     let start = Instant::now();
-    let body = match object(body, s.max_body).await {
+    let (body, bytes) = match object(body, s.max_body).await {
         Ok(b) => b,
         Err(r) => return r,
     };
@@ -583,6 +628,30 @@ async fn batch(
             }
             Err(p) => Err(json!({"status": 422, "detail": p.iter().map(Problem::to_json).collect::<Vec<_>>()})),
         });
+    }
+    if counted(&s, bytes) {
+        let (n, all) = match count(&s, resolved.at, good).await {
+            Ok(v) => v,
+            Err(r) => return r,
+        };
+        // Items over the limit fail alone, like items that do not parse.
+        good = Vec::with_capacity(all.len());
+        let mut at = vec![None; all.len()];
+        for (k, r) in all.into_iter().enumerate() {
+            if n[k] <= s.max_request_tokens {
+                at[k] = Some(good.len());
+                good.push(r);
+            }
+        }
+        for slot in &mut slots {
+            if let Ok(k) = *slot {
+                *slot = at[k].ok_or_else(|| {
+                    let mut e = too_long_body(n[k], s.max_request_tokens);
+                    e["status"] = 413.into();
+                    e
+                });
+            }
+        }
     }
     let mut done = match s.models.decide(resolved.at, good, None).await {
         Ok(d) => d,

@@ -1161,5 +1161,123 @@
         }
       }
     }
+  },
+  {
+    "name": "jev-over-token-limit",
+    "server": "small",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"The customer wrote in again about the September invoice, which still shows the old price. The customer wrote in again about the September invoice, which still shows the old price. The customer wrote in again about the September invoice, which still shows the old price. \", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"Is the customer asking for a refund?\"}}, \"kime\": {}}",
+    "kime": {
+      "status": 413,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body"
+            ],
+            "msg": "the request holds 80 tokens, over the limit of 64",
+            "type": "too_long"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "jev-under-token-limit",
+    "server": "small",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"Refund please.\", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"Is the customer asking for a refund?\"}}, \"kime\": {}}",
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya",
+        "answers": {
+          "q": {
+            "type": "noul",
+            "noul": 0.75
+          }
+        },
+        "usage": {
+          "input_tokens": 38,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "laya-over-token-limit-is-cut-not-refused",
+    "server": "small",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"The customer wrote in again about the September invoice, which still shows the old price. The customer wrote in again about the September invoice, which still shows the old price. The customer wrote in again about the September invoice, which still shows the old price. \", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"Is the customer asking for a refund?\"}}}",
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "noul",
+            "noul": 0.1006,
+            "confidence": 0.8994,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 86,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "batch-item-over-token-limit",
+    "server": "small",
+    "method": "POST",
+    "path": "/v1/systemone/batch",
+    "body": "{\"items\": [{\"id\": \"short\", \"state\": \"Refund please.\", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"Is the customer asking for a refund?\"}}}, {\"id\": \"long\", \"state\": \"The customer wrote in again about the September invoice, which still shows the old price. The customer wrote in again about the September invoice, which still shows the old price. The customer wrote in again about the September invoice, which still shows the old price. \", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"Is the customer asking for a refund?\"}}}]}",
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya",
+        "results": [
+          {
+            "id": "short",
+            "answers": {
+              "q": {
+                "type": "noul",
+                "noul": 0.75
+              }
+            },
+            "usage": {
+              "input_tokens": 38,
+              "output_tokens": 0
+            }
+          },
+          {
+            "id": "long",
+            "error": {
+              "detail": [
+                {
+                  "loc": [
+                    "body"
+                  ],
+                  "msg": "the request holds 80 tokens, over the limit of 64",
+                  "type": "too_long"
+                }
+              ],
+              "status": 413
+            }
+          }
+        ],
+        "usage": {
+          "input_tokens": 38,
+          "output_tokens": 0
+        }
+      }
+    }
   }
 ]

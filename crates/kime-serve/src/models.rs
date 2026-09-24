@@ -46,6 +46,8 @@ pub(crate) struct Resolved {
 pub(crate) struct Model {
     pub(crate) id: String,
     pub(crate) device: String,
+    /// The engine, for work outside the queue such as counting a big request's tokens.
+    pub(crate) kime: Kime,
     queue: mpsc::Sender<Job>,
     load: Arc<Load>,
     stats: Arc<Stats>,
@@ -160,7 +162,7 @@ impl Models {
                 let (id, device) = (k.model_id().to_string(), k.device());
                 let load = Arc::new(Load::default());
                 let stats = Arc::new(Stats::default());
-                let (l, st) = (load.clone(), stats.clone());
+                let (l, st, kime) = (load.clone(), stats.clone(), k.clone());
                 std::thread::Builder::new()
                     .name(format!("kime-{id}"))
                     .spawn(move || {
@@ -174,7 +176,7 @@ impl Models {
                         );
                     })
                     .expect("spawning a worker thread");
-                Model { id, device, queue: tx, load, stats }
+                Model { id, device, kime, queue: tx, load, stats }
             })
             .collect();
         Models { list, jev_aliases, max_queue }

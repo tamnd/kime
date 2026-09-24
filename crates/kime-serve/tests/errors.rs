@@ -9,7 +9,8 @@
 //! exceptions, so only their shape is compared.
 //!
 //! Cases run against one of three servers, named by `server`: `open` with no keys (the default),
-//! `keys` with Jev style keys and rate limits, and `laya-key` with laya-serve's `LAYA_API_KEY`.
+//! `keys` with Jev style keys and rate limits, `laya-key` with laya-serve's `LAYA_API_KEY`, and
+//! `small` with a 64 token request limit, so a short body shows the 413.
 //! `headers` adds request headers, and `retry_after` in the snapshot is the `retry-after`
 //! header in seconds.
 //!
@@ -67,6 +68,7 @@ async fn call(
 fn start(
     kime: &Kime,
     auth: kime_serve::Auth,
+    max_request_tokens: usize,
 ) -> (SocketAddr, tokio::sync::oneshot::Sender<()>, tokio::task::JoinHandle<std::io::Result<()>>) {
     let std = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     std.set_nonblocking(true).unwrap();
@@ -76,6 +78,7 @@ fn start(
     let mut cfg = kime_serve::Config::new(addr, vec![kime.clone()]);
     cfg.max_queue = std::time::Duration::ZERO;
     cfg.auth = auth;
+    cfg.max_request_tokens = max_request_tokens;
     let server = tokio::spawn(kime_serve::serve(listener, cfg, async {
         let _ = stopped.await;
     }));
@@ -149,9 +152,10 @@ async fn error_snapshots() {
     let mut keys = kime_serve::Auth::off();
     keys.add_keys_file("k1 ops 2\nt1 tokens - 10\n").unwrap();
     let servers = [
-        ("open", start(&kime, kime_serve::Auth::off())),
-        ("keys", start(&kime, keys)),
-        ("laya-key", start(&kime, kime_serve::Auth::laya("s3cret"))),
+        ("open", start(&kime, kime_serve::Auth::off(), 65_536)),
+        ("keys", start(&kime, keys, 65_536)),
+        ("laya-key", start(&kime, kime_serve::Auth::laya("s3cret"), 65_536)),
+        ("small", start(&kime, kime_serve::Auth::off(), 64)),
     ];
     let addr_of = |name: &str| servers.iter().find(|(n, _)| *n == name).map(|(_, s)| s.0).unwrap();
 
