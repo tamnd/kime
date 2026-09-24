@@ -192,7 +192,10 @@ async fn object(body: Body, max: usize) -> Result<Map<String, Value>, HttpRespon
     })?;
     match serde_json::from_slice(&bytes) {
         Ok(Value::Object(o)) => Ok(o),
-        Ok(_) => Err(detail(StatusCode::BAD_REQUEST, "request body must be a JSON object")),
+        Ok(_) => Err(detail(
+            StatusCode::BAD_REQUEST,
+            "request body must be an object with a 'questions' field",
+        )),
         Err(e) => Err(detail(StatusCode::BAD_REQUEST, format!("request body is not JSON: {e}"))),
     }
 }
