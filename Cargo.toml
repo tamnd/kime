@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*", "xtask"]
 
 [workspace.package]
-version = "0.0.12"
+version = "0.0.13"
 edition = "2024"
 # spec/07-engine.md says 1.90. The floor is raised deliberately, in a commit, and the msrv job in CI
 # checks it on every change so that it is never raised by accident in a dependency bump.
@@ -19,20 +19,20 @@ readme = "README.md"
 # One version for the whole workspace, bumped together. Internal crates are pinned exactly so that a
 # partial publish cannot produce a mixed version build.
 [workspace.dependencies]
-kime = { version = "=0.0.12", path = "crates/kime" }
-kime-ane = { version = "=0.0.12", path = "crates/kime-ane" }
-kime-core = { version = "=0.0.12", path = "crates/kime-core" }
-kime-cpu = { version = "=0.0.12", path = "crates/kime-cpu" }
-kime-cuda = { version = "=0.0.12", path = "crates/kime-cuda" }
-kime-engine = { version = "=0.0.12", path = "crates/kime-engine" }
-kime-eval = { version = "=0.0.12", path = "crates/kime-eval" }
-kime-metal = { version = "=0.0.12", path = "crates/kime-metal" }
-kime-model = { version = "=0.0.12", path = "crates/kime-model" }
-kime-route = { version = "=0.0.12", path = "crates/kime-route" }
-kime-serve = { version = "=0.0.12", path = "crates/kime-serve" }
-kime-tensor = { version = "=0.0.12", path = "crates/kime-tensor" }
-kime-tok = { version = "=0.0.12", path = "crates/kime-tok" }
-kime-train = { version = "=0.0.12", path = "crates/kime-train" }
+kime = { version = "=0.0.13", path = "crates/kime" }
+kime-ane = { version = "=0.0.13", path = "crates/kime-ane" }
+kime-core = { version = "=0.0.13", path = "crates/kime-core" }
+kime-cpu = { version = "=0.0.13", path = "crates/kime-cpu" }
+kime-cuda = { version = "=0.0.13", path = "crates/kime-cuda" }
+kime-engine = { version = "=0.0.13", path = "crates/kime-engine" }
+kime-eval = { version = "=0.0.13", path = "crates/kime-eval" }
+kime-metal = { version = "=0.0.13", path = "crates/kime-metal" }
+kime-model = { version = "=0.0.13", path = "crates/kime-model" }
+kime-route = { version = "=0.0.13", path = "crates/kime-route" }
+kime-serve = { version = "=0.0.13", path = "crates/kime-serve" }
+kime-tensor = { version = "=0.0.13", path = "crates/kime-tensor" }
+kime-tok = { version = "=0.0.13", path = "crates/kime-tok" }
+kime-train = { version = "=0.0.13", path = "crates/kime-train" }
 
 # Outside crates. Each one is here because writing it ourselves would be worse, and the list is meant to stay short enough to read.
 # The HTTP server's router, on hyper and tokio.
