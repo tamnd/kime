@@ -20,6 +20,7 @@ const USAGE: &str =
 options: --device auto|cpu|cuda[:N]  --threads N  --precision f16|f32|int8
          --max-batch N  --max-body BYTES  --max-queue-ms MS (0 is off)  --io-threads N
          --no-jev-aliases  --api-keys-file PATH  --rpm N  --tps N  --log-level info
+         --log-requests  --log-format text|json
 Every option is also a kime.toml field (--max-batch is max_batch) and a KIME_ variable
 (KIME_MAX_BATCH). Flags win over KIME_ variables, which win over the file, which wins over
 laya-serve's LAYA_ variables. The first model answers requests that name no model. API keys
@@ -46,6 +47,8 @@ struct Settings {
     rpm: Option<u32>,
     tps: Option<u32>,
     log_level: Option<String>,
+    log_requests: Option<bool>,
+    log_format: Option<String>,
 }
 
 impl Settings {
@@ -67,6 +70,8 @@ impl Settings {
             rpm: over.rpm.or(self.rpm),
             tps: over.tps.or(self.tps),
             log_level: over.log_level.or(self.log_level),
+            log_requests: over.log_requests.or(self.log_requests),
+            log_format: over.log_format.or(self.log_format),
         }
     }
 
@@ -124,6 +129,8 @@ impl Settings {
             rpm: num("KIME_RPM", var("KIME_RPM"))?,
             tps: num("KIME_TPS", var("KIME_TPS"))?,
             log_level: var("KIME_LOG_LEVEL"),
+            log_requests: bool("KIME_LOG_REQUESTS")?,
+            log_format: var("KIME_LOG_FORMAT"),
         })
     }
 
@@ -195,6 +202,8 @@ impl Settings {
                 "--rpm" => s.rpm = Some(num(a, &val()?)?),
                 "--tps" => s.tps = Some(num(a, &val()?)?),
                 "--log-level" => s.log_level = Some(val()?),
+                "--log-requests" => s.log_requests = Some(true),
+                "--log-format" => s.log_format = Some(val()?),
                 "--no-jev-aliases" => s.jev_aliases = Some(false),
                 "--help" | "-h" => return Err(USAGE.into()),
                 other => return Err(format!("unknown option {other:?}\n{USAGE}")),
@@ -269,6 +278,14 @@ fn config(s: Settings) -> Result<kime_serve::Config, String> {
         return Err(format!("log level {level:?} is not one of {}", LOG_LEVELS.join(", ")));
     }
     let quiet = matches!(level.as_str(), "critical" | "error" | "warning");
+    let log = match (s.log_requests.unwrap_or(false), s.log_format.as_deref()) {
+        (_, Some(f)) if !matches!(f, "text" | "json") => {
+            return Err(format!("log format {f:?} is not text or json"));
+        }
+        (false, _) => kime_serve::Log::Off,
+        (true, Some("json")) => kime_serve::Log::Json,
+        (true, _) => kime_serve::Log::Text,
+    };
     let mut dev = device(s.device.as_deref().unwrap_or("auto"))?;
     let prec = precision(s.precision.as_deref().unwrap_or("f16"))?;
     if let Some(t) = s.threads {
@@ -310,6 +327,7 @@ fn config(s: Settings) -> Result<kime_serve::Config, String> {
         cfg.max_queue = std::time::Duration::from_millis(ms);
     }
     cfg.auth = auth;
+    cfg.log = log;
     Ok(cfg)
 }
 

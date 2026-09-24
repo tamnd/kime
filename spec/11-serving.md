@@ -91,7 +91,8 @@ The decision is returned in `kime.routing` when extensions are on, and as a top 
 
 ## Observability
 
-- `tracing` spans per request with the request id. JSON logs to stdout when `--log-format json` is set. Request bodies are never logged. `--log-requests` logs hashes and sizes only.
+- A request log on stdout, off by default. `--log-requests` (`log_requests = true`, `KIME_LOG_REQUESTS=1`) writes one line per request with the time, the request id, the method, path and status, the time taken, the body's size and the first 16 hex digits of its blake3 hash, and for an answered request the model, the number of questions and the input tokens. `--log-format json` writes the same as one JSON object per line. Request bodies are never logged. Off, the server does not read the body in the middleware and the cost is one branch per request.
+- OpenTelemetry spans per request with the request id, off unless an exporter is set. Not built yet.
 - Prometheus metrics: request counts by status and model; latency histograms per stage (queue, tokenize, state, question, total) with buckets from 50 us to 5 s; batch size and token histograms per bucket; cache hit ratios; truncations; router decisions by model and reason; device memory; rejected requests by reason.
 - `GET /ready` returns JSON with the loaded models, device names, queue depths and the EWMA per bucket.
 

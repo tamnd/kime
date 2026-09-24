@@ -15,10 +15,12 @@ use kime_engine::Kime;
 
 mod api;
 mod auth;
+mod log;
 mod metrics;
 mod models;
 
 pub use auth::Auth;
+pub use log::Log;
 
 /// How the server runs.
 #[derive(Debug)]
@@ -40,6 +42,8 @@ pub struct Config {
     pub max_queue: Duration,
     /// API keys and rate limits. Off unless set.
     pub auth: Auth,
+    /// The request log on stdout. Off unless set.
+    pub log: Log,
 }
 
 impl Config {
@@ -55,6 +59,7 @@ impl Config {
             io_threads: 2,
             max_queue: Duration::from_millis(500),
             auth: Auth::off(),
+            log: Log::Off,
         }
     }
 }
@@ -101,6 +106,7 @@ pub async fn serve(
         auth: cfg.auth,
         max_body: cfg.max_body,
         metrics: metrics::Metrics::default(),
+        log: cfg.log,
     });
     let listener = listener.tap_io(|tcp| {
         // Answers are small and latency is the product, so Nagle only gets in the way.
