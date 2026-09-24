@@ -521,6 +521,10 @@ name = "kime-route"
 version = "0.0.15"
 dependencies = [
  "kime-core",
+ "regex",
+ "serde_json",
+ "unicode-normalization",
+ "unicode-properties",
 ]
 
 [[package]]
