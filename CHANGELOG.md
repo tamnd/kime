@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.0.17
 
 - `crates/kime-route/tests/lang/routing-set.jsonl` is the labelled routing set for #26, written by `tools/route/routing-set.py`: 5,061 texts in 65 languages. It has 64 MASSIVE test utterances per language, 499 more with the accents stripped, 800 papluca texts, 300 AG News articles, 100 LeetCode statements, the 33 cases from Laya issues #20, #54, #130, #168, #172 and #178, 47 texts in Czech, Slovak, Croatian, Lithuanian, Estonian, Catalan and Basque that the identifier has no training data for, and 18 English texts with words other languages claim. kime routes 99.15% of it right against 78.52% for Laya's rules, all of the issue cases, all of the unseen languages (Laya 67.86% with accents and 5.26% without), and 99.00% of stripped MASSIVE (Laya 52.71%). English with French loanwords like `café`, `crème brûlée`, `résumé` and `naïve` used to go to the multilingual model, because Laya's rules count the accents against English. When those accents are all Laya's rules have against a text, the identifier now also looks at it with the accents taken off, and 0.99 there sends it to the English checkpoint. That moves 4 of the 161,674 MASSIVE and papluca test texts and costs about 0.7 us per state on the Mac.
 
