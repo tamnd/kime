@@ -255,3 +255,95 @@ async fn overload(kime: Kime, cases: &[Value]) {
     let _ = stop.send(());
     server.await.unwrap().unwrap();
 }
+
+/// With `laya` and `laya-multilingual` both loaded, a request that leaves the choice to the
+/// server goes where kime-route sends it, a batch is routed item by item with each item's answer
+/// the same as the single endpoint's, and `/metrics` counts the decisions.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn serve_routed() {
+    let threads = std::env::var("KIME_THREADS").ok().and_then(|t| t.parse().ok()).unwrap_or(0);
+    let load = |name: &str| {
+        let model =
+            std::env::var("KIME_MODELS").map_or_else(|_| name.into(), |d| format!("{d}/{name}"));
+        Kime::builder().model(model).device(Device::Cpu { threads }).build()
+    };
+    let (en, ml) = match (load("laya"), load("laya-multilingual")) {
+        (Ok(en), Ok(ml)) => (en, ml),
+        (Err(e), _) | (_, Err(e)) => {
+            assert!(std::env::var_os("KIME_REQUIRE_WEIGHTS").is_none(), "{e}");
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let mut cfg = kime_serve::Config::new(addr, vec![en, ml]);
+    cfg.max_queue = std::time::Duration::ZERO;
+    let server = tokio::spawn(kime_serve::serve(listener, cfg, async {
+        let _ = stopped.await;
+    }));
+
+    let q = json!({"q": {"type": "choice", "instructions": "What does the customer want?",
+        "criteria": {"cancel": "", "refund": "", "book": ""}}});
+    let states = [
+        ("I was charged twice for my subscription, please refund me", "laya"),
+        ("Мне нужно отменить подписку", "laya-multilingual"),
+        ("saya mau pesan tiket ke jakarta besok pagi", "laya-multilingual"),
+        ("The café on the corner charged me twice for a crème brûlée", "laya"),
+    ];
+    let mut single = Vec::new();
+    for (state, want) in states {
+        let (s, v) = post(addr, "/v1/systemone", &json!({"state": state, "questions": q})).await;
+        assert_eq!(s, 200, "{v}");
+        let key = if want == "laya" { "english" } else { "multilingual" };
+        assert_eq!(v["routing"]["model"], key, "{state}: {}", v["routing"]);
+        let (s, v) = post(
+            addr,
+            "/v1/systemone",
+            &json!({"model": "kime-latest", "state": state, "questions": q}),
+        )
+        .await;
+        assert_eq!(s, 200, "{v}");
+        assert_eq!(v["model"], want, "{state}");
+        single.push(v);
+    }
+    // A caller's lang wins over detection.
+    let body = json!({"state": states[1].0, "questions": q, "kime": {"route": {"lang": "en"}}});
+    let (_, v) = post(addr, "/v1/systemone", &body).await;
+    assert_eq!(v["model"], "laya");
+
+    let mut items: Vec<Value> = states
+        .iter()
+        .enumerate()
+        .map(|(i, (state, _))| json!({"id": i.to_string(), "state": state, "questions": q}))
+        .collect();
+    items.push(json!({"id": "bad", "state": "x", "questions": {}}));
+    let body = json!({"model": "kime-latest", "items": items});
+    let (s, v) = post(addr, "/v1/systemone/batch", &body).await;
+    assert_eq!(s, 200, "{v}");
+    let r = v["results"].as_array().unwrap();
+    for (k, (_, want)) in states.iter().enumerate() {
+        assert_eq!(r[k]["id"], k.to_string());
+        assert_eq!(r[k]["model"], *want, "{}", r[k]);
+        assert_eq!(r[k]["answers"], single[k]["answers"]);
+    }
+    assert_eq!(r[4]["error"]["status"], 422);
+
+    let mut s = tokio::net::TcpStream::connect(addr).await.unwrap();
+    s.write_all(b"GET /metrics HTTP/1.1\r\nhost: x\r\nconnection: close\r\n\r\n").await.unwrap();
+    let mut text = String::new();
+    s.read_to_string(&mut text).await.unwrap();
+    for line in [
+        "kime_route_decisions_total{model=\"laya-multilingual\",reason=\"script\"} 3",
+        "kime_route_decisions_total{model=\"laya\",reason=\"lang\"} 1",
+        "kime_route_decisions_total{model=\"laya\",reason=\"identifier\"} 3",
+        "kime_route_decisions_total{model=\"laya-multilingual\",reason=\"identifier\"} 3",
+        "kime_route_decisions_total{model=\"laya\",reason=\"word_lists\"} 3",
+    ] {
+        assert!(text.contains(line), "{line} in {text}");
+    }
+
+    let _ = stop.send(());
+    server.await.unwrap().unwrap();
+}

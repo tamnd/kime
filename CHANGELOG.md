@@ -2,6 +2,14 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
+## Unreleased
+
+- `kime serve` routes each item of a batch on its own (#26). A batch to `kime-latest` or another routed name is split by model, the groups run at once, and each result carries its `model` when more than one model answered; the top level `model` is the first group's. On the Mac, with a load average of 20 to 65 from other builds, a batch of 96 states (32 English, 8 each of German, Spanish, Russian, Indonesian, Japanese, Malay, Dutch and Hindi from the MASSIVE and AG News test splits) sent 34 items to `laya` and 62 to `laya-multilingual`, and took 5.15 s against 14.49 s when all went to `laya` and 2.83 s when all went to `laya-multilingual`. The two non-English items that went to `laya` are a German line quoting George Eliot and a Dutch line about president Trump.
+
+- `/metrics` has `kime_route_decisions_total{model,reason}` (#25), the requests the router sent to each model by the rule that decided: `lang`, `lang_guess`, `no_letters`, `script`, `word_lists` or `identifier`. `kime_route::router::Decision` carries the rule as `by`.
+
+- The keep-alive and `Retry-After` checks in `crates/kime-serve/tests/errors.rs` no longer fail on a slow machine. The keep-alive check uses a key that one answered request puts in debt, so the refill cannot pay it back before the second request, and `Retry-After` may be anywhere from 1 second up to the snapshot's value.
+
 ## 0.0.17
 
 - `crates/kime-route/tests/lang/routing-set.jsonl` is the labelled routing set for #26, written by `tools/route/routing-set.py`: 5,061 texts in 65 languages. It has 64 MASSIVE test utterances per language, 499 more with the accents stripped, 800 papluca texts, 300 AG News articles, 100 LeetCode statements, the 33 cases from Laya issues #20, #54, #130, #168, #172 and #178, 47 texts in Czech, Slovak, Croatian, Lithuanian, Estonian, Catalan and Basque that the identifier has no training data for, and 18 English texts with words other languages claim. kime routes 99.15% of it right against 78.52% for Laya's rules, all of the issue cases, all of the unseen languages (Laya 67.86% with accents and 5.26% without), and 99.00% of stripped MASSIVE (Laya 52.71%). English with French loanwords like `café`, `crème brûlée`, `résumé` and `naïve` used to go to the multilingual model, because Laya's rules count the accents against English. When those accents are all Laya's rules have against a text, the identifier now also looks at it with the accents taken off, and 0.99 there sends it to the English checkpoint. That moves 4 of the 161,674 MASSIVE and papluca test texts and costs about 0.7 us per state on the Mac.

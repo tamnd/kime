@@ -7,6 +7,40 @@ use serde_json::Value;
 use crate::lang::{Analysis, MAX_CHARS, analyse_text, state_text};
 use crate::lid::{MIN_WORDS, OVERRULE, model, strip_accents, words};
 
+/// The rule that made a decision, for counting them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum By {
+    /// The caller's `lang`.
+    Lang,
+    /// The caller's `lang_guess`.
+    LangGuess,
+    /// No letters, so the default.
+    NoLetters,
+    /// A script other than Latin.
+    Script,
+    /// Laya's stopword and diacritic rules.
+    WordLists,
+    /// The language identifier in [`crate::lid`].
+    Identifier,
+}
+
+impl By {
+    pub const ALL: [By; 6] =
+        [By::Lang, By::LangGuess, By::NoLetters, By::Script, By::WordLists, By::Identifier];
+
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            By::Lang => "lang",
+            By::LangGuess => "lang_guess",
+            By::NoLetters => "no_letters",
+            By::Script => "script",
+            By::WordLists => "word_lists",
+            By::Identifier => "identifier",
+        }
+    }
+}
+
 /// Which checkpoint a request goes to, and why, in the words of Laya's `RouteDecision`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Decision {
@@ -14,6 +48,7 @@ pub struct Decision {
     /// for the server's default.
     pub english: Option<bool>,
     pub reason: String,
+    pub by: By,
     /// Laya's `analyse` of the state, when detection ran.
     pub detection: Option<Analysis>,
 }
@@ -64,6 +99,7 @@ pub fn route(
         return Decision {
             english: Some(en),
             reason: format!("explicit lang={}", repr(l)),
+            by: By::Lang,
             detection: None,
         };
     }
@@ -72,6 +108,7 @@ pub fn route(
         return Decision {
             english: Some(en),
             reason: format!("lang_guess: the caller identified this as {what} text"),
+            by: By::LangGuess,
             detection: None,
         };
     }
@@ -85,15 +122,16 @@ pub fn detect(state: &Value, default_english: bool) -> Decision {
     let text = state_text(state, MAX_CHARS);
     let det = analyse_text(&text);
     let default = key(default_english);
-    let (english, reason) = if det.script == "unknown" {
-        (None, format!("no letters detected in state; using default ({default})"))
+    let identifier = |english: bool, reason: String| (Some(english), reason, By::Identifier);
+    let (english, reason, by) = if det.script == "unknown" {
+        (None, format!("no letters detected in state; using default ({default})"), By::NoLetters)
     } else if det.script != "latin" {
         let pct = 100.0 * det.non_latin_fraction;
         let reason = format!(
             "non-Latin script ({}, {pct:.0}% of letters); the English checkpoint cannot read it",
             det.script
         );
-        (Some(false), reason)
+        (Some(false), reason, By::Script)
     } else if words(&text) < MIN_WORDS {
         laya_latin(&det, default)
     } else {
@@ -105,22 +143,22 @@ pub fn detect(state: &Value, default_english: bool) -> Decision {
                 let reason = format!(
                     "Latin script, language not identified by its word lists, but the language identifier puts English at {pct:.0}%"
                 );
-                (Some(true), reason)
+                identifier(true, reason)
             } else {
-                (Some(true), "English Latin text".to_string())
+                (Some(true), "English Latin text".to_string(), By::WordLists)
             }
         } else if det.is_english {
             let reason = format!(
                 "Latin script, but the language identifier puts English at {pct:.0}%; not safe for the English checkpoint"
             );
-            (Some(false), reason)
+            identifier(false, reason)
         } else if p >= OVERRULE {
             let over = match det.language {
                 Some(l) => format!("the word lists' guess of '{l}'"),
                 None => format!("{:.0}% non-English letters", 100.0 * det.diacritic_rate),
             };
-            (
-                Some(true),
+            identifier(
+                true,
                 format!(
                     "Latin script, the language identifier puts English at {pct:.0}%, over {over}"
                 ),
@@ -134,16 +172,16 @@ pub fn detect(state: &Value, default_english: bool) -> Decision {
                 100.0 * q,
                 100.0 * det.diacritic_rate
             );
-            (Some(true), reason)
+            identifier(true, reason)
         } else {
             laya_latin(&det, default)
         }
     };
-    Decision { english, reason, detection: Some(det) }
+    Decision { english, reason, by, detection: Some(det) }
 }
 
 /// Laya's three branches for Latin script text.
-fn laya_latin(det: &Analysis, default: &str) -> (Option<bool>, String) {
+fn laya_latin(det: &Analysis, default: &str) -> (Option<bool>, String, By) {
     if !det.is_english {
         let reason = match det.language {
             Some(l) => format!("Latin script but language looks like '{l}', not English"),
@@ -152,14 +190,14 @@ fn laya_latin(det: &Analysis, default: &str) -> (Option<bool>, String) {
                 100.0 * det.diacritic_rate
             ),
         };
-        (Some(false), reason)
+        (Some(false), reason, By::WordLists)
     } else if det.language_undecided {
         let reason = format!(
             "Latin script, language not identified and no non-English letters; using default ({default})"
         );
-        (None, reason)
+        (None, reason, By::WordLists)
     } else {
-        (Some(true), "English Latin text".to_string())
+        (Some(true), "English Latin text".to_string(), By::WordLists)
     }
 }
 

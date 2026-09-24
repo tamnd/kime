@@ -264,6 +264,7 @@ impl Models {
             Some(false) => ml,
             None => 0,
         };
+        self.list[r.at].stats.routed(d.by);
         let detection = d.detection.map_or(Value::Null, |a| a.to_json());
         r.route = Some(Route { reason: d.reason, detection });
     }
