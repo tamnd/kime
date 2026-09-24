@@ -4,6 +4,7 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- Attention runs in f32, taking four queries at a time with register tiles, and uses the vectorized exp. It is 5.6x to 6x faster on x86 with the default target, where the old f64 `mul_add` was a call, and 1.2x to 3x on the M4 depending on load. The worst Laya logit error gate moves from 1.5e-4 to 2.5e-4. The probability gate stays at 2e-5.
 - GELU runs in f32 without calls, so the GeGLU loop vectorizes. It was an f64 `erf` call per element. The op is 5.8x to 8x faster on the M4 and 3.2x on an EPYC with the default x86 target, and Laya parity still agrees on all 625 questions for both checkpoints.
 
 ## 0.0.9
