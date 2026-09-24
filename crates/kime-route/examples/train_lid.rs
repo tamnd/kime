@@ -15,7 +15,7 @@ use std::io::{BufRead, BufReader};
 use std::time::Instant;
 
 use kime_route::lang::analyse_text;
-use kime_route::lid::{BUCKETS, MIN_WORDS, Model, features, model, words};
+use kime_route::lid::{BUCKETS, MIN_WORDS, Model, OVERRULE, features, model, words};
 use serde_json::Value;
 
 struct Row {
@@ -25,6 +25,8 @@ struct Row {
     english: bool,
     /// What Laya's rules say.
     laya_english: bool,
+    /// Whether Laya's rules take it for Latin script text.
+    latin: bool,
     words: usize,
     feats: Vec<(u32, f32)>,
 }
@@ -44,12 +46,14 @@ fn load(path: &str) -> Vec<Row> {
                             let v: Value = serde_json::from_str(l).unwrap_or_default();
                             let text = v["text"].as_str().unwrap_or_default();
                             let lang = v["lang"].as_str().unwrap_or_default().to_string();
+                            let a = analyse_text(text);
                             Row {
                                 english: lang == "en",
                                 lang,
                                 source: v["source"].as_str().unwrap_or_default().to_string(),
                                 split: v["split"].as_str().unwrap_or_default().to_string(),
-                                laya_english: analyse_text(text).is_english,
+                                laya_english: a.is_english,
+                                latin: a.script == "latin",
                                 words: words(text),
                                 feats: features(text),
                             }
@@ -112,9 +116,14 @@ fn train(rows: &[&Row], epochs: usize) -> Model {
     Model { weights: w, bias, threshold: 0.5 }
 }
 
-/// The router's answer: English only when Laya's rules and the identifier both say so.
+/// The router's answer, as `lid::english_model` gives it.
 fn routes_english(m: &Model, r: &Row, threshold: f32) -> bool {
-    r.laya_english && (r.words < MIN_WORDS || sigmoid(m.logit(&r.feats)) >= threshold)
+    if r.latin && r.words >= MIN_WORDS {
+        let p = sigmoid(m.logit(&r.feats));
+        p >= threshold && (r.laya_english || p >= OVERRULE)
+    } else {
+        r.laya_english
+    }
 }
 
 fn report(m: &Model, rows: &[&Row]) {
@@ -167,24 +176,26 @@ fn main() {
         eprintln!("trained in {:.1} s", t.elapsed().as_secs_f64());
         m = Model::from_bytes(&m.to_bytes()).unwrap_or_else(|e| panic!("{e}"));
 
-        // The highest threshold that keeps English on the English model: at most one English
-        // val text in 10,000 goes to the multilingual model because of the identifier.
+        // The threshold with the fewest mistakes on the val split, where English sent to the
+        // multilingual model counts a hundred times. AG News has some French, German and Spanish
+        // articles labelled English, so this cannot ask for no English mistakes at all.
         let val = split("val");
-        let mut en: Vec<f32> = val
-            .iter()
-            .filter(|r| r.english && r.laya_english)
-            .map(|r| sigmoid(m.logit(&r.feats)))
-            .collect();
-        en.sort_by(f32::total_cmp);
-        m.threshold = en[en.len() / 10_000].min(0.5);
-        for th in [0.5, 0.2, 0.1, 0.05, 0.02, 0.01, m.threshold] {
-            let right = val.iter().filter(|r| routes_english(&m, r, th) == r.english).count();
-            let en_miss = val.iter().filter(|r| r.english && !routes_english(&m, r, th)).count();
-            eprintln!(
-                "val threshold {th:.5}: {:.2}% right, {en_miss} English misrouted",
-                100.0 * right as f64 / val.len() as f64
-            );
+        let cost = |th: f32| {
+            let (mut en, mut other) = (0, 0);
+            for r in &val {
+                if routes_english(&m, r, th) != r.english {
+                    if r.english { en += 1 } else { other += 1 }
+                }
+            }
+            (en, other, 100 * en + other)
+        };
+        let grid: Vec<f32> = (1..100).map(|i| i as f32 / 100.0).collect();
+        let best = grid.iter().copied().min_by_key(|&th| cost(th).2).unwrap_or(0.5);
+        for th in [0.9, 0.5, 0.2, 0.1, 0.05, 0.01, best] {
+            let (en, other, _) = cost(th);
+            eprintln!("val threshold {th:.2}: {en} English and {other} other texts misrouted");
         }
+        m.threshold = best;
         std::fs::write(out, m.to_bytes()).unwrap_or_else(|e| panic!("{out}: {e}"));
         eprintln!("wrote {out}, threshold {:.5}", m.threshold);
         m
