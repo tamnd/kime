@@ -4,6 +4,11 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+## 0.0.9
+
+- `kime-cpu` builds on Linux and Windows again. 0.0.8 sized the GEMM scratch with a name from the macOS only Accelerate module inside `cfg!`, which still type checks on every OS, so 0.0.8 only compiled on macOS. Use 0.0.9 instead of 0.0.8.
+- The publish script runs clippy for the other targets rustup has installed before it publishes, because `cargo publish` only builds for the machine it runs on.
+
 ## 0.0.8
 
 The CPU GEMM is several times faster, and there is a first INT8 path. On the M4 Mac, 8 threads, the first 40 parity cases (80 questions), kime answers batches of 16 in 122 to 132 ms per question against 263 to 322 ms for Laya 0.3.9 with its own batching, run back to back on a machine with a load average of 20 to 30 from other work. One question at a time kime is still slower, 337 to 350 ms against 211 ms.
