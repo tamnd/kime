@@ -92,6 +92,10 @@ pub(crate) struct Stats {
     passes: AtomicU64,
     truncated: AtomicU64,
     cut_tokens: AtomicU64,
+    /// Times the worker thread died and started again.
+    pub(crate) restarts: AtomicU64,
+    /// Requests dropped unanswered because their caller had gone.
+    pub(crate) abandoned: AtomicU64,
     /// From submission to the start of the forward pass that answered it.
     pub(crate) queue: Histogram,
     tokenize: Histogram,
@@ -112,6 +116,8 @@ impl Default for Stats {
             passes: AtomicU64::new(0),
             truncated: AtomicU64::new(0),
             cut_tokens: AtomicU64::new(0),
+            restarts: AtomicU64::new(0),
+            abandoned: AtomicU64::new(0),
             queue: Histogram::seconds(),
             tokenize: Histogram::seconds(),
             device: Histogram::seconds(),
@@ -279,7 +285,7 @@ impl Metrics {
                 );
             }
         }
-        let counters: [Named<AtomicU64>; 5] = [
+        let counters: [Named<AtomicU64>; 7] = [
             ("kime_questions_total", "Questions answered.", |s| &s.questions),
             ("kime_input_tokens_total", "Input tokens read, the usage.input_tokens unit.", |s| {
                 &s.input_tokens
@@ -291,6 +297,16 @@ impl Metrics {
                 |s| &s.truncated,
             ),
             ("kime_truncated_tokens_total", "State tokens cut to fit.", |s| &s.cut_tokens),
+            (
+                "kime_worker_restarts_total",
+                "Times the model's worker thread died and started again.",
+                |s| &s.restarts,
+            ),
+            (
+                "kime_abandoned_requests_total",
+                "Requests dropped before they ran because the client had gone.",
+                |s| &s.abandoned,
+            ),
         ];
         for (name, help, get) in counters {
             head(&mut out, name, "counter", help);

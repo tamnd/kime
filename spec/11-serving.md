@@ -34,6 +34,8 @@ Batch forming:
 - **No head of line blocking by length.** TEI issue #723 (one input longer than the budget hangs the queue) cannot happen, because a state longer than `max_batch_tokens` is split into its own batch at the smallest bucket that fits, up to the model's max.
 - **Laya compat model.** It has one stage, and its rows are whole sequences.
 
+What is built today, for the compat models: one worker thread per loaded model takes what queued while its last forward pass ran, up to `--max-batch` requests (default 256) and about `--max-batch-tokens` tokens (default 16,384, the largest compat bucket), splits them into one row per question and runs the rows in batches grouped by bucket. The tokens are guessed from the size of each request, a third of its bytes per question row up to the model's row length, so nothing is tokenized twice. The token limit keeps each pass short, so the worker comes back to the queue often, and a request whose client has gone by then is dropped unanswered and counted in `kime_abandoned_requests_total`. A job over either limit alone, like a big `/batch` call, runs alone. The queue is bounded twice: by the wait estimate (`--max-queue-ms`) and by `--max-pending` (default 4,096) requests queued or running per model, and past either a new request gets 529. A request bigger than `--max-pending` alone still runs when nothing else is queued. A failed batch runs each of its requests again alone, a panic in the engine fails only its pass, and a worker thread that dies starts again, with a 500 for the requests it held. `kime_worker_restarts_total` counts those. The two stage scheduler above is M3.
+
 Multiple GPUs: each device has its own scheduler. A request goes to the device whose queue has the lowest estimated wait. If one device already holds the state in its cache, the request goes there, unless the queue difference is over 2 ms.
 
 ## Caches
@@ -59,7 +61,7 @@ Rendered question headers and options tokenize to the same ids across requests w
 ## Rate limiting and overload
 
 - Per key limits: requests per minute and input tokens per second, as token buckets in a flat array indexed by key id, with one atomic per bucket and no locks. Each bucket is kept as the time it will be full again (GCRA), so admitting a request is one compare and swap. A key may send a whole minute of requests at once. Tokens are only known after the answer, so they are charged then, and a key more than one second of tokens in debt is refused until it is paid down. The keys file gives each key its limits. Global defaults come from `--rpm` and `--tps`, and with no keys they apply to all requests together. Exceeding a limit returns 429 with `retry-after-ms` computed from the bucket refill time and `retry-after` in whole seconds. A refused request's body is still read, so the connection stays open for the retry.
-- Overload: when the estimated queue wait exceeds `--max-queue-ms` (default 500), new requests get 529 with `retry-after-ms` set to the current wait estimate. This is Jev's 529 status. It protects tail latency instead of letting the queue grow without limit.
+- Overload: when the estimated queue wait exceeds `--max-queue-ms` (default 500), or a model already holds `--max-pending` requests (default 4,096), new requests get 529 with `retry-after-ms` set to the current wait estimate. This is Jev's 529 status. It protects tail latency instead of letting the queue grow without limit.
 - Concurrency limit: a semaphore on in-flight requests per server (default 4,096) bounds memory.
 
 ## Router
@@ -111,6 +113,8 @@ The metrics `/metrics` has today. Times are histograms with buckets from 50 µs 
 | `kime_queue_seconds` | model | submission to the start of the forward pass |
 | `kime_tokenize_seconds`, `kime_device_seconds` | model | per forward pass |
 | `kime_pass_requests`, `kime_pass_questions`, `kime_pass_input_tokens`, `kime_pass_device_batches` | model | how full each forward pass was |
+| `kime_worker_restarts_total` | model | times the model's worker thread died and started again |
+| `kime_abandoned_requests_total` | model | requests dropped before they ran because the client had gone |
 | `kime_truncations_total`, `kime_truncated_tokens_total` | model | questions whose state was cut to fit the sequence length, and the state tokens cut |
 | `kime_device_memory_bytes` | model, kind | bytes on the device: `weights`, and `plans` for the arenas of the buckets used so far |
 | `kime_otel_spans_total` | outcome | spans `exported`, `dropped` because the queue was full and `failed` because the collector did not answer 2xx, when tracing is on |
@@ -145,8 +149,10 @@ models = ["laya", "laya-multilingual"]
 device = "cuda:0"
 precision = "f16"
 max_batch = 256
+max_batch_tokens = 16384
 max_body = 8388608
 max_queue_ms = 500
+max_pending = 4096
 io_threads = 2
 jev_aliases = true
 api_keys_file = "/run/secrets/kime-keys"

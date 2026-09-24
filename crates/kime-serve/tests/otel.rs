@@ -62,9 +62,14 @@ fn attr<'a>(span: &'a Value, key: &str) -> &'a Value {
     &a.iter().find(|a| a["key"] == key).unwrap_or_else(|| panic!("no {key} in {span}"))["value"]
 }
 
+/// A local copy in `$KIME_MODELS/laya`, or the Hugging Face cache.
+fn model() -> String {
+    std::env::var("KIME_MODELS").map_or_else(|_| "laya".into(), |d| format!("{d}/laya"))
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn spans() {
-    let kime = match Kime::builder().model("laya").device(Device::Cpu { threads: 0 }).build() {
+    let kime = match Kime::builder().model(model()).device(Device::Cpu { threads: 0 }).build() {
         Ok(k) => k,
         Err(e) => {
             assert!(std::env::var_os("KIME_REQUIRE_WEIGHTS").is_none(), "{e}");

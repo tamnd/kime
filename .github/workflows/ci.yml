@@ -137,6 +137,40 @@ jobs:
           KIME_REQUIRE_MODELS: "1"
         run: cargo test --release -p kime-tok -p kime-eval
 
+  # The server with the Laya checkpoint on a CPU: the HTTP and error suites, OpenTelemetry, the
+  # chaos tests and a small W9 load test (spec/15-testing.md). The checkpoint is 843 MB, so it is
+  # cached by its pinned revision.
+  server:
+    name: server with the checkpoint
+    needs: quick
+    runs-on: ubuntu-24.04
+    env:
+      LAYA_REVISION: 5e7b2b1b8ca2ecdd3f2322d94069c9b6ce7e844b
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: server
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: models/laya
+          key: laya-${{ env.LAYA_REVISION }}
+      - name: fetch the checkpoint
+        run: |
+          set -euo pipefail
+          for f in rl_agent_config.json encoder/config.json tokenizer/tokenizer.json tokenizer/tokenizer_config.json model.safetensors; do
+            if [ -s "models/laya/$f" ]; then continue; fi
+            mkdir -p "models/laya/$(dirname "$f")"
+            curl --fail --silent --show-error --location --retry 3 -o "models/laya/$f" "https://huggingface.co/convaiinnovations/laya/resolve/$LAYA_REVISION/$f"
+          done
+      - name: cargo test
+        env:
+          KIME_MODELS: ${{ github.workspace }}/models
+          KIME_REQUIRE_WEIGHTS: "1"
+        run: cargo test --release -p kime-serve -- --nocapture
+
   # The checkpoint parsers read untrusted files (SECURITY.md). A minute per target on every change
   # keeps the targets building and catches the easy crashes. The long runs happen on a workstation
   # before a parser change lands.
