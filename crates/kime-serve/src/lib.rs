@@ -18,9 +18,11 @@ mod auth;
 mod log;
 mod metrics;
 mod models;
+mod otel;
 
 pub use auth::Auth;
 pub use log::Log;
+pub use otel::Otlp;
 
 /// How the server runs.
 #[derive(Debug)]
@@ -46,6 +48,8 @@ pub struct Config {
     pub auth: Auth,
     /// The request log on stdout. Off unless set.
     pub log: Log,
+    /// Where OpenTelemetry spans go. Off unless set.
+    pub otlp: Option<Otlp>,
 }
 
 impl Config {
@@ -63,6 +67,7 @@ impl Config {
             max_queue: Duration::from_millis(500),
             auth: Auth::off(),
             log: Log::Off,
+            otlp: None,
         }
     }
 }
@@ -111,6 +116,7 @@ pub async fn serve(
         max_request_tokens: cfg.max_request_tokens,
         metrics: metrics::Metrics::default(),
         log: cfg.log,
+        tracer: cfg.otlp.map(otel::Tracer::spawn),
     });
     let listener = listener.tap_io(|tcp| {
         // Answers are small and latency is the product, so Nagle only gets in the way.

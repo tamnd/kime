@@ -20,10 +20,11 @@ const USAGE: &str =
 options: --device auto|cpu|cuda[:N]  --threads N  --precision f16|f32|int8
          --max-batch N  --max-body BYTES  --max-request-tokens N  --max-queue-ms MS (0 is off)
          --io-threads N  --no-jev-aliases  --api-keys-file PATH  --rpm N  --tps N  --log-level info
-         --log-requests  --log-format text|json
+         --log-requests  --log-format text|json  --otlp-endpoint http://HOST:4318  --otlp-service NAME
 Every option is also a kime.toml field (--max-batch is max_batch) and a KIME_ variable
 (KIME_MAX_BATCH). Flags win over KIME_ variables, which win over the file, which wins over
-laya-serve's LAYA_ variables. The first model answers requests that name no model. API keys
+laya-serve's LAYA_ variables. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_OTLP_ENDPOINT and
+OTEL_SERVICE_NAME are read when the KIME_ ones are not set. The first model answers requests that name no model. API keys
 also come from KIME_API_KEYS (comma separated) and from laya-serve's LAYA_API_KEY. With no
 keys anyone can call the API.";
 
@@ -50,6 +51,8 @@ struct Settings {
     log_level: Option<String>,
     log_requests: Option<bool>,
     log_format: Option<String>,
+    otlp_endpoint: Option<String>,
+    otlp_service: Option<String>,
 }
 
 impl Settings {
@@ -74,6 +77,8 @@ impl Settings {
             log_level: over.log_level.or(self.log_level),
             log_requests: over.log_requests.or(self.log_requests),
             log_format: over.log_format.or(self.log_format),
+            otlp_endpoint: over.otlp_endpoint.or(self.otlp_endpoint),
+            otlp_service: over.otlp_service.or(self.otlp_service),
         }
     }
 
@@ -134,6 +139,15 @@ impl Settings {
             log_level: var("KIME_LOG_LEVEL"),
             log_requests: bool("KIME_LOG_REQUESTS")?,
             log_format: var("KIME_LOG_FORMAT"),
+            // The OpenTelemetry names, when kime's own are not set. The general endpoint is a
+            // base that traces go under.
+            otlp_endpoint: var("KIME_OTLP_ENDPOINT")
+                .or_else(|| var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"))
+                .or_else(|| {
+                    var("OTEL_EXPORTER_OTLP_ENDPOINT")
+                        .map(|b| format!("{}/v1/traces", b.trim_end_matches('/')))
+                }),
+            otlp_service: var("KIME_OTLP_SERVICE").or_else(|| var("OTEL_SERVICE_NAME")),
         })
     }
 
@@ -208,6 +222,8 @@ impl Settings {
                 "--log-level" => s.log_level = Some(val()?),
                 "--log-requests" => s.log_requests = Some(true),
                 "--log-format" => s.log_format = Some(val()?),
+                "--otlp-endpoint" => s.otlp_endpoint = Some(val()?),
+                "--otlp-service" => s.otlp_service = Some(val()?),
                 "--no-jev-aliases" => s.jev_aliases = Some(false),
                 "--help" | "-h" => return Err(USAGE.into()),
                 other => return Err(format!("unknown option {other:?}\n{USAGE}")),
@@ -344,6 +360,16 @@ fn config(s: Settings) -> Result<kime_serve::Config, String> {
     }
     cfg.auth = auth;
     cfg.log = log;
+    if let Some(e) = &s.otlp_endpoint {
+        let mut o = kime_serve::Otlp::new(e)?;
+        if let Some(name) = s.otlp_service {
+            o.service = name;
+        }
+        if !quiet {
+            eprintln!("kime serve: sending a span per request to {e} as {}", o.service);
+        }
+        cfg.otlp = Some(o);
+    }
     Ok(cfg)
 }
 
@@ -439,6 +465,29 @@ mod tests {
         assert_eq!(s.log_level.as_deref(), Some("warning"));
         let bad = env(&[("LAYA_MODELS", "english,klingon")]);
         assert!(Settings::gather(&[], false, &bad).unwrap_err().contains("\"klingon\""));
+    }
+
+    #[test]
+    fn otlp_settings() {
+        let otel =
+            env(&[("OTEL_EXPORTER_OTLP_ENDPOINT", "http://c:4318/"), ("OTEL_SERVICE_NAME", "svc")]);
+        let s = Settings::gather(&[], false, &otel).unwrap();
+        assert_eq!(s.otlp_endpoint.as_deref(), Some("http://c:4318/v1/traces"));
+        assert_eq!(s.otlp_service.as_deref(), Some("svc"));
+        let get = env(&[
+            ("OTEL_EXPORTER_OTLP_ENDPOINT", "http://c:4318"),
+            ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://t:4318/traces"),
+        ]);
+        let s = Settings::gather(&[], false, &get).unwrap();
+        assert_eq!(s.otlp_endpoint.as_deref(), Some("http://t:4318/traces"));
+        let get = env(&[
+            ("OTEL_EXPORTER_OTLP_ENDPOINT", "http://c:4318"),
+            ("KIME_OTLP_ENDPOINT", "http://k:4318"),
+        ]);
+        let s = Settings::gather(&args(&["--otlp-service", "flag"]), false, &get).unwrap();
+        assert_eq!(s.otlp_endpoint.as_deref(), Some("http://k:4318"));
+        assert_eq!(s.otlp_service.as_deref(), Some("flag"));
+        assert!(Settings::gather(&[], false, &env(&[])).unwrap().otlp_endpoint.is_none());
     }
 
     #[test]
