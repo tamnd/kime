@@ -324,6 +324,14 @@ fn config(s: Settings) -> Result<kime_serve::Config, String> {
     }
     let mut cfg = kime_serve::Config::new(SocketAddr::new(ip, s.port.unwrap_or(8000)), models);
     cfg.jev_aliases = s.jev_aliases.unwrap_or(cfg.jev_aliases);
+    if cfg.jev_aliases && !quiet {
+        // The TypeSafe SDKs and jev-ultrafast all send jev-latest unless told otherwise, so this
+        // is on by default and said out loud.
+        eprintln!(
+            "kime serve: jev, jev-latest and other jev-* names are answered by {} (--no-jev-aliases turns this off)",
+            cfg.models[0].model_id()
+        );
+    }
     cfg.max_batch = s.max_batch.unwrap_or(cfg.max_batch);
     cfg.max_body = s.max_body.unwrap_or(cfg.max_body);
     if s.max_request_tokens == Some(0) {
