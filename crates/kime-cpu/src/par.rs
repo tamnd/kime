@@ -90,6 +90,23 @@ impl<'a> Shared<'a> {
 }
 
 impl Shared<'_> {
+    /// Elements `start..start + len` as a slice.
+    ///
+    /// # Safety
+    ///
+    /// No other thread may read or write those elements while the slice lives.
+    ///
+    /// # Panics
+    ///
+    /// If the range is out of bounds.
+    #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn slice_mut(&self, start: usize, len: usize) -> &mut [f32] {
+        assert!(start + len <= self.len);
+        // SAFETY: in bounds by the assert, and the caller guarantees no other thread touches it.
+        unsafe { std::slice::from_raw_parts_mut(self.ptr.add(start), len) }
+    }
+
     /// Reads element `i`.
     ///
     /// # Safety

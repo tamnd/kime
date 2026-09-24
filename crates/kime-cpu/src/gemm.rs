@@ -9,6 +9,13 @@
 //! only decide which outputs run side by side, so the result is the same bit for bit for any
 //! thread count and any split, and the same on x86 with FMA as on ARM.
 //!
+//! On macOS the GEMM goes to Accelerate instead, whose `sgemm` runs on the AMX units at two to
+//! four times what the NEON kernel reaches. Its sums are in an order of its own that changes with
+//! the number of rows in the call, so it is always called on blocks of exactly 64 rows, the last
+//! one padded with zeros. With the row count fixed, a row's result does not depend on the rows
+//! around it or on its place in the block, so the bits still do not depend on the batch or the
+//! split. They are not the same bits as on other machines, which the parity tests allow for.
+//!
 //! [`dot`], which attention uses for its scores, sums in eight lanes instead and is not meant to
 //! match the GEMM bit for bit.
 
@@ -25,8 +32,10 @@ const MR: usize = 6;
 /// Rows of `w` per panel, two vectors.
 pub const NR: usize = 16;
 /// Rows of `w` per task, a multiple of NR sized so a task's panels stay in L2.
+#[cfg(not(target_os = "macos"))]
 const NB: usize = 4 * NR;
 /// Rows of `x` per task, a multiple of MR.
+#[cfg(not(target_os = "macos"))]
 const MB: usize = 24 * MR;
 
 /// `dot(a, b)` in the order described in the module docs.
@@ -212,8 +221,8 @@ fn dot_v<V: V8>(a: &[f32], b: &[f32]) -> f32 {
     s as f32
 }
 
-/// Packs `w`, `[n, k]` row major, into the panels [`Gemm`] reads: `[n.div_ceil(16)][k][16]`,
-/// with the rows past `n` zero.
+/// Lays out `w`, `[n, k]` row major, the way [`Gemm`] reads it: panels of 16 rows, or as it is
+/// on macOS, where Accelerate reads it.
 ///
 /// # Panics
 ///
@@ -221,6 +230,23 @@ fn dot_v<V: V8>(a: &[f32], b: &[f32]) -> f32 {
 #[must_use]
 pub fn pack(w: &[f32], n: usize, k: usize) -> Vec<f32> {
     assert_eq!(w.len(), n * k, "w is not [n, k]");
+    if cfg!(target_os = "macos") { w.to_vec() } else { pack_panels(w, n, k) }
+}
+
+/// Values in `w` as [`pack`] lays it out.
+fn packed_len(n: usize, k: usize) -> usize {
+    if cfg!(target_os = "macos") { n * k } else { n.div_ceil(NR) * NR * k }
+}
+
+/// Floats of scratch each task of a GEMM with these sizes needs.
+#[must_use]
+pub fn scratch_len(k: usize, n: usize) -> usize {
+    if cfg!(target_os = "macos") { blas::ROWS * (k + 3 * n.min(blas::COLS)) + 1 } else { 0 }
+}
+
+/// `w` in panels: `[n.div_ceil(16)][k][16]`, with the rows past `n` zero.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+fn pack_panels(w: &[f32], n: usize, k: usize) -> Vec<f32> {
     let panels = n.div_ceil(NR);
     let mut out = vec![0f32; panels * k * NR];
     if k == 0 {
@@ -243,6 +269,7 @@ pub fn pack(w: &[f32], n: usize, k: usize) -> Vec<f32> {
 ///
 /// Rows `i..i + R` must be in `x`, which is `[_, k]`, and `panel` must hold `k * NR` values.
 #[inline(always)]
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 unsafe fn kernel<V: V8, const R: usize>(
     x: &[f32],
     k: usize,
@@ -284,6 +311,7 @@ unsafe fn kernel<V: V8, const R: usize>(
     wide.map(|row| row.map(|v| v as f32))
 }
 
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 struct Args<'a> {
     x: &'a [f32],
     w: &'a [f32],
@@ -294,6 +322,7 @@ struct Args<'a> {
     y: &'a Shared<'a>,
 }
 
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 impl Args<'_> {
     #[inline(always)]
     fn run<V: V8, const R: usize>(&self, i: usize, p: usize) {
@@ -326,6 +355,36 @@ impl Args<'_> {
         };
         // SAFETY: as above.
         unsafe { self.y.set(at, v) };
+    }
+
+    /// Finishes columns `j0..` of row `i` of `y` from their sums, as [`put`](Self::put) does for one element, with
+    /// the choices made once for the row.
+    #[cfg(target_os = "macos")]
+    fn put_row(&self, i: usize, j0: usize, sums: &[f32]) {
+        // SAFETY: each stretch of a row belongs to exactly one task.
+        let y = unsafe { self.y.slice_mut(i * self.n + j0, sums.len()) };
+        let biased = |j: usize, v: f32| match self.b {
+            Some(b) => v + b[j0 + j],
+            None => v,
+        };
+        match (self.b, self.ep) {
+            (None, Epilogue::None) => y.copy_from_slice(sums),
+            (_, Epilogue::None) => {
+                y.iter_mut().zip(sums).enumerate().for_each(|(j, (y, &v))| *y = biased(j, v))
+            }
+            (_, Epilogue::Gelu) => {
+                y.iter_mut().zip(sums).enumerate().for_each(|(j, (y, &v))| *y = gelu(biased(j, v)))
+            }
+            (_, Epilogue::Relu) => y
+                .iter_mut()
+                .zip(sums)
+                .enumerate()
+                .for_each(|(j, (y, &v))| *y = biased(j, v).max(0.0)),
+            (Some(b), Epilogue::Accumulate) => {
+                y.iter_mut().zip(sums).zip(&b[j0..]).for_each(|((y, &v), &b)| *y += v + b)
+            }
+            (None, Epilogue::Accumulate) => y.iter_mut().zip(sums).for_each(|(y, &v)| *y += v),
+        }
     }
 
     /// Rows `rows` against the panels `panels`.
@@ -388,7 +447,8 @@ pub fn linear(
 ) {
     let w = pack(w, n, k);
     let g = Gemm { x, m, k, w: &w, n, b, ep: Epilogue::None };
-    g.run(y, threads, |tasks, f| par::for_each(tasks, threads, f));
+    let len = scratch_len(k, n);
+    g.run(y, threads, |tasks, f| par::for_each(tasks, threads, |t| f(t, &mut vec![0.0; len])));
 }
 
 /// One GEMM with its epilogue, `y = ep(x wᵀ + b)`, split into tiles that any thread may run.
@@ -414,6 +474,7 @@ pub struct Gemm<'a> {
 
 impl Gemm<'_> {
     /// Rows per task: the largest block that still gives every thread a few tasks.
+    #[cfg(not(target_os = "macos"))]
     fn row_block(&self, threads: usize) -> usize {
         let nt = self.n.div_ceil(NB);
         [MB, 12 * MR, 6 * MR, 3 * MR]
@@ -423,6 +484,7 @@ impl Gemm<'_> {
     }
 
     /// Runs the GEMM into `y`, handing `spawn` a task count and the task body to run for each.
+    /// A task gets [`scratch_len`] floats of scratch of its own.
     ///
     /// # Panics
     ///
@@ -431,11 +493,11 @@ impl Gemm<'_> {
         &self,
         y: &mut [f32],
         threads: usize,
-        spawn: impl FnOnce(usize, &(dyn Fn(usize) + Sync)),
+        spawn: impl FnOnce(usize, &(dyn Fn(usize, &mut [f32]) + Sync)),
     ) {
         let Self { x, m, k, w, n, b, ep } = *self;
         assert_eq!(x.len(), m * k, "x is not [m, k]");
-        assert_eq!(w.len(), n.div_ceil(NR) * NR * k, "w is not [n, k] packed");
+        assert_eq!(w.len(), packed_len(n, k), "w is not [n, k] packed");
         assert_eq!(y.len(), m * n, "y is not [m, n]");
         if let Some(b) = b {
             assert_eq!(b.len(), n, "b is not [n]");
@@ -453,14 +515,137 @@ impl Gemm<'_> {
             }
             return;
         }
+        #[cfg(target_os = "macos")]
+        {
+            blas::run(&args, m, threads, spawn);
+        }
+        #[cfg(not(target_os = "macos"))]
+        self.run_panels(&args, threads, spawn);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn run_panels(
+        &self,
+        args: &Args<'_>,
+        threads: usize,
+        spawn: impl FnOnce(usize, &(dyn Fn(usize, &mut [f32]) + Sync)),
+    ) {
+        let (m, n) = (self.m, self.n);
         let mb = self.row_block(threads);
         let mt = m.div_ceil(mb);
         let (panels, per) = (n.div_ceil(NR), NB / NR);
         let nt = panels.div_ceil(per);
-        spawn(mt * nt, &|t| {
+        spawn(mt * nt, &|t, _| {
             let (bi, bj) = (t % mt, t / mt);
             let rows = (bi * mb, ((bi + 1) * mb).min(m));
             args.block_dispatch(rows, (bj * per, ((bj + 1) * per).min(panels)));
+        });
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod blas {
+    use super::Args;
+
+    /// Rows per call. The bits of a row depend on the row count of the call, so it never changes.
+    pub(super) const ROWS: usize = 64;
+    /// Elements of `k` per call. Accelerate sums in f32, so the calls cover `k` in blocks of this
+    /// and their results are added in f64, which keeps long rows as accurate as the NEON kernel.
+    const KB: usize = 128;
+    /// Columns per task are a multiple of this when the columns are split.
+    pub(super) const COLS: usize = 256;
+
+    #[link(name = "Accelerate", kind = "framework")]
+    unsafe extern "C" {
+        fn cblas_sgemm(
+            order: i32,
+            trans_a: i32,
+            trans_b: i32,
+            m: i32,
+            n: i32,
+            k: i32,
+            alpha: f32,
+            a: *const f32,
+            lda: i32,
+            b: *const f32,
+            ldb: i32,
+            beta: f32,
+            c: *mut f32,
+            ldc: i32,
+        );
+    }
+
+    /// `len` f64 values inside `buf`, which holds at least `2 len + 1` f32 values.
+    fn f64s(buf: &mut [f32], len: usize) -> &mut [f64] {
+        // SAFETY: any bit pattern is an f64, and align_to_mut only hands out aligned values.
+        let (_, mid, _) = unsafe { buf.align_to_mut::<f64>() };
+        &mut mid[..len]
+    }
+
+    const ROW_MAJOR: i32 = 101;
+    const NO_TRANS: i32 = 111;
+    const TRANS: i32 = 112;
+
+    /// One task per block of 64 rows of `x`, each a few `sgemm` calls into the task's scratch,
+    /// then the bias and the epilogue on the way to `y`.
+    ///
+    /// The columns are split in chunks of 256 whatever the number of rows, since Accelerate picks
+    /// its kernels by the width of the call and a width that followed the batch would change bits.
+    pub(super) fn run(
+        args: &Args<'_>,
+        m: usize,
+        threads: usize,
+        spawn: impl FnOnce(usize, &(dyn Fn(usize, &mut [f32]) + Sync)),
+    ) {
+        let (k, n) = (args.k, args.n);
+        let dim = |v: usize| i32::try_from(v).expect("GEMM sizes fit in an i32");
+        let _ = threads;
+        let (mt, cols) = (m.div_ceil(ROWS), COLS.min(n));
+        spawn(mt * n.div_ceil(cols), &|t, scratch| {
+            let (bi, bj) = (t % mt, t / mt);
+            let (r0, rows) = (bi * ROWS, ROWS.min(m - bi * ROWS));
+            let (j0, nc) = (bj * cols, cols.min(n - bj * cols));
+            let (xs, rest) = scratch[..ROWS * (k + 3 * cols) + 1].split_at_mut(ROWS * k);
+            let (c, wide) = rest.split_at_mut(ROWS * cols);
+            let (c, wide) = (&mut c[..ROWS * nc], &mut f64s(wide, ROWS * cols)[..ROWS * nc]);
+            wide.fill(0.0);
+            let x = if rows == ROWS {
+                &args.x[r0 * k..(r0 + ROWS) * k]
+            } else {
+                xs[..rows * k].copy_from_slice(&args.x[r0 * k..(r0 + rows) * k]);
+                xs[rows * k..].fill(0.0);
+                &xs[..]
+            };
+            let mut p = 0;
+            while p < k {
+                let kc = KB.min(k - p);
+                // SAFETY: x is ROWS by k and w is n by k, read from column p for kc columns, and
+                // c is ROWS by n, all row major and dense.
+                unsafe {
+                    cblas_sgemm(
+                        ROW_MAJOR,
+                        NO_TRANS,
+                        TRANS,
+                        dim(ROWS),
+                        dim(nc),
+                        dim(kc),
+                        1.0,
+                        x.as_ptr().add(p),
+                        dim(k),
+                        args.w.as_ptr().add(j0 * k + p),
+                        dim(k),
+                        0.0,
+                        c.as_mut_ptr(),
+                        dim(nc),
+                    );
+                }
+                wide.iter_mut().zip(c.iter()).for_each(|(w, &v)| *w += f64::from(v));
+                p += kc;
+            }
+            c.iter_mut().zip(wide.iter()).for_each(|(c, &w)| *c = w as f32);
+            for r in 0..rows {
+                args.put_row(r0 + r, j0, &c[r * nc..(r + 1) * nc]);
+            }
         });
     }
 }
@@ -505,27 +690,55 @@ mod tests {
                 for threads in [1, 3] {
                     let mut y = vec![f32::NAN; m * n];
                     linear(&x, m, k, &w, n, bias, &mut y, threads);
-                    close(&y, &want, 1e-5, &format!("{m}x{k}x{n}"));
+                    // Accelerate sums in f32 alone, so it drifts a little further on long rows.
+                    let tol = if cfg!(target_os = "macos") { 2e-5 } else { 1e-5 };
+                    close(&y, &want, tol, &format!("{m}x{k}x{n}"));
                 }
             }
         }
     }
 
     #[test]
+    fn epilogues_on_every_column() {
+        let mut rng = Rng(5);
+        let (m, k, n) = (70, 40, 600);
+        let (x, w, b, y0) = (rng.vec(m * k), rng.vec(n * k), rng.vec(n), rng.vec(m * n));
+        let packed = pack(&w, n, k);
+        let lin = naive(&x, m, k, &w, n, Some(&b));
+        for ep in [Epilogue::None, Epilogue::Gelu, Epilogue::Relu, Epilogue::Accumulate] {
+            let want: Vec<f32> = lin
+                .iter()
+                .zip(&y0)
+                .map(|(&v, &y)| match ep {
+                    Epilogue::None => v,
+                    Epilogue::Gelu => gelu(v),
+                    Epilogue::Relu => v.max(0.0),
+                    Epilogue::Accumulate => y + v,
+                })
+                .collect();
+            let mut y = y0.clone();
+            let g = Gemm { x: &x, m, k, w: &packed, n, b: Some(&b), ep };
+            let len = scratch_len(k, n);
+            g.run(&mut y, 4, |tasks, f| par::for_each(tasks, 4, |t| f(t, &mut vec![0.0; len])));
+            close(&y, &want, 1e-4, &format!("{ep:?}"));
+        }
+    }
+
+    #[test]
     fn same_bits_for_any_split() {
         let mut rng = Rng(11);
-        let (m, k, n) = (37, 200, 101);
+        let (m, k, n) = (137, 300, 600);
         let x = rng.vec(m * k);
         let w = rng.vec(n * k);
         let mut one = vec![0f32; m * n];
         linear(&x, m, k, &w, n, None, &mut one, 1);
-        for threads in [2, 5, 16] {
+        for threads in [2, 5, 10, 16] {
             let mut y = vec![0f32; m * n];
             linear(&x, m, k, &w, n, None, &mut y, threads);
             assert!(y.iter().zip(&one).all(|(a, b)| a.to_bits() == b.to_bits()));
         }
         // And the same bits for a row wherever it sits in the batch.
-        for i in [0, 5, 36] {
+        for i in [0, 5, 70, 136] {
             let mut row = vec![0f32; n];
             linear(&x[i * k..(i + 1) * k], 1, k, &w, n, None, &mut row, 1);
             assert!(row.iter().zip(&one[i * n..]).all(|(a, b)| a.to_bits() == b.to_bits()));

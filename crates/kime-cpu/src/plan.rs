@@ -278,6 +278,7 @@ impl Backend for CpuBackend {
             }
         };
         let mut ropes: Vec<(u64, Rope)> = Vec::new();
+        let mut scratch = bucket.tokens;
         let mut steps = Vec::with_capacity(graph.ops.len());
         for (i, op) in graph.ops.iter().enumerate() {
             let step = match *op {
@@ -310,6 +311,7 @@ impl Backend for CpuBackend {
                     if w.0[gw].packed.is_empty() && a.width * out.width > 0 {
                         return bad(format!("op {i}: gemm weight {gw} was not packed"));
                     }
+                    scratch = scratch.max(gemm::scratch_len(a.width, out.width));
                     Step::Gemm { a, w: gw, b, ep: epilogue, out }
                 }
                 Op::Rope { qkv, theta } => {
@@ -399,7 +401,7 @@ impl Backend for CpuBackend {
             row_seq: Vec::with_capacity(bucket.tokens),
             blocks: Vec::with_capacity(bucket.tokens.div_ceil(QB) + bucket.seqs),
             scratch: PerWorker(
-                (0..threads).map(|_| UnsafeCell::new(Vec::with_capacity(bucket.tokens))).collect(),
+                (0..threads).map(|_| UnsafeCell::new(Vec::with_capacity(scratch))).collect(),
             ),
             profile: None,
         })
@@ -550,7 +552,16 @@ impl Ctx<'_> {
                     b: b.map(|b| self.w(b)),
                     ep,
                 };
-                g.run(y, self.pool.threads(), |n, f| self.pool.run(n, &|i, _| f(i)));
+                let scratch = self.scratch;
+                g.run(y, self.pool.threads(), |n, f| {
+                    self.pool.run(n, &|i, worker| {
+                        // SAFETY: the scratch is this worker's, and lowering reserved enough of it
+                        // for every GEMM in the plan, so this does not allocate.
+                        let s = unsafe { scratch.get(worker) };
+                        s.resize(gemm::scratch_len(g.k, g.n), 0.0);
+                        f(i, s);
+                    });
+                });
             }
             Step::Rope { qkv, rope } => {
                 let (rope, d, cu, seq) = (&self.ropes[rope], qkv.width / 3, self.cu, self.row_seq);
