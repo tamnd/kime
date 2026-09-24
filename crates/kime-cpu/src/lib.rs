@@ -10,8 +10,9 @@ pub mod ops;
 pub mod par;
 pub mod plan;
 pub mod pool;
+pub mod qgemm;
 #[cfg(test)]
 mod testing;
 
-pub use compat::{Compat, Input, Output, executor, executor_from};
+pub use compat::{Compat, Input, Output, executor, executor_from, executor_with};
 pub use plan::{CpuBackend, CpuPlan};

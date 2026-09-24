@@ -1,13 +1,13 @@
 //! Times the compat graph on the plan executor on the parity questions.
 //!
-//!     cargo run --release -p kime-cpu --example plan_bench -- <laya dir> <fixture.jsonl> [threads] [batch]
+//!     cargo run --release -p kime-cpu --example plan_bench -- <laya dir> <fixture.jsonl> [threads] [batch] [f32|int8]
 //!
 //! It prints the load time, the latency of one question at a time (p50 and p99), the throughput
 //! when `batch` questions run together, and where the time goes by kind of step.
 
 use std::time::Instant;
 
-use kime_cpu::{executor, par};
+use kime_cpu::{CpuBackend, executor_with, par};
 use kime_model::Model;
 use kime_tensor::{BatchBuf, Outputs};
 use serde_json::Value;
@@ -18,6 +18,7 @@ fn main() {
     let fixture = &args[2];
     let threads = args.get(3).map_or_else(par::available, |t| t.parse().unwrap());
     let batch: usize = args.get(4).map_or(16, |b| b.parse().unwrap());
+    let int8 = args.get(5).is_some_and(|p| p == "int8");
 
     let mut qs: Vec<(Vec<u32>, Vec<u32>, u8)> = Vec::new();
     for line in std::fs::read_to_string(fixture).unwrap().lines() {
@@ -33,8 +34,12 @@ fn main() {
 
     let t = Instant::now();
     let model = Model::open(dir).unwrap();
-    let mut exec = executor(&model, threads).unwrap();
-    println!("load and convert: {:.0} ms, {threads} threads", t.elapsed().as_secs_f64() * 1e3);
+    let mut exec = executor_with(&model, CpuBackend::new(threads).with_int8(int8)).unwrap();
+    println!(
+        "load and convert: {:.0} ms, {threads} threads, {}",
+        t.elapsed().as_secs_f64() * 1e3,
+        if int8 { "INT8" } else { "FP32" }
+    );
 
     let (mut buf, mut out) = (BatchBuf::default(), Outputs::default());
     let mut run = |exec: &mut kime_tensor::Executor<_>, qs: &[(Vec<u32>, Vec<u32>, u8)]| {

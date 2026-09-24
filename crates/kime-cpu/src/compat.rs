@@ -23,7 +23,19 @@ use crate::plan::CpuBackend;
 ///
 /// When the graph does not lower, which for a checkpoint that loaded means a bug.
 pub fn executor(model: &Model, threads: usize) -> kime_tensor::Result<Executor<CpuBackend>> {
-    executor_from(&model.spec, &model.graph, &model.tensors, threads)
+    executor_with(model, CpuBackend::new(threads))
+}
+
+/// [`executor`] on a backend the caller set up, such as one [`with_int8`](CpuBackend::with_int8).
+///
+/// # Errors
+///
+/// As [`executor`].
+pub fn executor_with(
+    model: &Model,
+    backend: CpuBackend,
+) -> kime_tensor::Result<Executor<CpuBackend>> {
+    build(&model.spec, &model.graph, &model.tensors, backend)
 }
 
 /// [`executor`] from the pieces of a model.
@@ -37,6 +49,15 @@ pub fn executor_from(
     tensors: &Tensors,
     threads: usize,
 ) -> kime_tensor::Result<Executor<CpuBackend>> {
+    build(spec, graph, tensors, CpuBackend::new(threads))
+}
+
+fn build(
+    spec: &LayaSpec,
+    graph: &LayaGraph,
+    tensors: &Tensors,
+    backend: CpuBackend,
+) -> kime_tensor::Result<Executor<CpuBackend>> {
     let host: Vec<HostTensor<'_>> = (0..tensors.entries().len())
         .map(|i| {
             let v = tensors.view(i);
@@ -44,7 +65,7 @@ pub fn executor_from(
         })
         .collect();
     let (plan, vocab) = (graph.plan(spec), spec.encoder.vocab);
-    Executor::new(CpuBackend::new(threads), &host, plan, &Buckets::default(), "compat", vocab, 3)
+    Executor::new(backend, &host, plan, &Buckets::default(), "compat", vocab, 3)
 }
 
 /// One question, laid out as Laya lays it out.
