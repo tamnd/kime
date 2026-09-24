@@ -19,6 +19,8 @@ mod compat;
 #[cfg(target_os = "macos")]
 mod device;
 #[cfg(target_os = "macos")]
+pub mod energy;
+#[cfg(target_os = "macos")]
 mod plan;
 
 #[cfg(target_os = "macos")]

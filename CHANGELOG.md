@@ -4,6 +4,7 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime_metal::energy::Meter` reads the machine's total power from the SMC's `PSTR` key, which needs no root, samples it every 5 ms around a run and adds it up, and the `metal_bench` example prints the energy per decision next to the idle draw. The key covers the whole machine, so the idle draw has to come from the same session.
 ## 0.0.11
 
 - `kime_cuda::energy::Meter` reads NVML's total energy counter, loaded at run time like the driver, and the `cuda_bench` example prints the energy per decision next to the board's idle draw. `tools/ref/laya_gpu.py` times Laya's own forward on the GPU and reads the same counter. On an RTX 4090 with the English model, all 625 parity questions and one session, kime FP16 takes 0.73 J per decision one at a time (1.69 ms p50) against 2.41 J for Laya 0.3.9 with bf16 autocast (16.4 ms p50), and 0.57 J against 0.85 J in batches of 16. kime FP32 takes 2.02 J and 1.57 J, and Laya FP32 3.22 J and 2.28 J.
