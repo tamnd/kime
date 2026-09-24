@@ -4,6 +4,8 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `python/` is the start of the `kime` Python package (#28): the engine in process through pyo3, one abi3 wheel for CPython 3.10 and newer, no PyTorch. `kime.load` and `kime.Agent` take Laya's arguments and give Laya's answers from `system_one`, `predict` and `predict_batch`, and the presets, `clean_email_body`, `email_state` and `agent_step` come from `kime-core`. On the 200 parity cases, 195 answers are the same as Laya's `Agent.system_one` byte for byte and the other 5 differ by one step in the fourth decimal, with all 625 choices the same. Forward passes run with the GIL released. `tools/python/bench.py` times both packages in process on the same cases. On the Mac (M-series, 10 cores, load average 11 to 14 from other builds, two interleaved rounds) kime on the CPU answered one request at a time in 352 to 368 ms at p50 in FP32 and 314 to 334 ms in INT8, against 358 to 500 ms for Laya 0.3.9 on the CPU and 137 to 143 ms for Laya on the Apple GPU through MPS. With `predict_batch` kime did 6.3 to 7.4 states a second in FP32 and 8.3 to 8.8 in INT8, against 1.8 to 2.0 for Laya on the CPU and 3.9 to 4.8 on MPS. Hooks, `lang_temperatures`, `max_len` and `head_max_len` raise `NotImplementedError` for now.
+
 ## 0.0.15
 
 - `kime serve` says at start which model answers `jev`, `jev-latest` and the other `jev-*` names, and that `--no-jev-aliases` turns them off. The aliases stay on by default, since `typesafe-sdk` 0.7.1, `@typesafe-ai/sdk` 0.6.0 and jev-ultrafast all send `jev-latest` unless told otherwise.
