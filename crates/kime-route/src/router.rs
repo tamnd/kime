@@ -5,7 +5,7 @@
 use serde_json::Value;
 
 use crate::lang::{Analysis, MAX_CHARS, analyse_text, state_text};
-use crate::lid::{MIN_WORDS, OVERRULE, model, words};
+use crate::lid::{MIN_WORDS, OVERRULE, model, strip_accents, words};
 
 /// Which checkpoint a request goes to, and why, in the words of Laya's `RouteDecision`.
 #[derive(Debug, Clone, PartialEq)]
@@ -125,6 +125,16 @@ pub fn detect(state: &Value, default_english: bool) -> Decision {
                     "Latin script, the language identifier puts English at {pct:.0}%, over {over}"
                 ),
             )
+        } else if det.language.is_none()
+            && let q = m.p_english(&strip_accents(&text))
+            && q >= OVERRULE
+        {
+            let reason = format!(
+                "Latin script, the language identifier puts English at {:.0}% with the accents taken off, over {:.0}% non-English letters",
+                100.0 * q,
+                100.0 * det.diacritic_rate
+            );
+            (Some(true), reason)
         } else {
             laya_latin(&det, default)
         }
@@ -220,6 +230,9 @@ mod tests {
         );
         assert_eq!(d.english, Some(true));
         assert!(d.reason.ends_with("over the word lists' guess of 'pt'"), "{}", d.reason);
+        let d = detect(&json!("The café on the corner serves a great crème brûlée"), true);
+        assert_eq!(d.english, Some(true));
+        assert!(d.reason.contains("with the accents taken off, over 8%"), "{}", d.reason);
         let d = detect(&json!("I was charged twice for my subscription"), true);
         assert_eq!((d.english, d.reason.as_str()), (Some(true), "English Latin text"));
     }
