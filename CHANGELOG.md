@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.0.18
 
 - `/metrics` has `kime_device_memory_bytes{model,kind}` (#25), the bytes a model holds on its device: `weights`, and `plans` for the arenas of the buckets it has used. `Kime::memory` gives the same numbers, kept after every forward pass so `/metrics` never waits on the device, and `Backend` has `weight_bytes` and `plan_bytes` for it, done for the CPU and CUDA backends. On the Mac with both checkpoints loaded on CPU, the metric said 1,685 MB of weights for `laya`, 1,288 MB for `laya-multilingual` and 888 MB of plans for `laya` after a batch of 300 AG News and LeetCode states, 3,861 MB in all, and `footprint` put the process at 3,833 MB.
 
