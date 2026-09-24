@@ -38,6 +38,10 @@ Running the same cases with `--device cuda` on an RTX 4090 uses Laya's bf16 auto
 
 So Laya on a GPU does not agree with Laya on a CPU for 5 of 1,250 questions. The tolerance in `spec/15-testing.md` for kime's FP16 backends is a probability error of 6e-3 with 100% argmax agreement, which is more than ten times tighter than that.
 
+## Laya's speed and energy on a GPU
+
+`laya_gpu.py <model dir> <fixture> [batch] [on|off]` runs every question of a parity fixture through Laya's own model on the first NVIDIA GPU, once one at a time and once in batches, the way `Agent.system_one` does, and prints the latency, the throughput and the energy per decision from NVML's total energy counter. `cargo run --release -p kime-cuda --example cuda_bench -- <dir>/laya <fixture> f16 16` prints the same numbers for kime, so the two can run back to back on one machine. The idle line is the board's draw in the five seconds after the timed runs, with the clocks still up, which is higher than a board that has been idle for a while (about 20 W on the 4090 against 56 to 64 W right after a run).
+
 ## Tokenizer corpus
 
 `tok_corpus.py` writes the MASSIVE train utterances in all 51 languages plus 200,000 fuzz strings to a JSON lines file, with the ids Hugging Face tokenizers gives for each line under both Laya tokenizers, and prints how fast Hugging Face was on one thread. The parquet files are cached in `--cache`, and a cache that already has all 51 is used without touching the network. `cargo run --release -p kime-tok --example corpus -- <models>/laya tok-corpus.jsonl` then checks kime against every line and times it the same way.

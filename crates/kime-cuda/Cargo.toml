@@ -16,6 +16,7 @@ readme.workspace = true
 cudarc.workspace = true
 kime-model.workspace = true
 kime-tensor.workspace = true
+libloading.workspace = true
 
 [dev-dependencies]
 kime-cpu.workspace = true
