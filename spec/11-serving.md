@@ -30,7 +30,7 @@ Batch forming:
 
 - **No fixed wait window when idle.** If the device is idle, a single request runs at once, alone. Batching only happens while the device is busy: items that arrive during a run are batched for the next run. This gives the best single request latency and near maximum throughput under load, with no tuning. TEI uses the same continuous batching idea.
 - **Token budget, not request count.** A request's state never has to wait for a whole batch of long states. Long states over the budget run alone in their own bucket.
-- **Deadline ordering.** Items with `deadline_ms` are ordered earliest deadline first within a queue. Items that cannot make their deadline given the current queue estimate are rejected at enqueue with 504. The estimate is an EWMA of run time per bucket.
+- **Deadline ordering.** Items with `deadline_ms` are ordered earliest deadline first within a queue. Items that cannot make their deadline given the current queue estimate are rejected at enqueue with 504. The estimate is an EWMA of run time per bucket. Nothing runs while every item is refused, so an estimate that a burst left high would never come down. Once the device has sat idle for longer than the estimate, one item goes through whatever its deadline and refreshes it.
 - **No head of line blocking by length.** TEI issue #723 (one input longer than the budget hangs the queue) cannot happen, because a state longer than `max_batch_tokens` is split into its own batch at the smallest bucket that fits, up to the model's max.
 - **Laya compat model.** It has one stage, and its rows are whole sequences.
 

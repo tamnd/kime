@@ -8,6 +8,9 @@
 //! with a 400, 404 or 405, the body must be the same. Laya's 422 messages come from Python
 //! exceptions, so only their shape is compared.
 //!
+//! The cases run in order. `jev-deadline` comes right after a forward pass, so the wait estimate
+//! is fresh and a 1 ms deadline is refused.
+//!
 //! `KIME_BLESS=1` rewrites the `kime` snapshots. Like `tests/http.rs` it needs the checkpoint in
 //! `$KIME_MODELS/laya` or the Hugging Face cache, and passes with a note when it is missing unless
 //! `KIME_REQUIRE_WEIGHTS` is set.

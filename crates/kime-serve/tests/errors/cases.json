@@ -717,5 +717,73 @@
         ]
       }
     }
+  },
+  {
+    "name": "jev-deadline-met",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {\"deadline_ms\": 600000}}",
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya",
+        "answers": {
+          "q": {
+            "type": "choice",
+            "choice": "a",
+            "confidence": 0.56,
+            "probabilities": {
+              "a": 0.78,
+              "b": 0.22
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 18,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "jev-deadline",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {\"deadline_ms\": 1}}",
+    "kime": {
+      "status": 504,
+      "body": {
+        "detail": {
+          "error_type": "deadline_exceeded",
+          "message": "the answer cannot be ready within deadline_ms 1, the queue and the forward pass would take longer"
+        }
+      }
+    }
+  },
+  {
+    "name": "jev-bad-deadline",
+    "jev": true,
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"Which?\", \"criteria\": {\"a\": \"a\", \"b\": \"b\"}}}, \"kime\": {\"deadline_ms\": 0}}",
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body",
+              "kime",
+              "deadline_ms"
+            ],
+            "msg": "deadline_ms must be a whole number of milliseconds, 1 or more",
+            "type": "int_range",
+            "input": 0
+          }
+        ]
+      }
+    }
   }
 ]

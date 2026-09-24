@@ -24,7 +24,7 @@ use kime_core::request::{Limits, Loc, Problem, parse};
 use kime_engine::Error;
 use serde_json::{Map, Value, json};
 
-use crate::models::{Done, Models, Named, Resolved};
+use crate::models::{Done, Models, Named, Refused, Resolved};
 
 /// Everything the handlers share.
 #[derive(Debug)]
@@ -182,6 +182,27 @@ fn overloaded(wait: Duration) -> HttpResponse {
     r
 }
 
+/// Jev's 504, for a `deadline_ms` the queue and the forward pass would miss. The estimate goes in
+/// `server-timing` so the body stays the same from one request to the next.
+fn late(deadline: Duration, ready: Duration) -> HttpResponse {
+    let mut r = reply(
+        StatusCode::GATEWAY_TIMEOUT,
+        &json!({"detail": {"error_type": "deadline_exceeded", "message": format!("the answer cannot be ready within deadline_ms {}, the queue and the forward pass would take longer", deadline.as_millis())}}),
+    );
+    if let Ok(v) = HeaderValue::from_str(&format!("estimate;dur={:.1}", ready.as_secs_f64() * 1e3))
+    {
+        r.headers_mut().insert(HeaderName::from_static("server-timing"), v);
+    }
+    r
+}
+
+fn refused(r: Refused, deadline: Option<Duration>) -> HttpResponse {
+    match r {
+        Refused::Overloaded(wait) => overloaded(wait),
+        Refused::Deadline(ready) => late(deadline.unwrap_or_default(), ready),
+    }
+}
+
 /// Reads and parses a JSON object body, or the 400 laya-serve and Jev both give.
 async fn object(body: Body, max: usize) -> Result<Map<String, Value>, HttpResponse> {
     let bytes = axum::body::to_bytes(body, max).await.map_err(|_| {
@@ -214,10 +235,11 @@ struct Opts {
     precision: Option<u32>,
     entropy: bool,
     extensions: bool,
+    deadline: Option<Duration>,
 }
 
 fn opts(kime: Option<&Value>) -> Result<Opts, Vec<Problem>> {
-    let mut o = Opts { precision: Some(2), entropy: false, extensions: false };
+    let mut o = Opts { precision: Some(2), entropy: false, extensions: false, deadline: None };
     let Some(k) = kime else { return Ok(o) };
     let problem = |field: &str, kind, msg: &str, input: &Value| Problem {
         loc: vec!["body".into(), "kime".into(), Loc::from(field)],
@@ -263,6 +285,18 @@ fn opts(kime: Option<&Value>) -> Result<Opts, Vec<Problem>> {
         Some(v) => {
             bad.push(problem("extensions", "bool_type", "extensions must be true or false", v))
         }
+    }
+    match k.get("deadline_ms") {
+        None | Some(Value::Null) => {}
+        Some(v) => match v.as_u64().filter(|&ms| ms >= 1) {
+            Some(ms) => o.deadline = Some(Duration::from_millis(ms)),
+            None => bad.push(problem(
+                "deadline_ms",
+                "int_range",
+                "deadline_ms must be a whole number of milliseconds, 1 or more",
+                v,
+            )),
+        },
     }
     if bad.is_empty() { Ok(o) } else { Err(bad) }
 }
@@ -377,9 +411,9 @@ async fn systemone(
         Ok(o) => o,
         Err(p) => return invalid(&p),
     };
-    let mut done = match s.models.decide(resolved.at, vec![req]).await {
+    let mut done = match s.models.decide(resolved.at, vec![req], o.deadline).await {
         Ok(d) => d,
-        Err(wait) => return overloaded(wait),
+        Err(r) => return refused(r, o.deadline),
     };
     let res = match done.results.pop() {
         Some(Ok(r)) => r,
@@ -487,9 +521,9 @@ async fn batch(
             Err(p) => Err(json!({"status": 422, "detail": p.iter().map(Problem::to_json).collect::<Vec<_>>()})),
         });
     }
-    let mut done = match s.models.decide(resolved.at, good).await {
+    let mut done = match s.models.decide(resolved.at, good, None).await {
         Ok(d) => d,
-        Err(wait) => return overloaded(wait),
+        Err(r) => return refused(r, None),
     };
     let mut answered: Vec<Option<Result<Response, Error>>> =
         std::mem::take(&mut done.results).into_iter().map(Some).collect();
