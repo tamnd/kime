@@ -4,6 +4,15 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+## 0.0.8
+
+The CPU GEMM is several times faster, and there is a first INT8 path. On the M4 Mac, 8 threads, the first 40 parity cases (80 questions), kime answers batches of 16 in 122 to 132 ms per question against 263 to 322 ms for Laya 0.3.9 with its own batching, run back to back on a machine with a load average of 20 to 30 from other work. One question at a time kime is still slower, 337 to 350 ms against 211 ms.
+
+- `kime-cpu` packs the weights once into panels of 16 rows and runs a 6 by 16 micro kernel that keeps its outputs in registers, in place of one dot product per output. The sums keep their order, so the bits are the same for any batch, split or thread count. On the M4 at 8 threads, one question at a time went from 869 to 246 ms and batches of 16 from 572 to 175 ms per question on a quiet machine.
+- On macOS the GEMM goes to Accelerate, which runs on the AMX units. Every call is 64 rows, at most 256 columns and at most 128 of k, with the k blocks summed in f64, so a question still gets the same bits alone or in any batch. Against the packed kernel it is 1.4x to 1.7x faster at single question shapes and 2.1x to 2.5x on batches of 960 rows. A bias with the Accumulate epilogue was added at the wrong column after the first chunk of 256 columns, which a new test catches.
+- `kime-cpu` has an INT8 GEMM: weights rounded per output channel, activations per row, exact sums in i32, with an `smmla` kernel on Arm cores that have i8mm and a scalar kernel elsewhere. `kime predict --precision int8` and `Precision::Int8` turn it on. It is never picked automatically, because on Laya's checkpoint it agrees with FP32 on 95.5% of questions and spec 10 asks for 99.5%. On the M4 it is 1.3x to 1.5x faster than Accelerate FP32 on batches.
+- `Device::Cuda` with `Precision::Int8` is an Unsupported error instead of silently running something else.
+
 ## 0.0.7
 
 - `kime-cli` builds on Windows again. 0.0.6 imported `PathBuf` for `kime pull` on every OS, but only the unix code path uses it, so the unused import stopped the Windows build under `-D warnings`.
