@@ -679,6 +679,7 @@ async fn health(Extension(s): Extension<Shared>) -> HttpResponse {
         .map(|m| match m.id.as_str() {
             "laya" => json!("english"),
             "laya-multilingual" => json!("multilingual"),
+            "laya-typed-decisions" => json!("typed-decisions"),
             id => json!(id),
         })
         .collect();

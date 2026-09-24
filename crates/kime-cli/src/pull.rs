@@ -15,7 +15,7 @@ use kime::hub::{self, FILES, HubRef};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-const USAGE: &str = "usage: kime pull <laya | laya-multilingual | org/repo[/subfolder] | hf://org/repo[/subfolder]> [--revision main]
+const USAGE: &str = "usage: kime pull <laya | laya-multilingual | laya-typed-decisions | org/repo[/subfolder] | hf://org/repo[/subfolder]> [--revision main]
 The cache is $HF_HUB_CACHE, else $HF_HOME/hub, else ~/.cache/huggingface/hub. HF_TOKEN is sent when set, and HF_ENDPOINT replaces https://huggingface.co.";
 
 pub(crate) fn run(args: &[String]) -> ExitCode {

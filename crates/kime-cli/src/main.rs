@@ -24,7 +24,13 @@ const PLANNED: &[(&str, &str, &str)] = &[
 ];
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args: Vec<String> = std::env::args().collect();
+    // Installed as `laya-serve`, kime is laya-serve: it serves with laya-serve's defaults.
+    let called = std::path::Path::new(&args[0]).file_stem().and_then(|n| n.to_str());
+    if called == Some("laya-serve") {
+        return serve::run(&args[1..], true);
+    }
+    args.remove(0);
     match args.first().map(String::as_str) {
         Some("--version" | "-V" | "version") => {
             println!("kime {}", env!("CARGO_PKG_VERSION"));
@@ -37,7 +43,7 @@ fn main() -> ExitCode {
         Some("convert") => convert::run(&args[1..]),
         Some("predict") => predict::run(&args[1..]),
         Some("pull") => pull::run(&args[1..]),
-        Some("serve") => serve::run(&args[1..]),
+        Some("serve") => serve::run(&args[1..], false),
         None | Some("--help" | "-h" | "help") => {
             help();
             ExitCode::SUCCESS

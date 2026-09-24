@@ -16,6 +16,7 @@ use tokio::sync::oneshot;
 const LAYA_KEYS: &[(&str, &str, &str)] = &[
     ("laya", "english", "convaiinnovations/laya"),
     ("laya-multilingual", "multilingual", "convaiinnovations/laya/multilingual"),
+    ("laya-typed-decisions", "typed-decisions", "convaiinnovations/laya/typed-decisions"),
 ];
 
 /// How a request named its model, which decides the response shape and the routing reason.
@@ -23,7 +24,8 @@ const LAYA_KEYS: &[(&str, &str, &str)] = &[
 pub(crate) enum Named {
     /// No model, or `convaiinnovations/laya`, which laya-serve takes to mean "you choose".
     Default,
-    /// A Laya checkpoint name, normalized to Laya's router key (`english`, `multilingual`).
+    /// A Laya checkpoint name, normalized to Laya's router key (`english`, `multilingual`,
+    /// `typed-decisions`).
     Laya(String),
     /// A kime or Jev name, `kime-latest` or `jev-*`, or a concrete id.
     Kime,
@@ -177,6 +179,14 @@ impl Models {
             | "multi"
             | "ml"
             | "convaiinnovations/laya-multilingual" => laya("multilingual", "laya-multilingual"),
+            "laya-typed-decisions"
+            | "typed-decisions"
+            | "typed"
+            | "typed_decisions"
+            | "decisions"
+            | "convaiinnovations/laya-typed-decisions" => {
+                laya("typed-decisions", "laya-typed-decisions")
+            }
             "kime-latest" => Some(Resolved { at: 0, named: Named::Kime }),
             n if self.jev_aliases && (n == "jev" || n.starts_with("jev-")) => {
                 Some(Resolved { at: 0, named: Named::Kime })

@@ -97,18 +97,39 @@ The decision is returned in `kime.routing` when extensions are on, and as a top 
 
 ## Configuration
 
-Everything can be set by flag, env var (`KIME_<FLAG>`) or a TOML file (`--config kime.toml`), with flags taking precedence. The Laya env vars (`LAYA_HOST`, `LAYA_PORT`, `LAYA_DEVICE`, `LAYA_PRELOAD`, `LAYA_MODELS`, `LAYA_THREADS`, `LAYA_AUTO_TASK`, `LAYA_API_KEY`, `LAYA_LOG_LEVEL`) are read as fallbacks, so a laya-serve systemd unit or Docker setup can switch binaries without changes.
+Every setting has a flag, a field in a TOML file (`--config kime.toml`, or `KIME_CONFIG`) and an env var named after the field in capitals (`max_queue_ms` is `--max-queue-ms` and `KIME_MAX_QUEUE_MS`). Sources override each other in this order, last one wins: the defaults, laya-serve's env vars, the file, the `KIME_*` env vars, the flags. A field the file does not know is an error that names it and its line, as is a value of the wrong type.
+
+The Laya env vars are read the way laya-serve 0.3.9 reads them:
+
+| Var | kime setting | Notes |
+|---|---|---|
+| `LAYA_HOST` | `host` | |
+| `LAYA_PORT` | `port` | |
+| `LAYA_DEVICE` | `device` | torch's `cpu`, `cuda` and `cuda:N` are kime's too |
+| `LAYA_MODELS` | `models` | `english`, `multilingual`, `typed-decisions` and the aliases Laya's router takes |
+| `LAYA_THREADS` | `threads` | ignored unless a whole number above 0, as in laya-serve |
+| `LAYA_API_KEY` | one API key | alone, it gives laya-serve's 401 body |
+| `LAYA_LOG_LEVEL` | `log_level` | uvicorn's levels, above `info` kime prints nothing at startup |
+| `LAYA_PRELOAD` | | kime always loads at startup, and says so when this is off |
+| `LAYA_AUTO_TASK` | | kime does not route to typed-decisions by itself yet, and says so when this is on |
+
+Installed or linked under the name `laya-serve`, kime also takes laya-serve's defaults: it listens on `0.0.0.0` rather than `127.0.0.1` and loads all three Laya checkpoints rather than only `laya`. A laya-serve systemd unit, container or Nix service then switches binaries with no config change, as long as the weights are in the Hugging Face cache (`kime pull laya-typed-decisions` and so on), since kime does not download at startup.
 
 ```toml
 host = "0.0.0.0"
 port = 8000
-models = ["kime-v1-s-en", "kime-v1-s-x"]
-default_model = "kime-latest"
+models = ["laya", "laya-multilingual"]
 device = "cuda:0"
-api_keys_file = "/run/secrets/kime-keys"
-state_cache = "2GiB"
-answer_cache = 100000
+precision = "f16"
+max_batch = 256
+max_body = 8388608
 max_queue_ms = 500
+io_threads = 2
 jev_aliases = true
-metrics = "127.0.0.1:9100"
+api_keys_file = "/run/secrets/kime-keys"
+rpm = 600
+tps = 20000
+log_level = "info"
 ```
+
+The state and answer caches, `default_model` and the metrics address get their fields when they arrive.
