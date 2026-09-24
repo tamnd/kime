@@ -25,8 +25,8 @@ impl Conn {
         Conn { r: BufReader::new(s), host: addr.to_string() }
     }
 
-    /// One POST and its response, on the same connection each time.
-    async fn post(&mut self, path: &str, body: &[u8]) -> (u16, Vec<u8>) {
+    /// One POST, its status, body and `server-timing` header, on the same connection each time.
+    async fn post(&mut self, path: &str, body: &[u8]) -> (u16, Vec<u8>, String) {
         let head = format!(
             "POST {path} HTTP/1.1\r\nhost: {}\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n",
             self.host,
@@ -38,7 +38,7 @@ impl Conn {
         let mut line = String::new();
         self.r.read_line(&mut line).await.unwrap();
         let status = line.get(9..12).and_then(|s| s.parse().ok()).unwrap_or(0);
-        let mut len = 0;
+        let (mut len, mut timing) = (0, String::new());
         loop {
             line.clear();
             self.r.read_line(&mut line).await.unwrap();
@@ -49,10 +49,34 @@ impl Conn {
             if let Some(v) = lower.strip_prefix("content-length:") {
                 len = v.trim().parse().unwrap();
             }
+            if let Some(v) = lower.strip_prefix("server-timing:") {
+                timing = v.trim().to_string();
+            }
         }
         let mut out = vec![0; len];
         self.r.read_exact(&mut out).await.unwrap();
-        (status, out)
+        (status, out, timing)
+    }
+}
+
+/// Adds up kime's `server-timing` parts: queue, tokenize, device and pass size. laya-serve sends
+/// none, and then this stays at zero.
+fn add_timing(sum: &mut [f64; 4], h: &str) {
+    for part in h.split(',') {
+        let mut kv = part.trim().split(';');
+        let name = kv.next().unwrap_or_default();
+        let i = match name {
+            "queue" => 0,
+            "tokenize" => 1,
+            "device" => 2,
+            "pass" => 3,
+            _ => continue,
+        };
+        for f in kv {
+            if let Some(v) = f.strip_prefix("dur=").or_else(|| f.strip_prefix("desc=")) {
+                sum[i] += v.trim_matches('"').parse::<f64>().unwrap_or(0.0);
+            }
+        }
     }
 }
 
@@ -94,7 +118,7 @@ async fn main() {
     // Warm up: every body once, one at a time.
     let mut c = Conn::open(&addr).await;
     for b in &bodies {
-        let (s, out) = c.post("/v1/systemone", b).await;
+        let (s, out, _) = c.post("/v1/systemone", b).await;
         assert_eq!(s, 200, "{}", String::from_utf8_lossy(&out));
     }
 
@@ -107,26 +131,30 @@ async fn main() {
             let (bodies, questions, addr) = (bodies.clone(), questions.clone(), addr.clone());
             tokio::spawn(async move {
                 let mut c = Conn::open(&addr).await;
-                let (mut lat, mut qs) = (Vec::new(), 0);
+                let (mut lat, mut qs, mut sum) = (Vec::new(), 0, [0.0; 4]);
                 let mut i = w * 7919;
                 while Instant::now() < end {
                     let k = i % bodies.len();
                     let t = Instant::now();
-                    let (s, out) = c.post("/v1/systemone", &bodies[k]).await;
+                    let (s, out, timing) = c.post("/v1/systemone", &bodies[k]).await;
                     lat.push(t.elapsed());
+                    add_timing(&mut sum, &timing);
                     assert_eq!(s, 200, "{}", String::from_utf8_lossy(&out));
                     qs += questions[k];
                     i += 1;
                 }
-                (lat, qs)
+                (lat, qs, sum)
             })
         })
         .collect();
-    let (mut lat, mut qs) = (Vec::new(), 0);
+    let (mut lat, mut qs, mut sum) = (Vec::new(), 0, [0.0; 4]);
     for t in tasks {
-        let (l, q) = t.await.unwrap();
+        let (l, q, s) = t.await.unwrap();
         lat.extend(l);
         qs += q;
+        for (a, b) in sum.iter_mut().zip(s) {
+            *a += b;
+        }
     }
     let took = start.elapsed().as_secs_f64();
     lat.sort();
@@ -139,4 +167,14 @@ async fn main() {
         pct(&lat, 0.9),
         pct(&lat, 0.99),
     );
+    if sum[3] > 0.0 {
+        let n = lat.len() as f64;
+        println!(
+            "  mean per request: queue {:.2} ms, tokenize {:.2} ms, device {:.2} ms, {:.1} requests per pass",
+            sum[0] / n,
+            sum[1] / n,
+            sum[2] / n,
+            sum[3] / n,
+        );
+    }
 }

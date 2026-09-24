@@ -15,6 +15,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::task::{Context, Poll, Waker};
+use std::time::{Duration, Instant};
 
 use kime_core::answer::{LAYA_MODEL, Response, Temperatures, laya_answer};
 use kime_core::render::{compat_question, compat_state};
@@ -307,6 +308,17 @@ impl fmt::Debug for Kime {
     }
 }
 
+/// Where the time of one [`Kime::decide_batch_timed`] call went.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Timing {
+    /// Validating the requests and laying their questions out as token ids.
+    pub tokenize: Duration,
+    /// The device batches, from the first upload to the last result copied back.
+    pub device: Duration,
+    /// How many device batches the questions took.
+    pub batches: usize,
+}
+
 /// One laid out question and where its answer goes.
 struct Item<'a> {
     req: usize,
@@ -356,7 +368,17 @@ impl Kime {
     ///
     /// As [`Kime::decide`]. One bad request fails the whole call.
     pub fn decide_batch(&self, reqs: &[Request]) -> Result<Vec<Response>, Error> {
+        Ok(self.decide_batch_timed(reqs)?.0)
+    }
+
+    /// [`Kime::decide_batch`], and where the time went.
+    ///
+    /// # Errors
+    ///
+    /// As [`Kime::decide_batch`].
+    pub fn decide_batch_timed(&self, reqs: &[Request]) -> Result<(Vec<Response>, Timing), Error> {
         let inner = &*self.inner;
+        let t0 = Instant::now();
         let mut parsed = Vec::with_capacity(reqs.len());
         for r in reqs {
             parsed.push(parse(&r.to_json(), &Limits::LAYA).map_err(Error::Invalid)?);
@@ -383,7 +405,10 @@ impl Kime {
                 items.push(Item { req: i, q, seq, logits: Vec::new(), act: [0.0; 2] });
             }
         }
-        self.run(&mut items)?;
+        let tokenize = t0.elapsed();
+        let t1 = Instant::now();
+        let batches = self.run(&mut items)?;
+        let timing = Timing { tokenize, device: t1.elapsed(), batches };
         let mut out: Vec<Response> = parsed
             .iter()
             .map(|_| Response { model: LAYA_MODEL.into(), answers: Vec::new(), input_tokens: 0 })
@@ -394,16 +419,18 @@ impl Kime {
             res.answers
                 .push((it.q.id.clone(), laya_answer(it.q, &it.logits, it.act, &inner.temps)));
         }
-        Ok(out)
+        Ok((out, timing))
     }
 
-    /// Runs every item in as few batches as the largest bucket allows, in order.
-    fn run(&self, items: &mut [Item<'_>]) -> Result<(), Error> {
+    /// Runs every item in as few batches as the largest bucket allows, in order, and says how
+    /// many it took.
+    fn run(&self, items: &mut [Item<'_>]) -> Result<usize, Error> {
         let (max_t, max_s, max_m) = self.inner.limits;
         let mut s = self.lock();
         let Session { runner, buf, out } = &mut *s;
-        let mut start = 0;
+        let (mut start, mut batches) = (0, 0);
         while start < items.len() {
+            batches += 1;
             let (mut t, mut m, mut end) = (0, 0, start);
             while end < items.len() && end - start < max_s {
                 let it = &items[end];
@@ -429,7 +456,7 @@ impl Kime {
             }
             start = end;
         }
-        Ok(())
+        Ok(batches)
     }
 
     /// [`Kime::decide`] on a thread of its own, for async callers. It works with any executor,

@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use kime_core::answer::Response;
 use kime_core::request::Request;
-use kime_engine::{Error, Kime};
+use kime_engine::{Error, Kime, Timing};
 use serde_json::{Value, json};
 use tokio::sync::oneshot;
 
@@ -56,6 +56,10 @@ pub(crate) struct Done {
     pub(crate) results: Vec<Result<Response, Error>>,
     /// Time between submission and the start of the forward pass that answered it.
     pub(crate) queue: Duration,
+    /// Where the time of that forward pass went. It is shared with whatever else was in it.
+    pub(crate) pass: Timing,
+    /// Requests in that forward pass, this one included.
+    pub(crate) shared: usize,
 }
 
 #[derive(Debug)]
@@ -139,7 +143,7 @@ fn gone(n: usize) -> Done {
     let results = (0..n)
         .map(|_| Err(Error::Unsupported("the model's worker thread stopped".into())))
         .collect();
-    Done { results, queue: Duration::ZERO }
+    Done { results, queue: Duration::ZERO, pass: Timing::default(), shared: 0 }
 }
 
 /// Answers jobs until the server drops the queue. Whatever has queued up while the last forward
@@ -163,16 +167,17 @@ fn worker(kime: &Kime, rx: &mpsc::Receiver<Job>, max: usize) {
             jobs.iter_mut().flat_map(|j| std::mem::take(&mut j.reqs)).collect();
         // One bad request fails a whole engine batch, so on an error each request runs alone and
         // gets its own result. The answers are the same bits either way.
-        let mut results: Vec<Result<Response, Error>> = match kime.decide_batch(&reqs) {
-            Ok(r) => r.into_iter().map(Ok).collect(),
-            Err(_) => reqs.iter().map(|r| kime.decide(r)).collect(),
-        };
+        let (mut results, pass): (Vec<Result<Response, Error>>, Timing) =
+            match kime.decide_batch_timed(&reqs) {
+                Ok((r, t)) => (r.into_iter().map(Ok).collect(), t),
+                Err(_) => (reqs.iter().map(|r| kime.decide(r)).collect(), Timing::default()),
+            };
         for (job, k) in jobs.into_iter().zip(counts) {
             let rest = results.split_off(k);
             let mine = std::mem::replace(&mut results, rest);
             let queue = start.saturating_duration_since(job.at);
             // The client may have gone away, and then nobody needs the answer.
-            let _ = job.done.send(Done { results: mine, queue });
+            let _ = job.done.send(Done { results: mine, queue, pass, shared: reqs.len() });
         }
     }
 }
