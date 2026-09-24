@@ -339,6 +339,11 @@ fn named_script(cp: u32) -> Option<&'static str> {
         .map(|(name, _)| *name)
 }
 
+/// Whether a letter counts as Latin script.
+pub(crate) fn is_latin_letter(c: char) -> bool {
+    is_latin(c as u32, 0x02B0)
+}
+
 /// The script of one letter for [`detect_script`] and [`script_profile`].
 fn script_of_letter(c: char) -> &'static str {
     let cp = c as u32;

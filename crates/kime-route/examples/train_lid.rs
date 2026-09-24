@@ -31,6 +31,20 @@ struct Row {
     feats: Vec<(u32, f32)>,
 }
 
+fn row(text: &str, lang: &str, source: &str, split: &str) -> Row {
+    let a = analyse_text(text);
+    Row {
+        english: lang == "en",
+        lang: lang.to_string(),
+        source: source.to_string(),
+        split: split.to_string(),
+        laya_english: a.is_english,
+        latin: a.script == "latin",
+        words: words(text),
+        feats: features(text),
+    }
+}
+
 fn load(path: &str) -> Vec<Row> {
     let file = std::fs::File::open(path).unwrap_or_else(|e| panic!("{path}: {e}"));
     let lines: Vec<String> = BufReader::new(file).lines().map_while(Result::ok).collect();
@@ -42,21 +56,31 @@ fn load(path: &str) -> Vec<Row> {
             .map(|part| {
                 s.spawn(move || {
                     part.iter()
-                        .map(|l| {
+                        .enumerate()
+                        .flat_map(|(i, l)| {
                             let v: Value = serde_json::from_str(l).unwrap_or_default();
                             let text = v["text"].as_str().unwrap_or_default();
-                            let lang = v["lang"].as_str().unwrap_or_default().to_string();
-                            let a = analyse_text(text);
-                            Row {
-                                english: lang == "en",
-                                lang,
-                                source: v["source"].as_str().unwrap_or_default().to_string(),
-                                split: v["split"].as_str().unwrap_or_default().to_string(),
-                                laya_english: a.is_english,
-                                latin: a.script == "latin",
-                                words: words(text),
-                                feats: features(text),
+                            let lang = v["lang"].as_str().unwrap_or_default();
+                            let source = v["source"].as_str().unwrap_or_default();
+                            let split = v["split"].as_str().unwrap_or_default();
+                            let mut out = vec![row(text, lang, source, split)];
+                            // Short English is mostly MASSIVE commands otherwise, so the longer
+                            // texts also give a window of 2 to 6 words for training.
+                            if split == "train" && source != "massive" {
+                                let w: Vec<&str> = text.split_whitespace().collect();
+                                let len = 2 + i % 5;
+                                if w.len() > len {
+                                    let at = (i * 7919) % (w.len() - len);
+                                    let window = w[at..at + len].join(" ");
+                                    out.push(row(
+                                        &window,
+                                        lang,
+                                        &format!("{source}-window"),
+                                        split,
+                                    ));
+                                }
                             }
+                            out
                         })
                         .collect::<Vec<_>>()
                 })
@@ -197,7 +221,7 @@ fn main() {
         }
         m.threshold = best;
         std::fs::write(out, m.to_bytes()).unwrap_or_else(|e| panic!("{out}: {e}"));
-        eprintln!("wrote {out}, threshold {:.5}", m.threshold);
+        eprintln!("wrote {out}, threshold {:.2}", m.threshold);
         m
     } else {
         model().clone()

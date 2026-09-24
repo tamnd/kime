@@ -27,10 +27,31 @@ pub const OVERRULE: f32 = 0.99;
 /// The most words of a text that are read. Past this the answer does not change.
 pub const MAX_WORDS: usize = 256;
 
-/// The words of a text as [`features`] splits it: runs of letters.
+/// Whether a whitespace separated token is a path, an identifier, an email or a dotted name like
+/// `example.co.uk` or `10.3.7`, which say nothing about the language around them.
+fn is_code(token: &str) -> bool {
+    if token.contains(['/', '_', '@', '\\', '=']) {
+        return true;
+    }
+    let c: Vec<char> = token.chars().collect();
+    (1..c.len().saturating_sub(1))
+        .any(|i| c[i] == '.' && c[i - 1].is_alphanumeric() && c[i + 1].is_alphanumeric())
+}
+
+/// The words the identifier reads in lowercased text: runs of Latin letters, outside of the
+/// tokens [`is_code`] drops. Words with letters of other scripts are left to Laya's rules.
+fn prose(lower: &str) -> impl Iterator<Item = &str> {
+    lower
+        .split_whitespace()
+        .filter(|t| !is_code(t))
+        .flat_map(|t| t.split(|c: char| !crate::lang::is_alpha(c)))
+        .filter(|w| !w.is_empty() && w.chars().all(crate::lang::is_latin_letter))
+}
+
+/// The words of a text the identifier reads.
 #[must_use]
 pub fn words(text: &str) -> usize {
-    text.split(|c: char| !crate::lang::is_alpha(c)).filter(|w| !w.is_empty()).count()
+    prose(&text.to_lowercase()).count()
 }
 
 fn fnv(seed: u64, bytes: &[u8]) -> u64 {
@@ -42,8 +63,8 @@ fn fnv(seed: u64, bytes: &[u8]) -> u64 {
     h
 }
 
-/// The features of a text: bucket and value pairs, sorted by bucket, with unit length. Words are
-/// runs of letters after lowercasing. Each word gives its character 1 to 4 grams with a space on
+/// The features of a text: bucket and value pairs, sorted by bucket, with unit length. The words
+/// are those of [`words`], after lowercasing. Each word gives its character 1 to 4 grams with a space on
 /// either side and the whole word.
 #[must_use]
 pub fn features(text: &str) -> Vec<(u32, f32)> {
@@ -51,8 +72,7 @@ pub fn features(text: &str) -> Vec<(u32, f32)> {
     let mut ids: Vec<u32> = Vec::new();
     let mut padded: Vec<u8> = Vec::with_capacity(64);
     let mut ends: Vec<usize> = Vec::with_capacity(64);
-    let words = lower.split(|c: char| !crate::lang::is_alpha(c)).filter(|w| !w.is_empty());
-    for w in words.take(MAX_WORDS) {
+    for w in prose(&lower).take(MAX_WORDS) {
         ids.push((fnv(9, w.as_bytes()) as usize % BUCKETS) as u32);
         padded.clear();
         ends.clear();
@@ -99,6 +119,9 @@ pub fn features(text: &str) -> Vec<(u32, f32)> {
     out
 }
 
+/// The bytes before the weights in `lid.bin`.
+const HEADER: usize = 16;
+
 /// Trained weights.
 #[derive(Debug, Clone)]
 pub struct Model {
@@ -134,7 +157,7 @@ impl Model {
     pub fn to_bytes(&self) -> Vec<u8> {
         let max = self.weights.iter().fold(0.0f32, |m, w| m.max(w.abs())).max(1e-12);
         let scale = max / f32::from(i16::MAX);
-        let mut out = Vec::with_capacity(16 + 2 * self.weights.len());
+        let mut out = Vec::with_capacity(HEADER + 2 * self.weights.len());
         out.extend_from_slice(&(self.weights.len() as u32).to_le_bytes());
         out.extend_from_slice(&self.bias.to_le_bytes());
         out.extend_from_slice(&self.threshold.to_le_bytes());
@@ -152,15 +175,15 @@ impl Model {
     /// When the bytes are not a model for [`BUCKETS`] buckets.
     pub fn from_bytes(b: &[u8]) -> Result<Model, String> {
         let word = |i: usize| -> [u8; 4] { b[i..i + 4].try_into().unwrap_or_default() };
-        if b.len() < 16 {
+        if b.len() < HEADER {
             return Err("language id model is truncated".into());
         }
         let n = u32::from_le_bytes(word(0)) as usize;
-        if n != BUCKETS || b.len() != 16 + 2 * n {
+        if n != BUCKETS || b.len() != HEADER + 2 * n {
             return Err(format!("language id model has {n} buckets, want {BUCKETS}"));
         }
         let scale = f32::from_le_bytes(word(12));
-        let weights = b[16..]
+        let weights = b[HEADER..]
             .as_chunks::<2>()
             .0
             .iter()
