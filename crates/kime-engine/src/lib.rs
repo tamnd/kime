@@ -46,7 +46,7 @@ pub enum Device {
     Ane,
 }
 
-/// The number format on a GPU. The CPU always computes in FP32.
+/// The number format. The CPU computes in FP32 for both float settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Precision {
     /// FP16 weights and GEMM inputs with FP32 accumulation, as Laya's autocast runs on a GPU.
@@ -54,6 +54,10 @@ pub enum Precision {
     F16,
     /// FP32 throughout, closest to Laya on the CPU.
     F32,
+    /// INT8 weights and activations in the encoder and decision head GEMMs on the CPU, with the
+    /// scorer in FP32. Faster, and further from Laya than FP32: see spec/10-cpu.md for the gate a
+    /// checkpoint has to pass. Not on GPUs yet.
+    Int8,
 }
 
 /// What can go wrong.
@@ -200,7 +204,7 @@ impl Builder {
 }
 
 enum Runner {
-    Cpu(Executor<kime_cpu::CpuBackend>),
+    Cpu(Box<Executor<kime_cpu::CpuBackend>>),
     #[cfg(feature = "cuda")]
     Cuda(Box<Executor<kime_cuda::CudaBackend>>),
 }
@@ -209,24 +213,24 @@ impl Runner {
     fn open(model: &Model, device: Device, precision: Precision) -> Result<Self, Error> {
         let cpu = |threads: usize| {
             let t = if threads == 0 { kime_cpu::par::available() } else { threads };
-            Ok(Runner::Cpu(kime_cpu::executor(model, t)?))
+            let backend = kime_cpu::CpuBackend::new(t).with_int8(precision == Precision::Int8);
+            Ok(Runner::Cpu(Box::new(kime_cpu::executor_with(model, backend)?)))
         };
         match device {
             Device::Cpu { threads } => cpu(threads),
             #[cfg(feature = "cuda")]
             Device::Cuda(n) => {
-                Ok(Runner::Cuda(Box::new(kime_cuda::executor(model, n, cuda(precision))?)))
+                Ok(Runner::Cuda(Box::new(kime_cuda::executor(model, n, cuda(precision)?)?)))
             }
             #[cfg(feature = "cuda")]
-            Device::Auto => match kime_cuda::executor(model, 0, cuda(precision)) {
-                Ok(e) => Ok(Runner::Cuda(Box::new(e))),
-                Err(_) => cpu(0),
-            },
-            #[cfg(not(feature = "cuda"))]
             Device::Auto => {
-                let _ = precision;
-                cpu(0)
+                match cuda(precision).and_then(|p| Ok(kime_cuda::executor(model, 0, p)?)) {
+                    Ok(e) => Ok(Runner::Cuda(Box::new(e))),
+                    Err(_) => cpu(0),
+                }
             }
+            #[cfg(not(feature = "cuda"))]
+            Device::Auto => cpu(0),
             #[cfg(not(feature = "cuda"))]
             Device::Cuda(_) => Err(Error::Unsupported("this build has no CUDA backend".into())),
             Device::Metal | Device::Ane => {
@@ -256,7 +260,8 @@ impl Runner {
     fn describe(&self) -> String {
         match self {
             Runner::Cpu(e) => {
-                format!("cpu, {} threads", kime_tensor::Backend::caps(e.backend()).threads)
+                let int8 = if e.backend().int8() { ", int8" } else { "" };
+                format!("cpu, {} threads{int8}", kime_tensor::Backend::caps(e.backend()).threads)
             }
             #[cfg(feature = "cuda")]
             Runner::Cuda(e) => format!("cuda, {}", e.backend().name()),
@@ -265,10 +270,11 @@ impl Runner {
 }
 
 #[cfg(feature = "cuda")]
-fn cuda(p: Precision) -> kime_cuda::Precision {
+fn cuda(p: Precision) -> Result<kime_cuda::Precision, Error> {
     match p {
-        Precision::F16 => kime_cuda::Precision::F16,
-        Precision::F32 => kime_cuda::Precision::F32,
+        Precision::F16 => Ok(kime_cuda::Precision::F16),
+        Precision::F32 => Ok(kime_cuda::Precision::F32),
+        Precision::Int8 => Err(Error::Unsupported("INT8 runs on the CPU only for now".into())),
     }
 }
 

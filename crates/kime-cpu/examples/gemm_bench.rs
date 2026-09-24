@@ -1,4 +1,5 @@
-//! GFLOPS of the GEMM at the compat shapes, with the weights packed once as a plan does.
+//! GFLOPS of the FP32 and INT8 GEMMs at the compat shapes, with the weights packed or rounded once
+//! as a plan does. The INT8 time includes rounding the activations.
 //!
 //!     cargo run --release -p kime-cpu --example gemm_bench -- [threads]
 
@@ -6,6 +7,7 @@ use std::time::Instant;
 
 use kime_cpu::gemm::{self, Gemm, pack};
 use kime_cpu::par;
+use kime_cpu::qgemm::{self, QGemm, QMatrix};
 use kime_tensor::Epilogue;
 
 /// Seconds per call, from the best of five after a warm up.
@@ -44,11 +46,20 @@ fn main() {
             g.run(&mut y, threads, |t, f| par::for_each(t, threads, |i| f(i, &mut vec![0.0; len])));
         });
 
+        let q = QMatrix::quantize(&w, n, k);
+        let g = QGemm { x: &x, m, w: &q, b: None, ep: Epilogue::None };
+        let len = qgemm::scratch_len(k);
+        let i8s = time(|| {
+            g.run(&mut y, threads, |t, f| par::for_each(t, threads, |i| f(i, &mut vec![0.0; len])));
+        });
+
         let ops = 2.0 * (m * k * n) as f64;
         println!(
-            "{m}x{k}x{n}: {:.2} ms, {:.0} GFLOPS on {threads} threads",
+            "{m}x{k}x{n} on {threads} threads: FP32 {:.2} ms {:.0} GFLOPS, INT8 {:.2} ms {:.0} GOPS",
             f32s * 1e3,
-            ops / f32s / 1e9
+            ops / f32s / 1e9,
+            i8s * 1e3,
+            ops / i8s / 1e9
         );
     }
 }

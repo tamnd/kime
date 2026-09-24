@@ -8,6 +8,10 @@
 //! Each step runs on the rows the batch has rather than the bucket's padded count. Padding only
 //! matters to a backend that captures a fixed shape, and on the CPU it would be wasted work. The
 //! kernels are the reference ones, so a plan gives the same bits as [`Compat`](crate::Compat).
+//!
+//! A backend made [`with_int8`](CpuBackend::with_int8) runs the GEMMs over token rows in INT8
+//! instead, which is every GEMM of the encoder and the decision head. The scorer and the act head
+//! run on a row per option or per question and stay in FP32, as spec/10-cpu.md has it.
 
 use std::cell::UnsafeCell;
 use std::sync::Arc;
@@ -21,6 +25,7 @@ use crate::gemm::{self, Gemm};
 use crate::ops::{Rope, geglu, layer_norm};
 use crate::par::{self, Shared};
 use crate::pool::Pool;
+use crate::qgemm::{self, QGemm, QMatrix};
 
 /// A weight converted to f32.
 #[derive(Debug)]
@@ -29,8 +34,11 @@ pub struct Tensor {
     pub shape: Vec<usize>,
     /// Row major values, empty for a weight only GEMMs read.
     pub data: Vec<f32>,
-    /// The values as [`gemm::pack`] lays them out, for a weight GEMMs read, and empty otherwise.
+    /// The values as [`gemm::pack`] lays them out, for a weight FP32 GEMMs read, and empty
+    /// otherwise.
     pub packed: Vec<f32>,
+    /// The values rounded to INT8, for a weight INT8 GEMMs read.
+    pub quant: Option<QMatrix>,
 }
 
 /// Every weight of a checkpoint, shared by all the plans built from it.
@@ -41,13 +49,34 @@ pub struct Weights(Arc<[Tensor]>);
 #[derive(Debug)]
 pub struct CpuBackend {
     pool: Pool,
+    int8: bool,
 }
 
 impl CpuBackend {
     /// A backend on `threads` threads, the calling thread included.
     #[must_use]
     pub fn new(threads: usize) -> Self {
-        Self { pool: Pool::new(threads.max(1)) }
+        Self { pool: Pool::new(threads.max(1)), int8: false }
+    }
+
+    /// The same backend with the GEMMs over token rows in INT8 when `on`: weights rounded per
+    /// output channel at upload, activations per row as they are read, sums in i32. See
+    /// [`qgemm`](crate::qgemm).
+    #[must_use]
+    pub fn with_int8(mut self, on: bool) -> Self {
+        self.int8 = on;
+        self
+    }
+
+    /// Whether the GEMMs over token rows run in INT8.
+    #[must_use]
+    pub fn int8(&self) -> bool {
+        self.int8
+    }
+
+    /// Whether a GEMM reading `a` runs in INT8.
+    fn int8_rows(&self, rows: Rows) -> bool {
+        self.int8 && rows == Rows::Tokens
     }
 
     /// Threads.
@@ -70,6 +99,7 @@ enum Step {
     Embed { table: usize, out: Loc },
     LayerNorm { x: Loc, w: usize, b: Option<usize>, eps: f64, out: Loc },
     Gemm { a: Loc, w: usize, b: Option<usize>, ep: Epilogue, out: Loc },
+    Gemm8 { a: Loc, w: usize, b: Option<usize>, ep: Epilogue, out: Loc },
     Rope { qkv: Loc, rope: usize },
     Attention { qkv: Loc, window: Option<usize>, out: Loc },
     GeGlu { x: Loc, out: Loc },
@@ -84,6 +114,7 @@ impl Step {
             Step::Embed { .. } => "embed",
             Step::LayerNorm { .. } => "layer norm",
             Step::Gemm { .. } => "gemm",
+            Step::Gemm8 { .. } => "gemm int8",
             Step::Rope { .. } => "rope",
             Step::Attention { .. } => "attention",
             Step::GeGlu { .. } => "geglu",
@@ -216,9 +247,10 @@ impl Backend for CpuBackend {
     }
 
     fn upload(&self, tensors: &[HostTensor<'_>], graph: &Graph) -> Result<Weights> {
-        // Weights the GEMMs read are packed once here, and kept row major only if something else
-        // reads them too.
+        // Weights the GEMMs read are packed or rounded once here, and kept row major only if
+        // something else reads them too.
         let (mut gemm, mut other) = (vec![false; tensors.len()], vec![false; tensors.len()]);
+        let mut gemm8 = vec![false; tensors.len()];
         let mark = |flags: &mut Vec<bool>, w: Option<usize>| {
             if let Some(f) = w.and_then(|w| flags.get_mut(w)) {
                 *f = true;
@@ -226,8 +258,11 @@ impl Backend for CpuBackend {
         };
         for op in &graph.ops {
             match *op {
-                Op::Gemm { w, b, .. } => {
-                    mark(&mut gemm, Some(w));
+                Op::Gemm { a, w, b, .. } => {
+                    match self.int8_rows(graph.shape(a).rows) {
+                        true => mark(&mut gemm8, Some(w)),
+                        false => mark(&mut gemm, Some(w)),
+                    }
                     mark(&mut other, b);
                 }
                 Op::Embed { table, .. } | Op::AddType { table, .. } => {
@@ -258,8 +293,14 @@ impl Backend for CpuBackend {
                 (true, &[rows, cols]) => gemm::pack(&data, rows, cols),
                 _ => Vec::new(),
             };
-            let data = if gemm[i] && !other[i] && !packed.is_empty() { Vec::new() } else { data };
-            Ok(Tensor { shape: h.shape.to_vec(), data, packed })
+            let quant = match (gemm8[i], h.shape) {
+                (true, &[rows, cols]) => Some(QMatrix::quantize(&data, rows, cols)),
+                _ => None,
+            };
+            // The row major values go when every reader has its own copy.
+            let copied = (!gemm[i] || !packed.is_empty()) && (!gemm8[i] || quant.is_some());
+            let data = if (gemm[i] || gemm8[i]) && !other[i] && copied { Vec::new() } else { data };
+            Ok(Tensor { shape: h.shape.to_vec(), data, packed, quant })
         });
         Ok(Weights(t.into_iter().collect::<Result<Vec<_>>>()?.into()))
     }
@@ -308,11 +349,19 @@ impl Backend for CpuBackend {
                     if !ok {
                         return bad(format!("op {i}: gemm shapes do not match"));
                     }
-                    if w.0[gw].packed.is_empty() && a.width * out.width > 0 {
-                        return bad(format!("op {i}: gemm weight {gw} was not packed"));
+                    if self.int8_rows(a.rows) {
+                        if w.0[gw].quant.is_none() {
+                            return bad(format!("op {i}: gemm weight {gw} was not rounded"));
+                        }
+                        scratch = scratch.max(qgemm::scratch_len(a.width));
+                        Step::Gemm8 { a, w: gw, b, ep: epilogue, out }
+                    } else {
+                        if w.0[gw].packed.is_empty() && a.width * out.width > 0 {
+                            return bad(format!("op {i}: gemm weight {gw} was not packed"));
+                        }
+                        scratch = scratch.max(gemm::scratch_len(a.width, out.width));
+                        Step::Gemm { a, w: gw, b, ep: epilogue, out }
                     }
-                    scratch = scratch.max(gemm::scratch_len(a.width, out.width));
-                    Step::Gemm { a, w: gw, b, ep: epilogue, out }
                 }
                 Op::Rope { qkv, theta } => {
                     let qkv = loc(qkv);
@@ -559,6 +608,28 @@ impl Ctx<'_> {
                         // for every GEMM in the plan, so this does not allocate.
                         let s = unsafe { scratch.get(worker) };
                         s.resize(gemm::scratch_len(g.k, g.n), 0.0);
+                        f(i, s);
+                    });
+                });
+            }
+            Step::Gemm8 { a, w, b, ep, out } => {
+                let rows = self.rows(a.rows);
+                // SAFETY: the layout keeps the inputs and the output of a step apart.
+                let x = unsafe { self.get(a) };
+                // SAFETY: the layout keeps the inputs and the output of a step apart.
+                let y = unsafe { self.arena.slice_mut(out.off, rows * out.width) };
+                let q = self.w[w]
+                    .quant
+                    .as_ref()
+                    .unwrap_or_else(|| unreachable!("checked when lowered"));
+                let g = QGemm { x, m: rows, w: q, b: b.map(|b| self.w(b)), ep };
+                let scratch = self.scratch;
+                g.run(y, self.pool.threads(), |n, f| {
+                    self.pool.run(n, &|i, worker| {
+                        // SAFETY: the scratch is this worker's, and lowering reserved enough of it
+                        // for every GEMM in the plan, so this does not allocate.
+                        let s = unsafe { scratch.get(worker) };
+                        s.resize(qgemm::scratch_len(q.k), 0.0);
                         f(i, s);
                     });
                 });
