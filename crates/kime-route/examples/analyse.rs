@@ -1,4 +1,4 @@
-//! Times `lang::analyse` over the states of a recording from `tools/route/record.py`.
+//! Times `lang::analyse` and `lid::english_model` over the states of a recording from `tools/route/record.py`.
 //!
 //!     cargo run --release -p kime-route --example analyse -- cases.jsonl
 
@@ -20,6 +20,17 @@ fn main() {
     println!(
         "{} states, {english} English, {:.2} s, {:.2} us per state",
         states.len(),
+        took.as_secs_f64(),
+        took.as_secs_f64() * 1e6 / states.len() as f64
+    );
+    let mut english = 0;
+    let t = Instant::now();
+    for s in &states {
+        english += usize::from(kime_route::lid::english_model(s));
+    }
+    let took = t.elapsed();
+    println!(
+        "with the identifier: {english} English, {:.2} s, {:.2} us per state",
         took.as_secs_f64(),
         took.as_secs_f64() * 1e6 / states.len() as f64
     );

@@ -305,7 +305,7 @@ fn tables() -> &'static Tables {
 }
 
 /// Python's `str.isalpha` for one character.
-fn is_alpha(c: char) -> bool {
+pub(crate) fn is_alpha(c: char) -> bool {
     matches!(
         c.general_category(),
         GeneralCategory::UppercaseLetter
