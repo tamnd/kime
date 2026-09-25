@@ -209,8 +209,20 @@ version = "0.0.19"
 dependencies = [
  "kime-core",
  "kime-engine",
+ "kime-route",
  "pyo3",
  "serde_json",
+]
+
+[[package]]
+name = "kime-route"
+version = "0.0.19"
+dependencies = [
+ "kime-core",
+ "regex",
+ "serde_json",
+ "unicode-normalization",
+ "unicode-properties",
 ]
 
 [[package]]
