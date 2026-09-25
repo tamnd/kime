@@ -795,7 +795,7 @@ async fn answer(
 }
 
 fn entry(name: &str, description: String) -> Value {
-    json!({"name": name, "description": description, "release_date": null})
+    json!({"name": name, "description": description, "release_date": crate::RELEASE_DATE})
 }
 
 fn model_entries(s: &State) -> Vec<Value> {

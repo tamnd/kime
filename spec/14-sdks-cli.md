@@ -27,12 +27,12 @@ TypeSafe style, in process or remote:
 ```python
 from kime import TypeSafeClient, Choice, Score, Noul    # same names and signatures as typesafe_sdk
 client = TypeSafeClient(base_url="http://localhost:8000")     # remote kime-serve, Jev or impossibl
-client = TypeSafeClient(local="kime-v1-s-en")                  # in process, no HTTP
-r = client.system_one(state, {"dept": Choice("Which team", {"billing": "...", "tech": "..."})})
+client = TypeSafeClient(local="laya")                          # in process, no HTTP
+r = client.system_one(state, {"dept": Choice(instructions="Which team", criteria={"billing": "...", "tech": "..."})})
 r.choices["dept"].choice, r.request_id, r.usage
 ```
 
-The TypeSafe style classes mirror `typesafe_sdk` 0.7.1: `TypeSafeClient`, `AsyncTypeSafeClient`, `RetryPolicy` (same defaults), the exception hierarchy (`TypeSafeAPIError`, `RateLimitError` with `retry_after_ms`, and so on), `models.list()`, `extra_body` and `response_model`. The env vars are `KIME_API_KEY`, `KIME_BASE_URL` and `KIME_DEFAULT_MODEL`, with `TYPESAFE_*` read as fallbacks.
+The TypeSafe style classes mirror `typesafe_sdk` 0.7.1: `TypeSafeClient`, `AsyncTypeSafeClient`, `RetryPolicy` (same defaults), the exception hierarchy with the same messages (`TypeSafeAPIError`, `TypeSafeRateLimitError` with `retry_after_ms`, and so on), `models.list()`, `extra_body` and `response_model`. The env vars are `KIME_API_KEY`, `KIME_BASE_URL`, `KIME_DEFAULT_MODEL` and `KIME_LOG_LEVEL`, with `TYPESAFE_*` read as fallbacks. It needs only the standard library, so there is no httpx and `http_client` is refused, and a key is only required for api.typesafe.ai. `local=` takes what `kime.load` takes or a `kime.Agent`, and answers `POST /v1/systemone` and `GET /v1/models` in process exactly as `kime serve` would, Jev options in a `kime` body field included.
 
 The GIL is released for the whole of `decide`. Async methods run on the engine's own threads and complete an asyncio future, so an event loop is never blocked.
 

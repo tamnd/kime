@@ -7,6 +7,10 @@
 
 #![forbid(unsafe_code)]
 
+/// The date this version of kime was released, which `/v1/models` gives as every model's
+/// `release_date`. Jev's clients want a string there, and a checkpoint carries no date of its own.
+pub const RELEASE_DATE: &str = "2026-09-25";
+
 pub mod agent;
 pub mod answer;
 pub mod confidence;

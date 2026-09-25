@@ -2,11 +2,11 @@
 //! turns that into dicts, so this layer stays small and the wire format is the same one the server
 //! speaks. Forward passes run with the GIL released.
 
-use kime_core::request::{Limits, parse};
+use kime_core::request::{Limits, Problem, parse};
 use kime_engine::{Device, Error, Kime, Precision};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 
 fn json(text: &str, what: &str) -> PyResult<Value> {
     serde_json::from_str(text)
@@ -87,6 +87,46 @@ impl Engine {
         Ok(resps.iter().map(|r| r.to_json().to_string()).collect())
     }
 
+    /// What `kime serve` answers a Jev client for this body, as the status and the JSON body:
+    /// 200 with Jev's shape, 400 when it is not JSON, or 422 with every validation problem.
+    fn decide_jev(&self, py: Python<'_>, body: &str) -> PyResult<(u16, String)> {
+        let reply = |status: u16, v: Value| Ok((status, v.to_string()));
+        let Ok(v) = serde_json::from_str::<Value>(body) else {
+            return reply(400, json!({"detail": "request body must be valid JSON"}));
+        };
+        let (precision, entropy) = match jev_opts(v.get("kime")) {
+            Ok(o) => o,
+            Err(msg) => return reply(422, json!({"detail": msg})),
+        };
+        let req = match parse(&v, &Limits::JEV) {
+            Ok(r) => r,
+            Err(p) => {
+                return reply(
+                    422,
+                    json!({"detail": p.iter().map(Problem::to_json).collect::<Vec<_>>()}),
+                );
+            }
+        };
+        match py.detach(|| self.kime.decide(&req)) {
+            Ok(r) => {
+                let answers: Map<String, Value> = r
+                    .answers
+                    .iter()
+                    .map(|(id, a)| (id.clone(), a.to_jev_json(precision, entropy)))
+                    .collect();
+                reply(
+                    200,
+                    json!({"model": self.kime.model_id(), "answers": answers,
+                        "usage": {"input_tokens": r.input_tokens, "output_tokens": 0}}),
+                )
+            }
+            Err(e @ (Error::Invalid(_) | Error::TooLong { .. })) => {
+                reply(422, json!({"detail": e.to_string()}))
+            }
+            Err(e) => Err(error(e)),
+        }
+    }
+
     /// The tokens a request reads over all its sequences.
     fn count_tokens(&self, body: &str) -> PyResult<usize> {
         let req = parse(&json(body, "the request")?, &Limits::LAYA)
@@ -103,6 +143,29 @@ impl Engine {
     fn device(&self) -> String {
         self.kime.device()
     }
+}
+
+/// The `kime` options that change a Jev answer: `precision` (0 to 6 or null, default 2) and
+/// `confidence` ("jev" or "entropy"). The rest are for the server.
+fn jev_opts(kime: Option<&Value>) -> Result<(Option<u32>, bool), String> {
+    let Some(k) = kime.filter(|k| !k.is_null()) else { return Ok((Some(2), false)) };
+    let k = k.as_object().ok_or("kime must be an object")?;
+    let precision = match k.get("precision") {
+        None => Some(2),
+        Some(Value::Null) => None,
+        Some(v) => Some(
+            v.as_u64()
+                .filter(|&p| p <= 6)
+                .and_then(|p| u32::try_from(p).ok())
+                .ok_or("precision must be 0 to 6 or null")?,
+        ),
+    };
+    let entropy = match k.get("confidence").map(Value::as_str) {
+        None | Some(Some("jev")) => false,
+        Some(Some("entropy")) => true,
+        Some(_) => return Err("confidence must be \"jev\" or \"entropy\"".into()),
+    };
+    Ok((precision, entropy))
 }
 
 /// Laya's `clean_email_body`.
@@ -209,6 +272,7 @@ impl AgentStep {
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add("RELEASE_DATE", kime_core::RELEASE_DATE)?;
     m.add_class::<Engine>()?;
     m.add_class::<AgentStep>()?;
     m.add_function(wrap_pyfunction!(clean_email_body, m)?)?;

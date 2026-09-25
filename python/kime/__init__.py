@@ -7,6 +7,9 @@ This package runs the same engine as `kime serve` inside the Python process. `ki
     import kime
     agent = kime.load("convaiinnovations/laya")
     agent.system_one("I was charged twice", kime.triage_questions())
+
+`kime.TypeSafeClient` is the client from `typesafe_sdk`, for `kime serve`, Jev, or a model in
+process with `local=`. See `kime.typesafe`.
 """
 
 import json
@@ -298,3 +301,13 @@ def agent_step(
 
 
 from .router import DEFAULT_MODELS, RouteDecision, Router, detect_language, detect_script, is_english  # noqa: E402
+from .typesafe import (  # noqa: E402
+    AsyncTypeSafeClient,
+    Choice,
+    Noul,
+    RetryPolicy,
+    Score,
+    TypeSafeAPIError,
+    TypeSafeClient,
+    TypeSafeError,
+)
