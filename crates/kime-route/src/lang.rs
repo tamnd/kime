@@ -527,6 +527,12 @@ pub fn latin_profile(text: &str) -> LatinProfile {
     LatinProfile { language, english_hits: en, diacritic_rate, looks_non_english }
 }
 
+/// The function word lists by language, in Laya's order, as `_STOP` in `laya/lang.py`.
+#[must_use]
+pub fn stop_words() -> &'static [(&'static str, &'static [&'static str])] {
+    STOP
+}
+
 /// A best effort language code for Latin script text, or `None` when undecided.
 #[must_use]
 pub fn guess_latin_language(text: &str) -> Option<&'static str> {

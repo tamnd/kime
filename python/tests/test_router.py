@@ -105,3 +105,19 @@ def test_lru():
     with r:
         pass
     assert r.loaded == []
+
+
+def test_predict_batch():
+    r = router()
+    q, other = kime.triage_questions(), {"refund": {"type": "noul", "instructions": "Is this a refund request?"}}
+    requests = [{"state": "I was charged twice, please refund me", "questions": q},
+                {"state": "Where is my parcel?", "questions": other},
+                {"state": "The app crashes when I log in", "questions": q, "lang": "en"}]
+    got = r.predict_batch(requests, batch_size=2)
+    for req, res in zip(requests, got):
+        want = r.predict(req["state"], req["questions"], lang=req.get("lang"))
+        assert res["answers"] == want["answers"] and res["routing"] == want["routing"]
+    assert [d.model for d in r.route_batch(requests)] == ["english"] * 3
+    assert r.predict_many([]) == []
+    with pytest.raises(ValueError, match="request 0 is missing required key 'questions'"):
+        r.predict_batch([{"state": "x"}])
