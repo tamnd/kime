@@ -29,3 +29,6 @@ __pycache__/
 .idea/
 .vscode/
 *.swp
+
+# tamnd/kime-compat, checked out here by the compat CI job.
+/kime-compat

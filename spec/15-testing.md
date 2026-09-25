@@ -56,6 +56,8 @@ Every kernel has a test against a naive Rust implementation over random shapes d
 | laya-serve clients | The impossibl and laya-serve curl examples give the same response shape, and the same answers within the parity tolerance on compat models. |
 | Errors | Snapshot tests for every error status body in 03. |
 
+These run in [tamnd/kime-compat](https://github.com/tamnd/kime-compat). Its `ci/against-kime.sh` starts a kime binary on the laya checkpoint and runs the live surfaces, and the `compat` job in this repository's CI runs it on every change with the binary built from the change. Today that is the response contract on real answers and the TypeSafe JS SDK examples under Node 20 and Bun.
+
 ## Model behaviour tests
 
 These run on every released checkpoint and are part of the release gate in 12:
