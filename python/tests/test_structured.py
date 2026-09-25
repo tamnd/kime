@@ -1,6 +1,8 @@
 """kime.decide and kime.predict_shortlist, ported from Laya 0.3.20, on fixed answers and on the
 checkpoint when it is on disk."""
 
+import json
+import math
 import os
 
 import pytest
@@ -91,12 +93,55 @@ def test_shortlist():
         kime.shortlist_choice("x", ["a"], embed, k=0)
 
 
-def test_decide_on_the_checkpoint():
+class Embeds:
+    """An agent whose embedding is the text's length, and keeps the batches it was given."""
+
+    def __init__(self):
+        self.calls = []
+
+    def embed(self, texts, max_length):
+        self.calls.append((list(texts), max_length))
+        return [[float(len(t)), 1.0] for t in texts]
+
+
+def test_embed_fn_from_agent_batches():
+    agent = Embeds()
+    fn = kime.embed_fn_from_agent(agent, max_length=64, batch_size=2)
+    assert fn(["a", "bb", "ccc", "", "e"]) == [[1.0, 1.0], [2.0, 1.0], [3.0, 1.0], [0.0, 1.0], [1.0, 1.0]]
+    assert [len(t) for t, _ in agent.calls] == [2, 2, 1] and {m for _, m in agent.calls} == {64}
+    assert fn([]) == []
+    for bad in (0, -1, True, 1.5, "8"):
+        with pytest.raises(ValueError, match="max_length must be a positive integer"):
+            kime.embed_fn_from_agent(agent, max_length=bad)
+        with pytest.raises(ValueError, match="batch_size must be a positive integer"):
+            kime.embed_fn_from_agent(agent, batch_size=bad)
+
+
+def checkpoint(precision="f32"):
     models = os.environ.get("KIME_MODELS")
     try:
-        agent = kime.load(models + "/laya" if models else "laya", device="cpu", precision="f32")
+        return kime.load(models + "/laya" if models else "laya", device="cpu", precision=precision)
     except RuntimeError as e:
         pytest.skip("no laya checkpoint: %s" % e)
+
+
+def test_embed_on_the_checkpoint():
+    agent = checkpoint()
+    path = os.path.join(os.path.dirname(__file__), "../../crates/kime-eval/fixtures/parity/embed.json")
+    fixture = json.load(open(path))
+    got = kime.embed_fn_from_agent(agent, max_length=16, batch_size=3)(fixture["texts"])
+    for g, w in zip(got, fixture["emb"]["16"]):
+        cos = math.fsum(a * b for a, b in zip(g, w)) / math.sqrt(math.fsum(a * a for a in g) * math.fsum(b * b for b in w))
+        assert len(g) == 1024 and cos > 0.99999
+    q = {"c": {"type": "choice", "instructions": "Which?", "criteria": ["refund request", "card lost", "pin blocked", "transfer late"]}}
+    out = kime.predict_shortlist(agent, "I lost my card yesterday", q, kime.embed_fn_from_agent(agent), k=2)
+    assert len(out["shortlist"]["c"]["labels"]) == 2 and out["answers"]["c"]["choice"] in out["shortlist"]["c"]["labels"]
+    with pytest.raises(RuntimeError, match="INT8"):
+        checkpoint("int8").embed(["card lost"])
+
+
+def test_decide_on_the_checkpoint():
+    agent = checkpoint()
     v = agent.decide("I was charged twice for my subscription, please refund me", SCHEMA)
     assert v["topic"] in ("billing", "support", None, 3) and v["urgency"] in (1, 2, 3)
     assert isinstance(v["complaint"], bool)

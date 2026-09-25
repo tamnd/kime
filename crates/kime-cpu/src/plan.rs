@@ -106,6 +106,7 @@ enum Step {
     AddType { h: Loc, table: usize },
     Gather { h: Loc, out: Loc },
     ActFeatures { h: Loc, logits: Loc, out: Loc },
+    MeanPool { h: Loc, out: Loc },
 }
 
 impl Step {
@@ -121,6 +122,7 @@ impl Step {
             Step::AddType { .. } => "type embedding",
             Step::Gather { .. } => "gather markers",
             Step::ActFeatures { .. } => "act features",
+            Step::MeanPool { .. } => "mean pool",
         }
     }
 
@@ -134,7 +136,8 @@ impl Step {
             | Step::Attention { out, .. }
             | Step::GeGlu { out, .. }
             | Step::Gather { out, .. }
-            | Step::ActFeatures { out, .. } => out,
+            | Step::ActFeatures { out, .. }
+            | Step::MeanPool { out, .. } => out,
             Step::Rope { qkv, .. } => qkv,
             Step::AddType { h, .. } => h,
         }
@@ -179,8 +182,9 @@ pub struct CpuPlan {
     steps: Vec<Step>,
     arena: Vec<f32>,
     ropes: Vec<Rope>,
-    logits: Loc,
-    act: Loc,
+    logits: Option<Loc>,
+    act: Option<Loc>,
+    pooled: Option<Loc>,
     /// Token starts of each sequence, then marker starts, then the sequence of each token, then
     /// the query blocks attention runs. Rebuilt per batch in place.
     cu: Vec<usize>,
@@ -332,7 +336,8 @@ impl Backend for CpuBackend {
                 | Op::Attention { .. }
                 | Op::GeGlu { .. }
                 | Op::GatherMarkers { .. }
-                | Op::ActFeatures { .. } => {}
+                | Op::ActFeatures { .. }
+                | Op::MeanPool { .. } => {}
             }
         }
         let t = par::map(tensors.len(), self.threads(), |i| {
@@ -476,21 +481,30 @@ impl Backend for CpuBackend {
                     }
                     Step::ActFeatures { h, logits, out }
                 }
+                Op::MeanPool { h, out } => {
+                    let (h, out) = (loc(h), loc(out));
+                    if h.rows != Rows::Tokens || out.rows != Rows::Seqs || out.width != h.width {
+                        return bad(format!("op {i}: mean pool shapes do not match"));
+                    }
+                    Step::MeanPool { h, out }
+                }
             };
             steps.push(step);
         }
-        let (Some(logits), Some(act)) = (graph.logits, graph.act) else {
-            return bad("the graph has no logits or act output".into());
-        };
-        let (logits, act) = (loc(logits), loc(act));
-        if logits.width != 1
-            || logits.rows != Rows::Markers
-            || act.width != 2
-            || act.rows != Rows::Seqs
+        let (logits, act, pooled) =
+            (graph.logits.map(loc), graph.act.map(loc), graph.pooled.map(loc));
+        if logits.is_some() != act.is_some() || (logits.is_none() && pooled.is_none()) {
+            return bad("the graph needs logits and act outputs, a pooled output, or both".into());
+        }
+        if logits.is_some_and(|l| l.width != 1 || l.rows != Rows::Markers)
+            || act.is_some_and(|a| a.width != 2 || a.rows != Rows::Seqs)
         {
             return bad(
                 "outputs must be one logit per marker and two act logits per sequence".into()
             );
+        }
+        if pooled.is_some_and(|p| p.rows != Rows::Seqs) {
+            return bad("the pooled output must have one row per sequence".into());
         }
         let threads = self.threads();
         Ok(CpuPlan {
@@ -501,6 +515,7 @@ impl Backend for CpuBackend {
             ropes: ropes.into_iter().map(|r| r.1).collect(),
             logits,
             act,
+            pooled,
             cu: Vec::with_capacity(bucket.seqs + 1),
             mcu: Vec::with_capacity(bucket.seqs + 1),
             row_seq: Vec::with_capacity(bucket.tokens),
@@ -569,14 +584,21 @@ impl Backend for CpuBackend {
             }
         }
 
-        // SAFETY: the steps are done, so nothing else touches the arena.
-        let logits = unsafe { ctx.arena.slice(plan.logits.off, m) };
-        // SAFETY: as above.
-        let act = unsafe { ctx.arena.slice(plan.act.off, 2 * s) };
         out.logits.clear();
-        out.logits.extend_from_slice(logits);
         out.act.clear();
-        out.act.extend_from_slice(act.as_chunks::<2>().0);
+        out.pooled.clear();
+        // SAFETY: the steps are done, so nothing else touches the arena.
+        unsafe {
+            if let Some(l) = plan.logits {
+                out.logits.extend_from_slice(ctx.arena.slice(l.off, m));
+            }
+            if let Some(a) = plan.act {
+                out.act.extend_from_slice(ctx.arena.slice(a.off, 2 * s).as_chunks::<2>().0);
+            }
+            if let Some(p) = plan.pooled {
+                out.pooled.extend_from_slice(ctx.arena.slice(p.off, p.width * s));
+            }
+        }
         Ok(())
     }
 }
@@ -797,6 +819,33 @@ impl Ctx<'_> {
                     row[d..].copy_from_slice(&act_features(&l[self.mcu[s]..self.mcu[s + 1]]));
                 }
             }
+            Step::MeanPool { h, out } => {
+                // SAFETY: the layout keeps the inputs and the output of a step apart.
+                let (x, d) = (unsafe { self.get(h) }, h.width);
+                // SAFETY: the layout keeps the inputs and the output of a step apart.
+                let y = unsafe { self.arena.slice_mut(out.off, self.rows(out.rows) * d) };
+                for (s, row) in y.chunks_exact_mut(d).enumerate() {
+                    mean_rows(&x[self.cu[s] * d..self.cu[s + 1] * d], row);
+                }
+            }
+        }
+    }
+}
+
+/// The mean of the rows of `x`, each as wide as `out`, summed in f64 a stretch of columns at a
+/// time so nothing is allocated. No rows give zeros.
+fn mean_rows(x: &[f32], out: &mut [f32]) {
+    const C: usize = 64;
+    let d = out.len();
+    let n = x.len() / d.max(1);
+    for c0 in (0..d).step_by(C) {
+        let c1 = (c0 + C).min(d);
+        let mut acc = [0f64; C];
+        for r in x.chunks_exact(d) {
+            acc.iter_mut().zip(&r[c0..c1]).for_each(|(a, &v)| *a += f64::from(v));
+        }
+        for (o, a) in out[c0..c1].iter_mut().zip(acc) {
+            *o = if n == 0 { 0.0 } else { (a / n as f64) as f32 };
         }
     }
 }
@@ -832,6 +881,20 @@ fn act_features(logits: &[f32]) -> [f32; 4] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mean_rows_over_wide_and_empty_sequences() {
+        // 70 columns cross the 64 column stretch, and no rows gives zeros.
+        let d = 70;
+        let x: Vec<f32> = (0..3 * d).map(|i| i as f32 * 0.5).collect();
+        let mut out = vec![1.0; d];
+        mean_rows(&x, &mut out);
+        for (c, o) in out.iter().enumerate() {
+            assert!((o - (x[c] + x[d + c] + x[2 * d + c]) / 3.0).abs() < 1e-4, "column {c}");
+        }
+        mean_rows(&[], &mut out);
+        assert!(out.iter().all(|&o| o == 0.0));
+    }
 
     #[test]
     fn act_features_match_the_reference() {

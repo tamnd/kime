@@ -24,7 +24,7 @@
 
 use serde_json::Value;
 
-use kime_tensor::plan::{Epilogue, Graph, Op, Rows};
+use kime_tensor::plan::{Epilogue, Graph, Op, Rows, Val};
 
 use crate::error::{Error, Result};
 use crate::tensors::Tensors;
@@ -451,17 +451,14 @@ impl LayaGraph {
         })
     }
 
-    /// The forward pass as ops for a backend to lower, the graph in the module comment. Values are
-    /// token rows until the markers are gathered, and a backend runs each op on the rows the batch
-    /// has.
-    #[must_use]
-    pub fn plan(&self, spec: &LayaSpec) -> Graph {
+    /// The encoder, from the token embedding to the final norm, as ModernBERT's
+    /// `last_hidden_state`. Returns that value, token rows as wide as the model.
+    fn encoder(&self, spec: &LayaSpec, g: &mut Graph) -> Val {
         let e = &spec.encoder;
         let d = e.d;
-        let mut g = Graph::default();
         let tok = |g: &mut Graph, w| g.val(Rows::Tokens, w);
-        let emb = tok(&mut g, d);
-        let h = tok(&mut g, d);
+        let emb = tok(g, d);
+        let h = tok(g, d);
         g.push(Op::Embed { table: self.tok_embeddings, out: emb });
         g.push(Op::LayerNorm { x: emb, w: self.embed_norm, b: None, eps: e.norm_eps, out: h });
         let gemm = |g: &mut Graph, a, w, b, epilogue, out| {
@@ -470,30 +467,56 @@ impl LayaGraph {
         for l in &self.layers {
             let x = match l.attn_norm {
                 Some(n) => {
-                    let x = tok(&mut g, d);
+                    let x = tok(g, d);
                     g.push(Op::LayerNorm { x: h, w: n, b: None, eps: e.norm_eps, out: x });
                     x
                 }
                 None => h,
             };
-            let qkv = tok(&mut g, 3 * d);
-            gemm(&mut g, x, l.wqkv, None, Epilogue::None, qkv);
+            let qkv = tok(g, 3 * d);
+            gemm(g, x, l.wqkv, None, Epilogue::None, qkv);
             g.push(Op::Rope { qkv, theta: l.rope_theta });
-            let att = tok(&mut g, d);
+            let att = tok(g, d);
             let window = (!l.global).then_some(e.window / 2);
             g.push(Op::Attention { qkv, window, out: att });
-            gemm(&mut g, att, l.wo, None, Epilogue::Accumulate, h);
-            let x = tok(&mut g, d);
+            gemm(g, att, l.wo, None, Epilogue::Accumulate, h);
+            let x = tok(g, d);
             g.push(Op::LayerNorm { x: h, w: l.mlp_norm, b: None, eps: e.norm_eps, out: x });
-            let u = tok(&mut g, 2 * e.inter);
-            gemm(&mut g, x, l.wi, None, Epilogue::None, u);
-            let a = tok(&mut g, e.inter);
+            let u = tok(g, 2 * e.inter);
+            gemm(g, x, l.wi, None, Epilogue::None, u);
+            let a = tok(g, e.inter);
             g.push(Op::GeGlu { x: u, out: a });
-            gemm(&mut g, a, l.mlp_wo, None, Epilogue::Accumulate, h);
+            gemm(g, a, l.mlp_wo, None, Epilogue::Accumulate, h);
         }
-        let h2 = tok(&mut g, d);
+        let h2 = tok(g, d);
         g.push(Op::LayerNorm { x: h, w: self.final_norm, b: None, eps: e.norm_eps, out: h2 });
-        let h = h2;
+        h2
+    }
+
+    /// The encoder mean pooled per sequence, Laya's `embed_fn_from_agent`. It runs no decision
+    /// head, so a batch for it has no markers.
+    #[must_use]
+    pub fn embed_plan(&self, spec: &LayaSpec) -> Graph {
+        let mut g = Graph::default();
+        let h = self.encoder(spec, &mut g);
+        let pooled = g.val(Rows::Seqs, spec.encoder.d);
+        g.push(Op::MeanPool { h, out: pooled });
+        g.pooled = Some(pooled);
+        g
+    }
+
+    /// The forward pass as ops for a backend to lower, the graph in the module comment. Values are
+    /// token rows until the markers are gathered, and a backend runs each op on the rows the batch
+    /// has.
+    #[must_use]
+    pub fn plan(&self, spec: &LayaSpec) -> Graph {
+        let d = spec.encoder.d;
+        let mut g = Graph::default();
+        let tok = |g: &mut Graph, w| g.val(Rows::Tokens, w);
+        let gemm = |g: &mut Graph, a, w, b, epilogue, out| {
+            g.push(Op::Gemm { a, w, b, epilogue, out });
+        };
+        let h = self.encoder(spec, &mut g);
         g.push(Op::AddType { h, table: self.type_emb });
         for l in &self.head {
             let x = tok(&mut g, d);

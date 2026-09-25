@@ -189,6 +189,11 @@ class Agent:
         body = json.dumps({"state": state, "questions": questions}, ensure_ascii=False)
         return self._engine.count_tokens(body)
 
+    def embed(self, texts: List[str], max_length: int = 512) -> List[List[float]]:
+        """Each text's encoder output mean pooled over its tokens, one row per text, as Laya's
+        `embed_fn_from_agent` computes it. No decision head runs."""
+        return self._engine.embed(["" if t is None else str(t) for t in texts], max_length)
+
     def __enter__(self) -> "Agent":
         return self
 

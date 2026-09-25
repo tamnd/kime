@@ -140,6 +140,10 @@ enum Step {
         logits: Loc,
         out: Loc,
     },
+    MeanPool {
+        h: Loc,
+        out: Loc,
+    },
 }
 
 impl Step {
@@ -154,6 +158,7 @@ impl Step {
             Step::AddType { .. } => "type embedding",
             Step::Gather { .. } => "gather markers",
             Step::ActFeatures { .. } => "act features",
+            Step::MeanPool { .. } => "mean pool",
         }
     }
 }
@@ -195,8 +200,9 @@ pub struct MetalPlan {
     /// The arena, the index tables, then every weight and rope table a step reads.
     bufs: Vec<Buffer>,
     at: Index,
-    logits: Loc,
-    act: Loc,
+    logits: Option<Loc>,
+    act: Option<Loc>,
+    pooled: Option<Loc>,
     profile: Option<Vec<u64>>,
 }
 
@@ -260,6 +266,10 @@ fn types(graph: &Graph, precision: Precision) -> Vec<Ty> {
             Op::Embed { out, .. } | Op::ActFeatures { out, .. } => ty[out.0 as usize] = Ty::F32,
             Op::Gemm { epilogue: Epilogue::Accumulate, out, .. } => ty[out.0 as usize] = Ty::F32,
             Op::AddType { h, .. } => ty[h.0 as usize] = Ty::F32,
+            Op::MeanPool { h, out } => {
+                ty[h.0 as usize] = Ty::F32;
+                ty[out.0 as usize] = Ty::F32;
+            }
             Op::Attention { qkv, out, .. } => {
                 ty[qkv.0 as usize] = Ty::F32;
                 half[out.0 as usize] = true;
@@ -274,7 +284,7 @@ fn types(graph: &Graph, precision: Precision) -> Vec<Ty> {
             _ => {}
         }
     }
-    for v in [graph.logits, graph.act].into_iter().flatten() {
+    for v in [graph.logits, graph.act, graph.pooled].into_iter().flatten() {
         ty[v.0 as usize] = Ty::F32;
     }
     loop {
@@ -435,6 +445,10 @@ impl MetalBackend {
                 e.pipe(&self.k.act_features).buf(0, out.at()).buf(1, h.at()).buf(2, logits.at());
                 e.buf(3, Index::at(at.cu)).buf(4, Index::at(at.mcu)).buf(5, n);
                 e.val(6, h.width as i32).go(rows(b.seqs), 256);
+            }
+            Step::MeanPool { h, out } => {
+                e.pipe(&self.k.mean_pool).buf(0, out.at()).buf(1, h.at()).buf(2, Index::at(at.cu));
+                e.buf(3, n).val(4, h.width as i32).go(rows(b.seqs), 256);
             }
         }
     }
@@ -635,23 +649,44 @@ impl Backend for MetalBackend {
                     }
                     Step::ActFeatures { h, logits, out }
                 }
+                Op::MeanPool { h, out } => {
+                    let (h, out) = (loc(h), loc(out));
+                    let ok = h.width == out.width
+                        && h.rows == Rows::Tokens
+                        && out.rows == Rows::Seqs
+                        && !h.half()
+                        && !out.half();
+                    if !ok {
+                        return bad(format!("op {i}: mean pool shapes do not match"));
+                    }
+                    Step::MeanPool { h, out }
+                }
             };
             steps.push(step);
         }
-        let (Some(logits), Some(act)) = (graph.logits, graph.act) else {
-            return bad("the graph has no logits or act output".into());
-        };
-        let (logits, act) = (loc(logits), loc(act));
-        if logits.width != 1
-            || logits.rows != Rows::Markers
-            || act.width != 2
-            || act.rows != Rows::Seqs
-            || logits.half()
-            || act.half()
-        {
-            return bad("outputs are not one logit per marker and two per sequence".into());
+        let (logits, act, pooled) =
+            (graph.logits.map(loc), graph.act.map(loc), graph.pooled.map(loc));
+        match (logits, act) {
+            (Some(l), Some(a)) => {
+                if l.width != 1
+                    || l.rows != Rows::Markers
+                    || a.width != 2
+                    || a.rows != Rows::Seqs
+                    || l.half()
+                    || a.half()
+                {
+                    return bad("outputs are not one logit per marker and two per sequence".into());
+                }
+            }
+            (None, None) if pooled.is_some() => {}
+            _ => return bad("the graph needs logits and act together, or a pooled output".into()),
         }
-        Ok(MetalPlan { bucket, steps, bufs, at, logits, act, profile: None })
+        if let Some(p) = pooled
+            && (p.rows != Rows::Seqs || p.half())
+        {
+            return bad("the pooled output is not one FP32 row per sequence".into());
+        }
+        Ok(MetalPlan { bucket, steps, bufs, at, logits, act, pooled, profile: None })
     }
 
     fn run(&self, p: &mut MetalPlan, batch: &Batch<'_>, out: &mut Outputs) -> Result<()> {
@@ -686,18 +721,24 @@ impl Backend for MetalBackend {
             self.submit(p, &p.steps)?;
         }
         let arena = p.bufs[0].ptr();
-        // SAFETY: lowering placed one FP32 logit per marker and two FP32 act values per sequence of
-        // the bucket in the arena at these offsets, and the GPU is done with them.
-        let (logits, act) = unsafe {
-            (
-                std::slice::from_raw_parts(arena.add(p.logits.off).cast::<f32>(), m),
-                std::slice::from_raw_parts(arena.add(p.act.off).cast::<f32>(), 2 * s),
-            )
+        // SAFETY: lowering placed one FP32 logit per marker, two FP32 act values per sequence and
+        // one FP32 pooled row per sequence of the bucket in the arena at these offsets, and the
+        // GPU is done with them.
+        let f32s = |l: Loc, n: usize| unsafe {
+            std::slice::from_raw_parts(arena.add(l.off).cast::<f32>(), n)
         };
         out.logits.clear();
-        out.logits.extend_from_slice(logits);
         out.act.clear();
-        out.act.extend(act.as_chunks::<2>().0.iter().copied());
+        out.pooled.clear();
+        if let Some(l) = p.logits {
+            out.logits.extend_from_slice(f32s(l, m));
+        }
+        if let Some(a) = p.act {
+            out.act.extend(f32s(a, 2 * s).as_chunks::<2>().0.iter().copied());
+        }
+        if let Some(l) = p.pooled {
+            out.pooled.extend_from_slice(f32s(l, l.width * s));
+        }
         Ok(())
     }
 }

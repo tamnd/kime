@@ -65,6 +65,7 @@ pub(crate) struct Kernels {
     /// f32, f16.
     pub(crate) gather: [Pipeline; 2],
     pub(crate) act_features: Pipeline,
+    pub(crate) mean_pool: Pipeline,
 }
 
 /// The Apple GPU.
@@ -134,6 +135,7 @@ impl MetalBackend {
             add_type: f("add_type")?,
             gather: [f("gather_f32")?, f("gather_f16")?],
             act_features: f("act_features")?,
+            mean_pool: f("mean_pool")?,
         };
         let name = device.name().to_string();
         Ok(Self { device, queue, k, precision, name })

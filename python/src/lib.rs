@@ -134,6 +134,13 @@ impl Engine {
         Ok(self.kime.count_tokens(&req))
     }
 
+    /// Each text's encoder output mean pooled, one row per text, with each text cut to
+    /// `max_length` tokens with the specials.
+    fn embed(&self, py: Python<'_>, texts: Vec<String>, max_length: usize) -> PyResult<Vec<Vec<f32>>> {
+        let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+        py.detach(|| self.kime.embed(&refs, max_length)).map_err(error)
+    }
+
     #[getter]
     fn model_id(&self) -> &str {
         self.kime.model_id()

@@ -755,6 +755,7 @@ impl Backend for CudaBackend {
                     }
                     Step::ActFeatures { h, logits, out }
                 }
+                Op::MeanPool { .. } => return bad(format!("op {i}: mean pool is not on CUDA yet")),
             };
             steps.push(step);
         }

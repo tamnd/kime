@@ -417,3 +417,19 @@ kernel void act_features(device float* out [[buffer(0)]], device const float* h 
     o[d + 2] = -ent / precise::log(kf);
     o[d + 3] = kf / 255.0f;
 }
+
+// Per sequence, the mean of its token rows. One threadgroup per sequence, each thread a stretch of
+// columns summed down the rows in order. A sequence with no rows gives zeros.
+kernel void mean_pool(device float* out [[buffer(0)]], device const float* h [[buffer(1)]],
+                      device const uint* cu [[buffer(2)]], device const uint* n [[buffer(3)]],
+                      constant int& d [[buffer(4)]], uint s [[threadgroup_position_in_grid]],
+                      uint t [[thread_position_in_threadgroup]], uint nt [[threads_per_threadgroup]]) {
+    if (s >= n[1]) return;
+    uint lo = cu[s], hi = cu[s + 1];
+    device float* o = out + (ulong)s * d;
+    for (int c = t; c < d; c += nt) {
+        float sum = 0.0f;
+        for (uint r = lo; r < hi; r++) sum += h[(ulong)r * d + c];
+        o[c] = hi > lo ? sum / (float)(hi - lo) : 0.0f;
+    }
+}

@@ -4,9 +4,7 @@ This is `laya.shortlist` from Laya 0.3.20 (Apache-2.0). `predict_shortlist` embe
 each option with an `embed_fn` you pass, keeps the `k` closest options of every choice question
 and answers once on what is left. The ranking, the ties, the checks and the `shortlist` entry in
 the result are Laya's. It needs no numpy: `embed_fn` may return a numpy array, a torch tensor or
-a list of lists.
-
-`embed_fn_from_agent`, which pools the checkpoint's own encoder, is not here yet.
+a list of lists. `embed_fn_from_agent` gives one that pools the checkpoint's own encoder.
 """
 
 import json
@@ -80,7 +78,27 @@ def predict_shortlist(
 
 
 def embed_fn_from_agent(agent: Any, max_length: int = 512, batch_size: int = 32):
-    raise NotImplementedError("embed_fn_from_agent is not in kime yet; pass your own embed_fn")
+    """Mean pools the encoder of the checkpoint `agent` already has loaded.
+
+    The callable embeds a list of strings with the checkpoint's own tokenizer and encoder and
+    returns a list of rows as wide as the encoder. It runs no decision head and loads nothing.
+    Each text is cut to `max_length` tokens with the specials, and `batch_size` bounds how many
+    texts go to the engine at once, as in Laya. A dedicated bi-encoder passed as `embed_fn` will
+    usually shortlist better.
+    """
+    if isinstance(max_length, bool) or not isinstance(max_length, int) or max_length < 1:
+        raise ValueError("max_length must be a positive integer, got %r" % (max_length,))
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
+        raise ValueError("batch_size must be a positive integer, got %r" % (batch_size,))
+
+    def embed_fn(texts: Sequence[str]) -> List[List[float]]:
+        rows = list(texts)
+        out: List[List[float]] = []
+        for start in range(0, len(rows), batch_size):
+            out.extend(agent.embed(rows[start : start + batch_size], max_length))
+        return out
+
+    return embed_fn
 
 
 def _rank(state, criteria, embed_fn, k, instructions):
