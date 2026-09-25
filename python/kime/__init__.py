@@ -140,6 +140,15 @@ class Agent:
 
     predict = system_one
 
+    def decide(self, state: State, schema: Any = None, *, questions: Optional[Dict[str, Any]] = None,
+               return_details: bool = False, **predict_kwargs: Any) -> Any:
+        """Answers `state` against a JSON schema or a Pydantic model and returns the schema's
+        values, as Laya's `Agent.decide` does. See `kime.structured`."""
+        from .structured import decide as _decide
+
+        return _decide(self, state, schema, questions=questions, return_details=return_details, **predict_kwargs)
+
+
     def predict_batch(
         self,
         states: List[State],
@@ -301,6 +310,16 @@ def agent_step(
 
 
 from .router import DEFAULT_MODELS, RouteDecision, Router, detect_language, detect_script, is_english  # noqa: E402
+from .shortlist import embed_fn_from_agent, predict_shortlist, shortlist_choice  # noqa: E402
+from .structured import (  # noqa: E402
+    DecisionResult,
+    SchemaError,
+    answer_to_pydantic,
+    answers_to_json,
+    decide,
+    questions_from_json_schema,
+    questions_from_pydantic,
+)
 from .typesafe import (  # noqa: E402
     AsyncTypeSafeClient,
     Choice,

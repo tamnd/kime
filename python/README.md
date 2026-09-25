@@ -21,7 +21,10 @@ What is here so far:
 - `kime.Router` with Laya's arguments, precedence and `RouteDecision`, plus `detect_language`, `detect_script` and `is_english`. It picks the checkpoint the way `kime serve` does, with Laya's word lists and a language identifier on top. `Router(identifier=False)` gives Laya 0.3.20's decisions exactly.
 - `kime.TypeSafeClient` and `kime.AsyncTypeSafeClient`, the client from `typesafe_sdk` 0.7.1 with the same names, arguments, answers, errors and retry rules, for `kime serve`, Jev or a model in process. See below.
 
-Not yet: hooks, `lang_temperatures`, `max_len` and `head_max_len` raise `NotImplementedError`. `decide` with a schema comes next (see issue #28).
+- `decide` on `kime.decide`, `Agent` and `Router`, which turns a JSON schema or a Pydantic model into questions and gives back the schema's values, with `DecisionResult`, `SchemaError` and the other helpers from `laya.structured`.
+- `predict_shortlist` and `shortlist_choice`, which keep the `k` labels of a big choice question closest to the state under an `embed_fn` you pass, as Laya's do.
+
+Not yet: hooks, `lang_temperatures`, `max_len` and `head_max_len` raise `NotImplementedError`, and so does `embed_fn_from_agent`.
 
 kime never downloads anything from Python. Fetch a model first with `kime pull convaiinnovations/laya`, or point `load` at a checkpoint that Laya or `huggingface_hub` already put in the Hugging Face cache.
 

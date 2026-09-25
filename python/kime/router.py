@@ -350,6 +350,14 @@ class Router:
 
     system_one = predict
 
+    def decide(self, state: State, schema: Any = None, *, questions: Optional[Dict[str, Any]] = None,
+               return_details: bool = False, **predict_kwargs: Any) -> Any:
+        """Routes, then answers against a schema, as Laya's `Router.decide` does. The details
+        carry the routing decision."""
+        from .structured import decide as _decide
+
+        return _decide(self, state, schema, questions=questions, return_details=return_details, **predict_kwargs)
+
     def __enter__(self) -> "Router":
         return self
 
