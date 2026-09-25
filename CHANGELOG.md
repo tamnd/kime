@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.0.21
 
 - The Python package has `kime.TypeSafeClient` and `kime.AsyncTypeSafeClient` (#28), the client from `typesafe_sdk` 0.7.1 with the same names, arguments, answer classes, errors and messages, and `RetryPolicy` with the same defaults and rules, in pure standard library Python. `TypeSafeClient(base_url=...)` talks to `kime serve`, Jev or impossibl, and `TypeSafeClient(local="laya")` answers in process through the engine with no server, the way `kime serve` would. The `KIME_` environment variables come first with the `TYPESAFE_` ones as fallbacks, and a key is only required for api.typesafe.ai. `/v1/models` now gives the release date of the kime version as each model's `release_date` in place of null, since the real `typesafe_sdk` refused the null and `models.list()` failed against `kime serve`. On the Mac, 300 English papluca texts with a noul, a choice and a score question each gave the same 300 responses through `typesafe_sdk` and through `kime.TypeSafeClient` against `kime serve`, and through `local=`. The client costs 75 us a call against 211 to 231 us for `typesafe_sdk` against the same server, imports in 29 to 46 ms against 106 to 158 ms, and peaks at 25 MB against 46 MB. A request through the full model took p50 242 ms through `typesafe_sdk`, 241 ms through kime's client and 209 ms in process, with a load average of 5 to 16.
 
