@@ -22,6 +22,9 @@ kime-cuda = { workspace = true, optional = true }
 serde_json.workspace = true
 blake3.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+kime-metal.workspace = true
+
 [features]
 default = ["cuda"]
 # The CUDA backend. It loads the CUDA libraries at run time, so a build with it still runs on a

@@ -17,7 +17,7 @@ use crate::predict::{device, precision};
 
 const USAGE: &str =
     "usage: kime serve [--config kime.toml] [--host 127.0.0.1] [--port 8000] [--models laya,laya-multilingual]
-options: --device auto|cpu|cuda[:N]  --threads N  --precision f16|f32|int8
+options: --device auto|cpu|cuda[:N]|metal  --threads N  --precision f16|f32|int8
          --max-batch N  --max-batch-tokens N  --max-body BYTES  --max-request-tokens N
          --max-queue-ms MS (0 is off)  --max-pending N (0 is off)  --io-threads N  --no-jev-aliases
          --answer-cache N (answers kept per model, 100000 by default, 0 is off)
@@ -195,7 +195,7 @@ impl Settings {
                 .map(|v| v.parse().map_err(|e| format!("LAYA_PORT={v:?}: {e}")))
                 .transpose()?,
             models,
-            // torch's "cuda" and "cuda:N" are kime's too. torch has no "auto", laya-serve's
+            // torch's "cuda", "cuda:N" and "mps" are kime's too. torch has no "auto", laya-serve's
             // default, and kime has it.
             device: var("LAYA_DEVICE"),
             threads: var("LAYA_THREADS").and_then(|v| v.parse().ok()).filter(|&n| n > 0),

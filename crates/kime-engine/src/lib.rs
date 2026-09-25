@@ -47,7 +47,7 @@ pub enum Device {
     },
     /// A CUDA GPU by ordinal.
     Cuda(usize),
-    /// The Apple GPU. Arrives with M4.
+    /// The Apple GPU, through kime-metal. macOS only, FP32 or FP16.
     Metal,
     /// The Apple Neural Engine. Arrives with M4.
     Ane,
@@ -226,6 +226,8 @@ enum Runner {
     Cpu(Box<Executor<kime_cpu::CpuBackend>>),
     #[cfg(feature = "cuda")]
     Cuda(Box<Executor<kime_cuda::CudaBackend>>),
+    #[cfg(target_os = "macos")]
+    Metal(Box<Executor<kime_metal::MetalBackend>>),
 }
 
 impl Runner {
@@ -241,21 +243,34 @@ impl Runner {
             Device::Cuda(n) => {
                 Ok(Runner::Cuda(Box::new(kime_cuda::executor(model, n, cuda(precision)?)?)))
             }
-            #[cfg(feature = "cuda")]
-            Device::Auto => {
-                match cuda(precision).and_then(|p| Ok(kime_cuda::executor(model, 0, p)?)) {
-                    Ok(e) => Ok(Runner::Cuda(Box::new(e))),
-                    Err(_) => cpu(0),
-                }
-            }
-            #[cfg(not(feature = "cuda"))]
-            Device::Auto => cpu(0),
+            Device::Auto => Runner::auto(model, precision).map_or_else(|| cpu(0), Ok),
             #[cfg(not(feature = "cuda"))]
             Device::Cuda(_) => Err(Error::Unsupported("this build has no CUDA backend".into())),
-            Device::Metal | Device::Ane => {
-                Err(Error::Unsupported("the Apple backends arrive with M4".into()))
+            #[cfg(target_os = "macos")]
+            Device::Metal => {
+                Ok(Runner::Metal(Box::new(kime_metal::executor(model, metal(precision)?)?)))
+            }
+            #[cfg(not(target_os = "macos"))]
+            Device::Metal => Err(Error::Unsupported("Metal needs macOS".into())),
+            Device::Ane => {
+                Err(Error::Unsupported("the Neural Engine backend arrives with M4".into()))
             }
         }
+    }
+
+    /// A GPU when there is one: CUDA, then on a Mac the Apple GPU, as Laya picks cuda, then mps.
+    /// `None` sends `Device::Auto` to the CPU, which is also where INT8 runs.
+    #[allow(unused_variables)]
+    fn auto(model: &Model, precision: Precision) -> Option<Self> {
+        #[cfg(feature = "cuda")]
+        if let Ok(e) = cuda(precision).and_then(|p| Ok(kime_cuda::executor(model, 0, p)?)) {
+            return Some(Runner::Cuda(Box::new(e)));
+        }
+        #[cfg(target_os = "macos")]
+        if let Ok(e) = metal(precision).and_then(|p| Ok(kime_metal::executor(model, p)?)) {
+            return Some(Runner::Metal(Box::new(e)));
+        }
+        None
     }
 
     fn add_graph(&mut self, g: kime_tensor::Graph) -> usize {
@@ -264,6 +279,8 @@ impl Runner {
             Runner::Cpu(e) => e.add_graph(g, &b, EMBED_STAGE),
             #[cfg(feature = "cuda")]
             Runner::Cuda(e) => e.add_graph(g, &b, EMBED_STAGE),
+            #[cfg(target_os = "macos")]
+            Runner::Metal(e) => e.add_graph(g, &b, EMBED_STAGE),
         }
     }
 
@@ -272,6 +289,8 @@ impl Runner {
             Runner::Cpu(e) => e.prepare(b)?,
             #[cfg(feature = "cuda")]
             Runner::Cuda(e) => e.prepare(b)?,
+            #[cfg(target_os = "macos")]
+            Runner::Metal(e) => e.prepare(b)?,
         };
         Ok(())
     }
@@ -285,6 +304,8 @@ impl Runner {
             Runner::Cpu(e) => e.run_lane(lane, &buf.batch(), out)?,
             #[cfg(feature = "cuda")]
             Runner::Cuda(e) => e.run_lane(lane, &buf.batch(), out)?,
+            #[cfg(target_os = "macos")]
+            Runner::Metal(e) => e.run_lane(lane, &buf.batch(), out)?,
         };
         Ok(())
     }
@@ -294,6 +315,8 @@ impl Runner {
             Runner::Cpu(e) => e.memory(),
             #[cfg(feature = "cuda")]
             Runner::Cuda(e) => e.memory(),
+            #[cfg(target_os = "macos")]
+            Runner::Metal(e) => e.memory(),
         }
     }
 
@@ -302,6 +325,8 @@ impl Runner {
             Runner::Cpu(e) => e.backend().int8(),
             #[cfg(feature = "cuda")]
             Runner::Cuda(_) => false,
+            #[cfg(target_os = "macos")]
+            Runner::Metal(_) => false,
         }
     }
 
@@ -313,7 +338,18 @@ impl Runner {
             }
             #[cfg(feature = "cuda")]
             Runner::Cuda(e) => format!("cuda, {}", e.backend().name()),
+            #[cfg(target_os = "macos")]
+            Runner::Metal(e) => format!("metal, {}", e.backend().name()),
         }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn metal(p: Precision) -> Result<kime_metal::Precision, Error> {
+    match p {
+        Precision::F16 => Ok(kime_metal::Precision::F16),
+        Precision::F32 => Ok(kime_metal::Precision::F32),
+        Precision::Int8 => Err(Error::Unsupported("INT8 runs on the CPU only for now".into())),
     }
 }
 

@@ -88,9 +88,9 @@ def _unsupported(**kwargs: Any) -> None:
 class Agent:
     """A loaded model with Laya's `Agent` API.
 
-    `device` is "auto", "cpu", "cuda" or "cuda:N". `threads` sets the CPU threads, all cores when
-    0. `precision` is "f16", "f32" or "int8". Laya's `fast` and `compile` are accepted and do
-    nothing, since kime always runs its fast path. Hooks and `lang_temperatures` are not supported
+    `device` is "auto", "cpu", "cuda", "cuda:N" or "metal" ("mps" works too). `threads` sets the
+    CPU threads, all cores when 0. `precision` is "f16", "f32" or "int8". Laya's `fast` and
+    `compile` are accepted and do nothing, since kime always runs its fast path. Hooks and `lang_temperatures` are not supported
     yet and raise NotImplementedError.
     """
 
