@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.0.22
 
 - There is a TypeScript SDK, `@kime/sdk`, in `ts/` (#29). It is `@typesafe-ai/sdk` 0.6.0 with the same client options, `systemOne`, `models.list`, `.withResponse()`, builders, answer types inferred from the question map, errors and messages, retry policy and logging, plus a typed `kime` options field, and it has no dependencies. It defaults to `http://127.0.0.1:8000`, needs a key only for api.typesafe.ai, and reads the `KIME_` environment variables before the `TYPESAFE_` ones. Its tests run on Node 20, Node 24, Bun and Deno in CI. On the Mac, against `kime serve` with laya, 300 English papluca texts with a noul, a choice and a score question each gave the same 300 responses through `@typesafe-ai/sdk` and `@kime/sdk` on Node 26 and Bun 1.4, and through `@kime/sdk` on Deno 2.9. The example from the TypeSafe SDK README prints the same answer with either package on Node 20, Node 26, Bun and Deno. Client overhead is level with the TypeSafe SDK (a `models.list` call p50 1.5 ms against 2.2 ms on Node, 80 us against 66 us on Bun), and the built file is 8.6 kB gzipped against 9.0 kB.
 
