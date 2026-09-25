@@ -130,6 +130,13 @@ pub enum Op {
         /// Sequence rows, `h` width plus four.
         out: Val,
     },
+    /// Per sequence, the mean of its token rows, Laya's `embed_fn_from_agent` pooling.
+    MeanPool {
+        /// Token rows.
+        h: Val,
+        /// Sequence rows, as wide as `h`.
+        out: Val,
+    },
 }
 
 impl Op {
@@ -149,7 +156,7 @@ impl Op {
             Op::Rope { qkv, .. } => (vec![qkv], vec![qkv]),
             Op::Attention { qkv, out, .. } => (vec![qkv], vec![out]),
             Op::AddType { h, .. } => (vec![h], vec![h]),
-            Op::GatherMarkers { h, out } => (vec![h], vec![out]),
+            Op::GatherMarkers { h, out } | Op::MeanPool { h, out } => (vec![h], vec![out]),
             Op::ActFeatures { h, logits, out } => (vec![h, logits], vec![out]),
         }
     }
@@ -166,6 +173,8 @@ pub struct Graph {
     pub logits: Option<Val>,
     /// Sequence rows, two wide, the act head.
     pub act: Option<Val>,
+    /// Sequence rows, the pooled embedding of each sequence.
+    pub pooled: Option<Val>,
 }
 
 impl Graph {
@@ -220,7 +229,7 @@ pub fn layout(graph: &Graph, rows: impl Fn(Rows) -> usize) -> Layout {
             l.1 = l.1.max(i);
         }
     }
-    for v in [graph.logits, graph.act].into_iter().flatten() {
+    for v in [graph.logits, graph.act, graph.pooled].into_iter().flatten() {
         let l = &mut live[v.0 as usize];
         l.0 = l.0.min(graph.ops.len());
         l.1 = usize::MAX;

@@ -22,9 +22,9 @@ What is here so far:
 - `kime.TypeSafeClient` and `kime.AsyncTypeSafeClient`, the client from `typesafe_sdk` 0.7.1 with the same names, arguments, answers, errors and retry rules, for `kime serve`, Jev or a model in process. See below.
 
 - `decide` on `kime.decide`, `Agent` and `Router`, which turns a JSON schema or a Pydantic model into questions and gives back the schema's values, with `DecisionResult`, `SchemaError` and the other helpers from `laya.structured`.
-- `predict_shortlist` and `shortlist_choice`, which keep the `k` labels of a big choice question closest to the state under an `embed_fn` you pass, as Laya's do.
+- `predict_shortlist` and `shortlist_choice`, which keep the `k` labels of a big choice question closest to the state under an `embed_fn` you pass, as Laya's do. `embed_fn_from_agent` gives one that mean pools the checkpoint's own encoder, and `Agent.embed` does the same for a list of texts. It runs in FP32 or FP16, not INT8.
 
-Not yet: hooks, `lang_temperatures`, `max_len` and `head_max_len` raise `NotImplementedError`, and so does `embed_fn_from_agent`.
+Not yet: hooks, `lang_temperatures`, `max_len` and `head_max_len` raise `NotImplementedError`.
 
 kime never downloads anything from Python. Fetch a model first with `kime pull convaiinnovations/laya`, or point `load` at a checkpoint that Laya or `huggingface_hub` already put in the Hugging Face cache.
 

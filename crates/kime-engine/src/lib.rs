@@ -177,12 +177,14 @@ impl Builder {
         let temps = Temperatures::new(agent.temperature, &agent.temperature_by_options);
         let budget = CompatBudget { max_len: agent.max_len, head_max_len: agent.head_max_len };
         let mut runner = Runner::open(&model, self.device, self.precision)?;
+        let embed = runner.add_graph(model.graph.embed_plan(&model.spec));
         if self.preload {
             for b in Buckets::default().stage("compat").iter().take(4) {
                 runner.prepare(*b)?;
             }
         }
         let buckets = Buckets::default().stage("compat").to_vec();
+        let embed_buckets = Buckets::default().stage(EMBED_STAGE).to_vec();
         let (weights, plans) = runner.memory();
         Ok(Kime {
             inner: Arc::new(Inner {
@@ -192,9 +194,12 @@ impl Builder {
                 budget,
                 temps,
                 buckets,
+                embed_buckets,
+                d: model.spec.encoder.d,
                 memory: [AtomicUsize::new(weights), AtomicUsize::new(plans)],
                 runner: Mutex::new(Session {
                     runner,
+                    embed,
                     buf: BatchBuf::default(),
                     out: Outputs::default(),
                 }),
@@ -239,6 +244,15 @@ impl Runner {
         }
     }
 
+    fn add_graph(&mut self, g: kime_tensor::Graph) -> usize {
+        let b = Buckets::default();
+        match self {
+            Runner::Cpu(e) => e.add_graph(g, &b, EMBED_STAGE),
+            #[cfg(feature = "cuda")]
+            Runner::Cuda(e) => e.add_graph(g, &b, EMBED_STAGE),
+        }
+    }
+
     fn prepare(&mut self, b: kime_tensor::Bucket) -> Result<(), Error> {
         match self {
             Runner::Cpu(e) => e.prepare(b)?,
@@ -249,10 +263,14 @@ impl Runner {
     }
 
     fn run(&mut self, buf: &BatchBuf, out: &mut Outputs) -> Result<(), Error> {
+        self.run_lane(0, buf, out)
+    }
+
+    fn run_lane(&mut self, lane: usize, buf: &BatchBuf, out: &mut Outputs) -> Result<(), Error> {
         match self {
-            Runner::Cpu(e) => e.run(&buf.batch(), out)?,
+            Runner::Cpu(e) => e.run_lane(lane, &buf.batch(), out)?,
             #[cfg(feature = "cuda")]
-            Runner::Cuda(e) => e.run(&buf.batch(), out)?,
+            Runner::Cuda(e) => e.run_lane(lane, &buf.batch(), out)?,
         };
         Ok(())
     }
@@ -262,6 +280,14 @@ impl Runner {
             Runner::Cpu(e) => e.memory(),
             #[cfg(feature = "cuda")]
             Runner::Cuda(e) => e.memory(),
+        }
+    }
+
+    fn int8(&self) -> bool {
+        match self {
+            Runner::Cpu(e) => e.backend().int8(),
+            #[cfg(feature = "cuda")]
+            Runner::Cuda(_) => false,
         }
     }
 
@@ -286,8 +312,13 @@ fn cuda(p: Precision) -> Result<kime_cuda::Precision, Error> {
     }
 }
 
+/// The buckets the pooled embedding runs in: sequences with no markers.
+const EMBED_STAGE: &str = "state";
+
 struct Session {
     runner: Runner,
+    /// The lane of the pooled embedding graph on the runner.
+    embed: usize,
     buf: BatchBuf,
     out: Outputs,
 }
@@ -300,6 +331,10 @@ struct Inner {
     temps: Temperatures,
     /// The compat buckets, smallest first.
     buckets: Vec<kime_tensor::Bucket>,
+    /// The buckets of the pooled embedding, smallest first.
+    embed_buckets: Vec<kime_tensor::Bucket>,
+    /// The width of the encoder, and of an embedding.
+    d: usize,
     runner: Mutex<Session>,
     /// [`Memory`], kept up to date after every forward pass so reading it needs no lock.
     memory: [AtomicUsize; 2],
@@ -486,7 +521,7 @@ impl Kime {
             items.iter().map(|it| (it.seq.ids.len(), it.seq.markers.len())).collect();
         let batches = split::split(&self.inner.buckets, &sizes);
         let mut s = self.lock();
-        let Session { runner, buf, out } = &mut *s;
+        let Session { runner, buf, out, .. } = &mut *s;
         for batch in &batches {
             buf.clear();
             for &i in batch {
@@ -507,6 +542,54 @@ impl Kime {
         self.inner.memory[0].store(weights, Ordering::Relaxed);
         self.inner.memory[1].store(plans, Ordering::Relaxed);
         Ok(batches.len())
+    }
+
+    /// Each text's encoder output mean pooled over its tokens, as Laya's `embed_fn_from_agent`
+    /// computes it: `[CLS]`, the text cut to `max_length` tokens with the specials, `[SEP]`. It
+    /// runs no decision head. Each row is as wide as the encoder.
+    ///
+    /// # Errors
+    ///
+    /// Device errors, and [`Error::Unsupported`] on a backend without the pooled graph or in
+    /// INT8, which puts some rows far from Laya's.
+    pub fn embed(&self, texts: &[&str], max_length: usize) -> Result<Vec<Vec<f32>>, Error> {
+        let inner = &*self.inner;
+        if self.lock().runner.int8() {
+            // On 125 texts the worst row had a cosine of 0.53 to Laya's, too far to shortlist on.
+            return Err(Error::Unsupported("embeddings need FP32 or FP16, not INT8".into()));
+        }
+        let sp = inner.tok.specials();
+        let keep = max_length.saturating_sub(2);
+        let seqs: Vec<Vec<u32>> = texts
+            .iter()
+            .map(|t| {
+                let mut ids = Vec::with_capacity(keep.min(t.len()) + 2);
+                ids.push(sp.cls);
+                inner.tok.encode_into(t, &mut ids);
+                ids.truncate(keep + 1);
+                ids.push(sp.sep);
+                ids
+            })
+            .collect();
+        let sizes: Vec<(usize, usize)> = seqs.iter().map(|s| (s.len(), 0)).collect();
+        let batches = split::split(&inner.embed_buckets, &sizes);
+        let mut rows = vec![Vec::new(); texts.len()];
+        let mut s = self.lock();
+        let Session { runner, embed, buf, out } = &mut *s;
+        for batch in &batches {
+            buf.clear();
+            for &i in batch {
+                buf.push(&seqs[i], &[], 0);
+            }
+            runner.run_lane(*embed, buf, out)?;
+            for (&i, row) in batch.iter().zip(out.pooled.chunks_exact(inner.d)) {
+                rows[i] = row.to_vec();
+            }
+        }
+        let (weights, plans) = runner.memory();
+        inner.memory[0].store(weights, Ordering::Relaxed);
+        inner.memory[1].store(plans, Ordering::Relaxed);
+        Ok(rows)
     }
 
     /// [`Kime::decide`] on a thread of its own, for async callers. It works with any executor,

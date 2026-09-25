@@ -89,6 +89,8 @@ pub struct Outputs {
     pub logits: Vec<f32>,
     /// The act head, one pair per sequence.
     pub act: Vec<[f32; 2]>,
+    /// The pooled embedding, one row per sequence, for a graph that has one.
+    pub pooled: Vec<f32>,
 }
 
 /// What a backend can do.
@@ -188,17 +190,45 @@ pub trait Backend: Send + Sync {
     }
 }
 
-/// A graph, its weights on one backend, and a plan per bucket built on first use.
+/// A graph, its weights on one backend, and a plan per bucket built on first use. More graphs
+/// can share the weights, see [`Executor::add_graph`].
 #[derive(Debug)]
 pub struct Executor<B: Backend> {
     backend: B,
     weights: B::Weights,
+    /// The graph the weights were uploaded for first, then any added.
+    lanes: Vec<Lane<B>>,
+    vocab: usize,
+    types: usize,
+}
+
+/// One graph on an executor's weights, the buckets it runs in and its plans.
+struct Lane<B: Backend> {
     graph: Graph,
     stage: String,
     buckets: Vec<Bucket>,
     plans: Vec<(Bucket, B::Plan)>,
-    vocab: usize,
-    types: usize,
+}
+
+impl<B: Backend> fmt::Debug for Lane<B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let warm: Vec<Bucket> = self.plans.iter().map(|p| p.0).collect();
+        f.debug_struct("Lane")
+            .field("stage", &self.stage)
+            .field("warm", &warm)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<B: Backend> Lane<B> {
+    fn new(graph: Graph, buckets: &Buckets, stage: &str) -> Self {
+        Self {
+            graph,
+            stage: stage.to_string(),
+            buckets: buckets.stage(stage).to_vec(),
+            plans: Vec::new(),
+        }
+    }
 }
 
 impl<B: Backend> Executor<B> {
@@ -218,16 +248,15 @@ impl<B: Backend> Executor<B> {
         types: usize,
     ) -> Result<Self> {
         let weights = backend.upload(tensors, &graph)?;
-        Ok(Self {
-            backend,
-            weights,
-            graph,
-            stage: stage.to_string(),
-            buckets: buckets.stage(stage).to_vec(),
-            plans: Vec::new(),
-            vocab,
-            types,
-        })
+        Ok(Self { backend, weights, lanes: vec![Lane::new(graph, buckets, stage)], vocab, types })
+    }
+
+    /// Adds a graph that runs on the weights already uploaded, in the buckets of `stage`, and
+    /// returns the lane to pass to [`Executor::run_lane`]. The graph may only read weights the
+    /// first graph reads, the way the first graph reads them, such as the encoder alone.
+    pub fn add_graph(&mut self, graph: Graph, buckets: &Buckets, stage: &str) -> usize {
+        self.lanes.push(Lane::new(graph, buckets, stage));
+        self.lanes.len() - 1
     }
 
     /// The backend.
@@ -237,18 +266,19 @@ impl<B: Backend> Executor<B> {
 
     /// The buckets with a plan built.
     pub fn warm(&self) -> impl Iterator<Item = Bucket> + '_ {
-        self.plans.iter().map(|p| p.0)
+        self.lanes[0].plans.iter().map(|p| p.0)
     }
 
     /// Bytes on the device: the weights, and the plans built so far.
     pub fn memory(&self) -> (usize, usize) {
-        let plans = self.plans.iter().map(|p| self.backend.plan_bytes(&p.1)).sum();
+        let plans =
+            self.lanes.iter().flat_map(|l| &l.plans).map(|p| self.backend.plan_bytes(&p.1)).sum();
         (self.backend.weight_bytes(&self.weights), plans)
     }
 
     /// The plans built so far, to inspect or profile.
     pub fn plans_mut(&mut self) -> impl Iterator<Item = &mut B::Plan> + '_ {
-        self.plans.iter_mut().map(|p| &mut p.1)
+        self.lanes[0].plans.iter_mut().map(|p| &mut p.1)
     }
 
     /// Builds the plan for `bucket` now rather than on first use.
@@ -257,12 +287,17 @@ impl<B: Backend> Executor<B> {
     ///
     /// From [`Backend::lower`].
     pub fn prepare(&mut self, bucket: Bucket) -> Result<usize> {
-        if let Some(i) = self.plans.iter().position(|p| p.0 == bucket) {
+        self.prepare_lane(0, bucket)
+    }
+
+    fn prepare_lane(&mut self, lane: usize, bucket: Bucket) -> Result<usize> {
+        let l = &mut self.lanes[lane];
+        if let Some(i) = l.plans.iter().position(|p| p.0 == bucket) {
             return Ok(i);
         }
-        let plan = self.backend.lower(&self.weights, &self.graph, bucket)?;
-        self.plans.push((bucket, plan));
-        Ok(self.plans.len() - 1)
+        let plan = self.backend.lower(&self.weights, &l.graph, bucket)?;
+        l.plans.push((bucket, plan));
+        Ok(l.plans.len() - 1)
     }
 
     /// Runs a batch in the smallest bucket that holds it. Once that bucket's plan exists and `out`
@@ -273,13 +308,28 @@ impl<B: Backend> Executor<B> {
     /// [`Error::Batch`] for an inconsistent batch, [`Error::NoBucket`] for one too big, and
     /// anything the backend reports.
     pub fn run(&mut self, batch: &Batch<'_>, out: &mut Outputs) -> Result<Bucket> {
+        self.run_lane(0, batch, out)
+    }
+
+    /// [`Executor::run`] on the graph `lane` from [`Executor::add_graph`], 0 being the first.
+    ///
+    /// # Errors
+    ///
+    /// As [`Executor::run`].
+    pub fn run_lane(
+        &mut self,
+        lane: usize,
+        batch: &Batch<'_>,
+        out: &mut Outputs,
+    ) -> Result<Bucket> {
         batch.check(self.vocab, self.types)?;
         let (t, s, m) = (batch.ids.len(), batch.seqs(), batch.markers.len());
-        let bucket = self.buckets.iter().copied().find(|b| b.holds(t, s, m)).ok_or_else(|| {
-            Error::NoBucket { stage: self.stage.clone(), tokens: t, seqs: s, markers: m }
+        let l = &self.lanes[lane];
+        let bucket = l.buckets.iter().copied().find(|b| b.holds(t, s, m)).ok_or_else(|| {
+            Error::NoBucket { stage: l.stage.clone(), tokens: t, seqs: s, markers: m }
         })?;
-        let i = self.prepare(bucket)?;
-        self.backend.run(&mut self.plans[i].1, batch, out)?;
+        let i = self.prepare_lane(lane, bucket)?;
+        self.backend.run(&mut self.lanes[lane].plans[i].1, batch, out)?;
         Ok(bucket)
     }
 }
