@@ -15,6 +15,21 @@ fn lines(name: &str) -> Vec<Value> {
         .collect()
 }
 
+/// The answers without `answer_confidence`, which Laya added in 0.3.20 after these recordings
+/// were made, once it is checked to be the largest probability, or the confidence of a noul.
+fn as_recorded(mut res: Value) -> Value {
+    for a in res["answers"].as_object_mut().unwrap().values_mut() {
+        let a = a.as_object_mut().unwrap();
+        let got = a.remove("answer_confidence").and_then(|v| v.as_f64()).unwrap();
+        let want = match a.get("probabilities").and_then(Value::as_object) {
+            Some(p) => p.values().filter_map(Value::as_f64).fold(0.0, f64::max),
+            None => a["confidence"].as_f64().unwrap(),
+        };
+        assert_eq!(got.to_bits(), want.to_bits(), "{a:?}");
+    }
+    res
+}
+
 fn check(model: &str, temps: &Temperatures) {
     let (cases, dumps) = (lines("cases.jsonl"), lines(&format!("{model}.jsonl")));
     let (mut same, mut bad) = (0, Vec::new());
@@ -32,7 +47,8 @@ fn check(model: &str, temps: &Temperatures) {
             input_tokens += d["ids"].as_array().unwrap().len();
             answers.push((q.id.clone(), laya_answer(q, &logits, [act[0], act[1]], temps)));
         }
-        let got = Response { model: LAYA_MODEL.into(), answers, input_tokens }.to_json();
+        let got =
+            as_recorded(Response { model: LAYA_MODEL.into(), answers, input_tokens }.to_json());
         if &got == want {
             same += 1;
         } else {

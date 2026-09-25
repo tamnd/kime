@@ -34,6 +34,21 @@ fn diff(a: &Value, b: &Value) -> Option<f64> {
     }
 }
 
+/// The answers without `answer_confidence`, which Laya added in 0.3.20 after these recordings
+/// were made, once it is checked to be the largest probability, or the confidence of a noul.
+fn as_recorded(mut res: Value) -> Value {
+    for a in res["answers"].as_object_mut().unwrap().values_mut() {
+        let a = a.as_object_mut().unwrap();
+        let got = a.remove("answer_confidence").and_then(|v| v.as_f64()).unwrap();
+        let want = match a.get("probabilities").and_then(Value::as_object) {
+            Some(p) => p.values().filter_map(Value::as_f64).fold(0.0, f64::max),
+            None => a["confidence"].as_f64().unwrap(),
+        };
+        assert_eq!(got.to_bits(), want.to_bits(), "{a:?}");
+    }
+    res
+}
+
 fn check(model: &str) {
     let threads = std::env::var("KIME_THREADS").ok().and_then(|t| t.parse().ok()).unwrap_or(0);
     let kime = match Kime::builder().model(model).device(Device::Cpu { threads }).build() {
@@ -57,7 +72,7 @@ fn check(model: &str) {
     let took = t.elapsed();
     let (mut same, mut last_digit, mut bad) = (0, 0, Vec::new());
     for (res, (id, want)) in got.iter().zip(&wants) {
-        let res = res.to_json();
+        let res = as_recorded(res.to_json());
         match diff(&res, want) {
             Some(0.0) => same += 1,
             Some(d) if d <= 1.5e-4 => last_digit += 1,
