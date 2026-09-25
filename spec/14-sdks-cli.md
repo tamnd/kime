@@ -38,7 +38,7 @@ The GIL is released for the whole of `decide`. Async methods run on the engine's
 
 ## TypeScript: `@kime/sdk`
 
-A pure TypeScript HTTP client for Node 20 and newer, Bun, Deno, edge runtimes and browsers (browser use only with `dangerouslyAllowBrowser`, as in the TypeSafe SDK). It mirrors `@typesafe-ai/sdk` 0.6.0: `new TypeSafeClient({apiKey, baseURL, defaultModel, retry, timeout, fetch})`, `systemOne({state, questions, model}, {signal, timeout})`, `.withResponse()`, the `noul()`, `choice()` and `score()` builders, and typed answers inferred from the question map. The one addition is a typed `kime` options field.
+A pure TypeScript HTTP client for Node 20 and newer, Bun, Deno, edge runtimes and browsers (browser use only with `dangerouslyAllowBrowser`, as in the TypeSafe SDK). It mirrors `@typesafe-ai/sdk` 0.6.0: `new TypeSafeClient({apiKey, baseURL, defaultModel, retry, timeout, fetch})`, `systemOne({state, questions, model}, {signal, timeout})`, `.withResponse()`, the `noul()`, `choice()` and `score()` builders, and typed answers inferred from the question map. The one addition is a typed `kime` options field. The package is in [`ts/`](../ts) and differs from the TypeSafe SDK only where kime has to: the base URL defaults to `http://127.0.0.1:8000`, a key is only required for api.typesafe.ai, and the `KIME_` environment variables are read before the `TYPESAFE_` ones.
 
 `@kime/node` is an optional native addon (napi-rs) for in process inference in Node, with the same API plus `local: "kime-v1-s-en"`. It ships prebuilt binaries for linux-x64 (CPU and CUDA), linux-arm64, darwin-arm64 and win32-x64.
 
