@@ -62,6 +62,8 @@ pub enum Criteria {
         when_false: Option<Value>,
         /// What true means, when given.
         when_true: Option<Value>,
+        /// Laya's `labels`: the words the model reads in place of `false` and `true`, trimmed.
+        labels: Option<(String, String)>,
     },
 }
 
@@ -214,7 +216,7 @@ impl Request {
             id: id.into(),
             qtype: QType::Noul,
             instructions: Some(Value::String(statement.into())),
-            criteria: Criteria::Noul { when_false: None, when_true: None },
+            criteria: Criteria::Noul { when_false: None, when_true: None, labels: None },
         })
     }
 
@@ -235,8 +237,8 @@ impl Request {
                         .collect(),
                 )),
                 Criteria::Score(levels) => Some(Value::Array(levels.clone())),
-                Criteria::Noul { when_false: None, when_true: None } => None,
-                Criteria::Noul { when_false, when_true } => {
+                Criteria::Noul { when_false: None, when_true: None, .. } => None,
+                Criteria::Noul { when_false, when_true, .. } => {
                     let mut m = Map::new();
                     for (k, v) in [("false", when_false), ("true", when_true)] {
                         if let Some(v) = v {
@@ -248,6 +250,9 @@ impl Request {
             };
             if let Some(c) = criteria {
                 o.insert("criteria".into(), c);
+            }
+            if let Criteria::Noul { labels: Some((f, t)), .. } = &q.criteria {
+                o.insert("labels".into(), serde_json::json!({"false": f, "true": t}));
             }
             qs.insert(q.id.clone(), Value::Object(o));
         }
@@ -278,9 +283,8 @@ pub struct Limits {
     /// Whether an empty `questions` object is allowed. Jev rejects it and Laya answers it with no
     /// answers.
     pub allow_no_questions: bool,
-    /// Whether to take what Laya takes without a word: a null or missing `state`, which Laya
-    /// renders as the text `null`, and noul criteria keys other than true and false, which Laya
-    /// ignores.
+    /// Whether to take a null or missing `state` without a word, as Laya does, which renders it
+    /// as the text `null`.
     pub lenient: bool,
 }
 
@@ -487,7 +491,23 @@ fn question(id: &str, q: &Value, limits: &Limits, p: &mut Problems) -> Option<Qu
     let criteria = match qtype {
         QType::Choice => choice(id, crit, limits, &crit_loc, p),
         QType::Score => score(id, crit, limits, &crit_loc, p),
-        QType::Noul => noul(id, crit, &crit_loc, limits, p),
+        QType::Noul => noul(id, crit, &crit_loc, p),
+    };
+    let criteria = match (obj.get("labels"), criteria) {
+        (None, c) => c,
+        (Some(l), Criteria::Noul { when_false, when_true, .. }) => {
+            let labels = noul_labels(id, l, &at(&["labels".into()]), p);
+            Criteria::Noul { when_false, when_true, labels }
+        }
+        (Some(l), c) => {
+            p.add(
+                &at(&["labels".into()]),
+                "labels_type",
+                format!("question '{id}': 'labels' is only supported for noul questions"),
+                l,
+            );
+            c
+        }
     };
     if p.0.len() > before {
         return None;
@@ -621,13 +641,7 @@ fn score(
     Criteria::Score(levels)
 }
 
-fn noul(
-    id: &str,
-    crit: Option<&Value>,
-    loc: &[Loc],
-    limits: &Limits,
-    p: &mut Problems,
-) -> Criteria {
+fn noul(id: &str, crit: Option<&Value>, loc: &[Loc], p: &mut Problems) -> Criteria {
     let mut when_false = None;
     let mut when_true = None;
     match crit {
@@ -635,11 +649,11 @@ fn noul(
         Some(Value::Object(m)) => {
             // Keys match case insensitively, as in Laya, which lower cases str(key). A later key
             // wins over an earlier one that lower cases the same, as it does in a Python dict.
+            // Laya dropped any other key before 0.3.20 and refuses it since.
             for (k, v) in m {
                 match k.to_lowercase().as_str() {
                     "true" => when_true = Some(v.clone()),
                     "false" => when_false = Some(v.clone()),
-                    _ if limits.lenient => {}
                     _ => p.add(
                         &with(loc, Loc::Key(k.clone())),
                         "noul_key",
@@ -656,7 +670,29 @@ fn noul(
             other,
         ),
     }
-    Criteria::Noul { when_false, when_true }
+    Criteria::Noul { when_false, when_true, labels: None }
+}
+
+/// Laya's `_resolve_noul_labels`: null means the defaults, and anything else must map exactly
+/// `false` and `true` to strings that are different and not blank once trimmed.
+fn noul_labels(id: &str, l: &Value, loc: &[Loc], p: &mut Problems) -> Option<(String, String)> {
+    if l.is_null() {
+        return None;
+    }
+    let pair = l.as_object().filter(|m| m.len() == 2).and_then(|m| {
+        let f = m.get("false")?.as_str()?.trim();
+        let t = m.get("true")?.as_str()?.trim();
+        (!f.is_empty() && !t.is_empty() && f != t).then(|| (f.to_string(), t.to_string()))
+    });
+    if pair.is_none() {
+        p.add(
+            loc,
+            "noul_labels",
+            format!("question '{id}': noul labels must map exactly 'false' and 'true' to distinct non-empty strings"),
+            l,
+        );
+    }
+    pair
 }
 
 #[cfg(test)]
@@ -693,7 +729,10 @@ mod tests {
         assert_eq!(ids, ["topic", "urgency", "refund"]);
         let Criteria::Choice(o) = &r.questions[0].criteria else { panic!() };
         assert_eq!(o[1].description, None);
-        assert_eq!(r.questions[2].criteria, Criteria::Noul { when_false: None, when_true: None });
+        assert_eq!(
+            r.questions[2].criteria,
+            Criteria::Noul { when_false: None, when_true: None, labels: None }
+        );
     }
 
     #[test]
@@ -740,13 +779,48 @@ mod tests {
             assert!(parse(&body, &Limits::JEV).is_err());
             assert_eq!(parse(&body, &Limits::LAYA).unwrap().state, Value::Null);
         }
-        // Laya ignores noul keys other than true and false.
+        // Laya 0.3.20 refuses noul keys other than true and false, in any case.
         let noul = json!({"state": "x", "questions": {"n": {"type": "noul", "instructions": "i", "criteria": {"maybe": "m", "True": "yes"}}}});
         assert!(parse(&noul, &Limits::JEV).is_err());
+        assert!(parse(&noul, &Limits::LAYA).is_err());
+        let noul = json!({"state": "x", "questions": {"n": {"type": "noul", "instructions": "i", "criteria": {"True": "yes"}}}});
         assert_eq!(
             parse(&noul, &Limits::LAYA).unwrap().questions[0].criteria,
-            Criteria::Noul { when_false: None, when_true: Some(json!("yes")) }
+            Criteria::Noul { when_false: None, when_true: Some(json!("yes")), labels: None }
         );
+    }
+
+    #[test]
+    fn noul_labels() {
+        let q = |labels: Value, t: &str| json!({"state": "x", "questions": {"n": {"type": t, "instructions": "i", "labels": labels}}});
+        let r = parse(&q(json!({"true": " yes ", "false": "no"}), "noul"), &Limits::LAYA).unwrap();
+        let want = Criteria::Noul {
+            when_false: None,
+            when_true: None,
+            labels: Some(("no".into(), "yes".into())),
+        };
+        assert_eq!(r.questions[0].criteria, want);
+        assert_eq!(parse(&r.to_json(), &Limits::LAYA).unwrap(), r);
+        let r = parse(&q(Value::Null, "noul"), &Limits::LAYA).unwrap();
+        assert_eq!(
+            r.questions[0].criteria,
+            Criteria::Noul { when_false: None, when_true: None, labels: None }
+        );
+        for bad in [
+            json!({"true": "yes"}),
+            json!({"true": "yes", "false": "yes "}),
+            json!({"true": "yes", "false": " "}),
+            json!({"true": "yes", "false": 0}),
+            json!({"True": "yes", "false": "no"}),
+            json!({"true": "yes", "false": "no", "maybe": "m"}),
+            json!(["no", "yes"]),
+        ] {
+            let e = parse(&q(bad.clone(), "noul"), &Limits::LAYA).unwrap_err();
+            assert_eq!(e[0].kind, "noul_labels", "{bad}");
+        }
+        let body = json!({"state": "x", "questions": {"c": {"type": "choice", "instructions": "i", "criteria": ["a", "b"], "labels": null}}});
+        let e = parse(&body, &Limits::JEV).unwrap_err();
+        assert_eq!(e[0].msg, "question 'c': 'labels' is only supported for noul questions");
     }
 
     #[test]

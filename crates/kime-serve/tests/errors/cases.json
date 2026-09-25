@@ -93,12 +93,11 @@
       }
     },
     "kime": {
-      "status": 422,
+      "status": 400,
       "body": {
-        "detail": "Input should be a valid dictionary"
+        "detail": "'questions' must be an object"
       }
-    },
-    "differs": "laya-serve 0.3.20 answers 400 and kime keeps the 422 it gives every question schema error (#147)"
+    }
   },
   {
     "name": "bad-type",
@@ -202,27 +201,11 @@
       }
     },
     "kime": {
-      "status": 200,
+      "status": 422,
       "body": {
-        "model": "laya-rl-agent",
-        "answers": {
-          "q": {
-            "type": "noul",
-            "noul": 0.1314,
-            "confidence": 0.8686,
-            "answer_confidence": 0.8686,
-            "action": {
-              "act_probability": 1.0
-            }
-          }
-        },
-        "usage": {
-          "input_tokens": 28,
-          "output_tokens": 0
-        }
+        "detail": "noul question 'q' takes only the keys true and false, got 'maybe'"
       }
-    },
-    "differs": "laya-serve 0.3.20 refuses noul criteria keyed other than true and false, and kime still answers as 0.3.9 did (#147)"
+    }
   },
   {
     "name": "noul-upper-key",
@@ -269,6 +252,90 @@
           "input_tokens": 24,
           "output_tokens": 0
         }
+      }
+    }
+  },
+  {
+    "name": "noul-labels",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"I was charged twice and nobody answers my emails\", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"The customer needs a human\", \"criteria\": {\"true\": \"a person has to step in\"}, \"labels\": {\"false\": \"bot\", \"true\": \"human\"}}}}",
+    "laya": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "noul",
+            "noul": 0.8292,
+            "confidence": 0.8292,
+            "answer_confidence": 0.8292,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 41,
+          "output_tokens": 0
+        }
+      }
+    },
+    "kime": {
+      "status": 200,
+      "body": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "q": {
+            "type": "noul",
+            "noul": 0.8292,
+            "confidence": 0.8292,
+            "answer_confidence": 0.8292,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 41,
+          "output_tokens": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "noul-bad-labels",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"i\", \"labels\": {\"false\": \"same\", \"true\": \"same\"}}}}",
+    "laya": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': noul labels must map exactly 'false' and 'true' to distinct non-empty strings"
+      }
+    },
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': noul labels must map exactly 'false' and 'true' to distinct non-empty strings"
+      }
+    }
+  },
+  {
+    "name": "choice-labels",
+    "method": "POST",
+    "path": "/v1/systemone",
+    "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"choice\", \"instructions\": \"i\", \"criteria\": [\"a\", \"b\"], \"labels\": {\"false\": \"no\", \"true\": \"yes\"}}}}",
+    "laya": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': 'labels' is only supported for noul questions"
+      }
+    },
+    "kime": {
+      "status": 422,
+      "body": {
+        "detail": "question 'q': 'labels' is only supported for noul questions"
       }
     }
   },

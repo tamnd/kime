@@ -40,7 +40,8 @@ laya-serve's `LAYA_API_KEY` is read too. When it is the only key, a missing or w
     "<id>": {
       "type": "choice | score | noul",
       "instructions": "string | object | array | null",
-      "criteria": "see below"
+      "criteria": "see below",
+      "labels": "noul only, optional: {\"false\": \"...\", \"true\": \"...\"}"
     }
   },
   "kime": { "optional kime options, see Extensions" }
@@ -55,7 +56,7 @@ Criteria per type:
 |---|---|---|
 | `choice` | Object `{label: EntryType or null}`, or array of label strings | 1 to 255 options by default. Up to 4,096 with `kime.shortlist`. A null or empty description means the label alone is the meaning. A single option choice is legal and returns probability 1. |
 | `score` | Array of EntryType, index is the level | 2 to 32 levels. Jev caps at 10 and we accept more. An int keyed object `{"0":...,"1":...}` is accepted for old Python SDK clients if its keys are exactly 0 to n-1. |
-| `noul` | Absent, or object with optional `true` and `false` keys | Keys are matched case insensitively after converting to string, so `True` and `"TRUE"` work as in Laya. |
+| `noul` | Absent, or object with optional `true` and `false` keys | Keys are matched case insensitively after converting to string, so `True` and `"TRUE"` work as in Laya. `labels`, as in Laya 0.3.20, gives the words the model reads in place of `false` and `true`. The answer keeps the `noul` field either way. |
 
 EntryType is a string, a number, a boolean, an object, an array or null. How each one renders into tokens is in 06.
 
@@ -167,12 +168,14 @@ Validation rules:
 - `type` must be one of the three types.
 - `choice` needs at least 1 option. Labels must be unique after trimming whitespace. The maximum is 255 unless shortlisting is on.
 - `score` needs 2 to 32 levels.
-- `noul` criteria may only have the keys true and false, in any case. The Laya compat mode ignores other keys, as laya-serve does.
+- `noul` criteria may only have the keys true and false, in any case, in both modes. laya-serve 0.3.9 ignored other keys and 0.3.20 refuses them.
+- `labels` is only for `noul` questions. It is null or an object with exactly the keys `false` and `true`, each a string that is not blank once trimmed, and the two must differ after trimming.
+- In the Laya compat mode a `questions` that is not an object is a 400 with laya-serve's message "'questions' must be an object", and a body that is not JSON is a 400 with "request body must be valid JSON".
 - A missing `instructions` is allowed (Jev allows it and the Jev JS builder defaults it to null), and it renders as an empty question.
 - The state must not be null. An empty string is allowed and is answered from priors. The Laya compat mode takes a null or missing state and renders it as the text `null`, as laya-serve does.
 - An unknown `model` is a 404 in both modes. laya-serve 0.3.9 routes it to the default model instead, and kime does not, so a typo is never answered by the wrong model.
 
-Every error above and the cases where the two modes differ are snapshotted in `crates/kime-serve/tests/errors/cases.json`, next to what laya-serve 0.3.9 answered to the same request.
+Every error above and the cases where the two modes differ are snapshotted in `crates/kime-serve/tests/errors/cases.json`, next to what laya-serve 0.3.20 answered to the same request.
 
 ## Limits and defaults
 
