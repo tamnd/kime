@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 const USAGE: &str = "usage: kime predict [--model laya] --state <text or @file> --questions <@file>
        kime predict [--model laya] --request <@file>
        kime predict [--model laya] --batch < requests.jsonl > responses.jsonl
-options: --format json|table  --device auto|cpu|cuda[:N]  --threads N  --precision f16|f32|int8
+options: --format json|table  --device auto|cpu|cuda[:N]|metal  --threads N  --precision f16|f32|int8
 A value starting with @ is read from that file, and @- from stdin.";
 
 /// Requests handed to the engine at once in `--batch` mode.
@@ -80,6 +80,7 @@ pub(crate) fn device(d: &str) -> Result<Device, String> {
         "auto" => Device::Auto,
         "cpu" => Device::Cpu { threads: 0 },
         "cuda" => Device::Cuda(0),
+        "metal" | "mps" => Device::Metal,
         d => match d.strip_prefix("cuda:").and_then(|n| n.parse().ok()) {
             Some(n) => Device::Cuda(n),
             None => return Err(format!("unknown device {d:?}")),

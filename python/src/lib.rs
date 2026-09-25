@@ -27,6 +27,7 @@ fn device(d: &str, threads: usize) -> PyResult<Device> {
         "auto" => Device::Auto,
         "cpu" => Device::Cpu { threads },
         "cuda" => Device::Cuda(0),
+        "metal" | "mps" => Device::Metal,
         d => match d.strip_prefix("cuda:").and_then(|n| n.parse().ok()) {
             Some(n) => Device::Cuda(n),
             None => return Err(PyValueError::new_err(format!("unknown device {d:?}"))),

@@ -477,6 +477,7 @@ dependencies = [
  "kime-core",
  "kime-cpu",
  "kime-cuda",
+ "kime-metal",
  "kime-model",
  "kime-tensor",
  "kime-tok",
