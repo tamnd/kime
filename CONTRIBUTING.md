@@ -12,7 +12,7 @@ If you want to write code, take an issue from the current milestone and say so o
 
 The minor version is the number of milestones finished. Work inside M0 is tagged 0.0.1, 0.0.2 and so on, the release where M0's exit criterion passes is 0.1.0, work inside M1 is 0.1.1 upwards, and so on. When M5 closes the version is 1.0.0, because that milestone is named 1.0.
 
-Tagging is the whole release process. Push a tag that matches the version in `Cargo.toml`, and the release workflow checks the tag against the manifest, checks that CHANGELOG.md has a section for it, runs the gate, builds the archives for every target, attests them and publishes. If any of those fail there is no release.
+Tagging is the whole release process. Push a tag that matches the version in `Cargo.toml`, and the release workflow checks the tag against the manifest, checks that CHANGELOG.md has a section for it, runs the gate, builds the archives for every target, attests them and publishes. If any of those fail there is no release. The release commit also sets `RELEASE_DATE` in `crates/kime-core/src/lib.rs` to the day of the release, since `/v1/models` gives it as every model's `release_date`.
 
 The crates go to crates.io with `.github/publish-crates.sh`, which is safe to run more than once and waits out the rate limits for new crates. Run it from a machine that holds the token, with `KIME_ENV_FILE` pointing at the file the token lives in, and it reads that one variable and nothing else.
 

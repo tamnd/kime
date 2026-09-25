@@ -26,6 +26,8 @@ pub use log::Log;
 pub use models::Faults;
 pub use otel::Otlp;
 
+pub use kime_core::RELEASE_DATE;
+
 /// How the server runs.
 #[derive(Debug)]
 pub struct Config {
