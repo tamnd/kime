@@ -9,7 +9,8 @@ goes where it should. `Router(identifier=False)` gives Laya's word lists alone.
 
 import json
 import threading
-from typing import Any, Dict, List, Optional, Tuple, Union
+from collections.abc import Sequence as SequenceABC
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from . import _native
 
@@ -116,6 +117,17 @@ def detect_script(text: str) -> str:
     return _native.detect_script(text)
 
 
+def guess_latin_language(text: str) -> Optional[str]:
+    """Laya's language code for Latin script text from its word lists, or None when undecided."""
+    return _native.guess_latin_language(text)
+
+
+def state_text(state: State, max_chars: int = 4000) -> str:
+    """The string leaves of a state joined by spaces, at most `max_chars` characters, which is
+    the text detection reads. Keys are left out."""
+    return _native.state_text(json.dumps(state, ensure_ascii=False), max_chars)
+
+
 def is_english(state: State) -> bool:
     """Whether Laya's word lists say the English checkpoint can read the state."""
     return bool(detect_language(state)["is_english"])
@@ -176,14 +188,9 @@ class Router:
                 self._touch(key)
                 return self._agents[key]
             repo, sub = _split(self.models[key])
-            agent = Agent(
-                repo,
-                device=self.device,
-                token=self.token,
-                subfolder=sub,
-                threads=self.threads,
-                precision=self.precision,
-            )
+            # threads and precision go only when set, so a Laya style Agent stand in still builds.
+            extra = {k: v for k, v in (("threads", self.threads), ("precision", self.precision)) if v}
+            agent = Agent(repo, device=self.device, token=self.token, subfolder=sub, **extra)
             self._agents[key] = agent
             self._order.append(key)
             self._evict()
@@ -278,8 +285,10 @@ class Router:
         if workflow and self.auto_task_detection:
             reason = "question ids match the %r typed-decisions workflow" % workflow
             return self._decision("typed-decisions", reason, None, workflow)
-        if lang is not None:
-            key = "english" if _english_from_code(lang) else "multilingual"
+        # A blank code names no language, so it falls through to the hints and detection.
+        english = None if lang is None else _english_from_code(lang)
+        if english is not None:
+            key = "english" if english else "multilingual"
             return self._decision(key, "explicit lang=%r" % lang, None, workflow)
         for source, hint in (("lang_guess", lang_guess), ("Router(lang_guess=...)", self.lang_guess)):
             resolved = self._resolve_hint(hint, state)
@@ -349,6 +358,56 @@ class Router:
         return result
 
     system_one = predict
+
+    def route_batch(self, requests: Sequence[Dict[str, Any]]) -> List[RouteDecision]:
+        """Routes every request without loading a checkpoint, in input order. Each request is a
+        dict with `state` and `questions` and may have `model`, `task`, `lang` and `lang_guess`,
+        as `route` takes them."""
+        if not isinstance(requests, SequenceABC) or isinstance(requests, (str, bytes)):
+            raise TypeError("requests must be a sequence of request dictionaries")
+        decisions = []
+        for i, request in enumerate(requests):
+            if not isinstance(request, dict):
+                raise TypeError("request %d must be a dict, got %s" % (i, type(request).__name__))
+            for key in ("state", "questions"):
+                if key not in request:
+                    raise ValueError("request %d is missing required key %r" % (i, key))
+            questions = request["questions"]
+            if not isinstance(questions, dict):
+                raise TypeError("request %d 'questions' must be a dict, got %s" % (i, type(questions).__name__))
+            decisions.append(self.route(request["state"], questions, model=request.get("model"),
+                                        task=request.get("task"), lang=request.get("lang"),
+                                        lang_guess=request.get("lang_guess")))
+        return decisions
+
+    def predict_batch(self, requests: Sequence[Dict[str, Any]], batch_size: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Routes every request, then answers them with one `predict_batch` per checkpoint and
+        question set, so each checkpoint loads at most once. Results come back in input order,
+        each with its `routing`. Question sets that differ only in key order are kept apart,
+        since options are positional."""
+        decisions = self.route_batch(requests)
+        groups: Dict[str, List[int]] = {}
+        for i, decision in enumerate(decisions):
+            groups.setdefault(decision["model"], []).append(i)
+        results: List[Any] = [None] * len(decisions)
+        for name, indices in groups.items():
+            agent = self.load(name)
+            by_questions: Dict[str, List[int]] = {}
+            for i in indices:
+                key = json.dumps(requests[i]["questions"], ensure_ascii=False, default=str)
+                by_questions.setdefault(key, []).append(i)
+            for members in by_questions.values():
+                states = [requests[i]["state"] for i in members]
+                out = agent.predict_batch(states, requests[members[0]]["questions"], batch_size=batch_size)
+                if len(out) != len(members):
+                    raise RuntimeError("internal error: Agent.predict_batch returned %d results for %d states"
+                                       % (len(out), len(members)))
+                for i, result in zip(members, out):
+                    result["routing"] = dict(decisions[i])
+                    results[i] = result
+        return results
+
+    predict_many = predict_batch
 
     def decide(self, state: State, schema: Any = None, *, questions: Optional[Dict[str, Any]] = None,
                return_details: bool = False, **predict_kwargs: Any) -> Any:

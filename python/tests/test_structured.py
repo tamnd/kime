@@ -145,3 +145,11 @@ def test_decide_on_the_checkpoint():
     v = agent.decide("I was charged twice for my subscription, please refund me", SCHEMA)
     assert v["topic"] in ("billing", "support", None, 3) and v["urgency"] in (1, 2, 3)
     assert isinstance(v["complaint"], bool)
+
+
+def test_star_import_has_every_public_name():
+    names = {}
+    exec("from kime import *", names)
+    assert [n for n in kime.__all__ if n not in names] == []
+    for n in ("decide", "DecisionResult", "embed_fn_from_agent", "predict_shortlist", "TypeSafeClient"):
+        assert n in kime.__all__

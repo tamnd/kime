@@ -136,7 +136,12 @@ impl Engine {
 
     /// Each text's encoder output mean pooled, one row per text, with each text cut to
     /// `max_length` tokens with the specials.
-    fn embed(&self, py: Python<'_>, texts: Vec<String>, max_length: usize) -> PyResult<Vec<Vec<f32>>> {
+    fn embed(
+        &self,
+        py: Python<'_>,
+        texts: Vec<String>,
+        max_length: usize,
+    ) -> PyResult<Vec<Vec<f32>>> {
         let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
         py.detach(|| self.kime.embed(&refs, max_length)).map_err(error)
     }
@@ -208,6 +213,24 @@ fn analyse(py: Python<'_>, state: &str) -> PyResult<String> {
 #[pyfunction]
 fn detect_script(text: &str) -> &'static str {
     kime_route::lang::detect_script(text)
+}
+
+/// Laya's `guess_latin_language`.
+#[pyfunction]
+fn guess_latin_language(text: &str) -> Option<&'static str> {
+    kime_route::lang::guess_latin_language(text)
+}
+
+/// Laya's `state_text` of a state given as JSON text.
+#[pyfunction]
+fn state_text(state: &str, max_chars: usize) -> PyResult<String> {
+    Ok(kime_route::lang::state_text(&json(state, "the state")?, max_chars))
+}
+
+/// Laya's `_STOP` word lists, as (language, words) pairs in Laya's order.
+#[pyfunction]
+fn stop_words() -> Vec<(&'static str, Vec<&'static str>)> {
+    kime_route::lang::stop_words().iter().map(|(lg, words)| (*lg, words.to_vec())).collect()
 }
 
 /// The checkpoint kime's detection picks for a state given as JSON text: Laya's rules with the
@@ -287,5 +310,8 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(analyse, m)?)?;
     m.add_function(wrap_pyfunction!(detect_script, m)?)?;
     m.add_function(wrap_pyfunction!(detect, m)?)?;
+    m.add_function(wrap_pyfunction!(guess_latin_language, m)?)?;
+    m.add_function(wrap_pyfunction!(state_text, m)?)?;
+    m.add_function(wrap_pyfunction!(stop_words, m)?)?;
     Ok(())
 }
