@@ -18,8 +18,9 @@ What is here so far:
 - The presets: `triage_questions`, `email_questions`, `guard_questions`, `moderation_questions` and `router_questions`.
 - `clean_email_body` and `email_state`, which give the same text as Laya's.
 - `agent_step`, which builds a browser agent step the way jev-ultrafast does and reads the answers back into an action.
+- `kime.Router` with Laya's arguments, precedence and `RouteDecision`, plus `detect_language`, `detect_script` and `is_english`. It picks the checkpoint the way `kime serve` does, with Laya's word lists and a language identifier on top. `Router(identifier=False)` gives Laya 0.3.20's decisions exactly.
 
-Not yet: hooks, `lang_temperatures`, `max_len` and `head_max_len` raise `NotImplementedError`. `Router`, `decide` with a schema and the TypeSafe style client come next (see issue #28).
+Not yet: hooks, `lang_temperatures`, `max_len` and `head_max_len` raise `NotImplementedError`. `decide` with a schema and the TypeSafe style client come next (see issue #28).
 
 kime never downloads anything from Python. Fetch a model first with `kime pull convaiinnovations/laya`, or point `load` at a checkpoint that Laya or `huggingface_hub` already put in the Hugging Face cache.
 

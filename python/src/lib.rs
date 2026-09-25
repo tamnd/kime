@@ -127,6 +127,33 @@ fn preset(name: &str, categories: Option<&str>) -> PyResult<String> {
     Ok(q.to_string())
 }
 
+/// Laya's `analyse` of a state given as JSON text, as JSON text.
+#[pyfunction]
+fn analyse(py: Python<'_>, state: &str) -> PyResult<String> {
+    let state = json(state, "the state")?;
+    Ok(py.detach(|| kime_route::lang::analyse(&state).to_json().to_string()))
+}
+
+/// Laya's `detect_script`.
+#[pyfunction]
+fn detect_script(text: &str) -> &'static str {
+    kime_route::lang::detect_script(text)
+}
+
+/// The checkpoint kime's detection picks for a state given as JSON text: Laya's rules with the
+/// language identifier on top, as `kime serve` routes. JSON text with `english` (true, false or
+/// null for the default), `reason` and `detection`.
+#[pyfunction]
+fn detect(py: Python<'_>, state: &str, default_english: bool) -> PyResult<String> {
+    let state = json(state, "the state")?;
+    let d = py.detach(|| kime_route::router::detect(&state, default_english));
+    let mut out = Map::new();
+    out.insert("english".into(), d.english.into());
+    out.insert("reason".into(), d.reason.into());
+    out.insert("detection".into(), d.detection.map_or(Value::Null, |a| a.to_json()));
+    Ok(Value::Object(out).to_string())
+}
+
 /// One step of a browser agent, from jev-ultrafast.
 #[pyclass(frozen, module = "kime._native")]
 struct AgentStep {
@@ -186,5 +213,8 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<AgentStep>()?;
     m.add_function(wrap_pyfunction!(clean_email_body, m)?)?;
     m.add_function(wrap_pyfunction!(preset, m)?)?;
+    m.add_function(wrap_pyfunction!(analyse, m)?)?;
+    m.add_function(wrap_pyfunction!(detect_script, m)?)?;
+    m.add_function(wrap_pyfunction!(detect, m)?)?;
     Ok(())
 }

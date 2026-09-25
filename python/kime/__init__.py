@@ -30,6 +30,12 @@ __all__ = [
     "moderation_questions",
     "router_questions",
     "triage_questions",
+    "Router",
+    "RouteDecision",
+    "DEFAULT_MODELS",
+    "detect_language",
+    "detect_script",
+    "is_english",
 ]
 
 _LAYA_REPO = "convaiinnovations/laya"
@@ -289,3 +295,6 @@ def agent_step(
     snapshot: Dict[str, Any], goal: str, history: Optional[List[Any]] = None
 ) -> AgentStep:
     return AgentStep(snapshot, goal, history)
+
+
+from .router import DEFAULT_MODELS, RouteDecision, Router, detect_language, detect_script, is_english  # noqa: E402
