@@ -525,6 +525,9 @@ async fn systemone(
             "request body must be an object with a 'questions' field",
         );
     }
+    if laya && !body["questions"].is_object() {
+        return detail(StatusCode::BAD_REQUEST, "'questions' must be an object");
+    }
     let body = Value::Object(body);
     let mut req = match parse(&body, if laya { &Limits::LAYA } else { &Limits::JEV }) {
         Ok(r) => r,

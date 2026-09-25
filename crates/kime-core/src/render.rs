@@ -64,15 +64,17 @@ pub fn compat_options(c: &Criteria) -> Vec<String> {
         Criteria::Score(levels) => {
             levels.iter().enumerate().map(|(i, v)| format!("level {i}: {}", criterion(v))).collect()
         }
-        Criteria::Noul { when_false, when_true } => {
+        Criteria::Noul { when_false, when_true, labels } => {
             let side = |v: &Option<Value>, default: &str| match v {
                 None | Some(Value::Null) => default.to_string(),
                 Some(Value::String(s)) if s.is_empty() => default.to_string(),
                 Some(v) => criterion(v),
             };
+            let (f, t) =
+                labels.as_ref().map_or(("false", "true"), |(f, t)| (f.as_str(), t.as_str()));
             vec![
-                format!("false: {}", side(when_false, NOUL_FALSE)),
-                format!("true: {}", side(when_true, NOUL_TRUE)),
+                format!("{f}: {}", side(when_false, NOUL_FALSE)),
+                format!("{t}: {}", side(when_true, NOUL_TRUE)),
             ]
         }
     }
