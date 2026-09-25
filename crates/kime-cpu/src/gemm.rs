@@ -560,6 +560,10 @@ mod blas {
     const KB: usize = 128;
     /// Columns per task are a multiple of this when the columns are split.
     pub(super) const COLS: usize = 256;
+    /// Outputs narrower than this skip Accelerate. On the M1 it gives a lone output column
+    /// different bits by where the row sits in the call, so a question would not get the same
+    /// answer alone and in a batch. A few dot products per row cost nothing anyway.
+    const NARROW: usize = 8;
 
     #[link(name = "Accelerate", kind = "framework")]
     unsafe extern "C" {
@@ -606,6 +610,24 @@ mod blas {
         let (k, n) = (args.k, args.n);
         let dim = |v: usize| i32::try_from(v).expect("GEMM sizes fit in an i32");
         let _ = threads;
+        if n < NARROW {
+            spawn(m.div_ceil(ROWS), &|t, _| {
+                let mut sums = [0f32; NARROW];
+                for r in t * ROWS..m.min((t + 1) * ROWS) {
+                    let x = &args.x[r * k..(r + 1) * k];
+                    for (j, v) in sums[..n].iter_mut().enumerate() {
+                        let w = &args.w[j * k..(j + 1) * k];
+                        *v = x
+                            .iter()
+                            .zip(w)
+                            .map(|(&a, &b)| f64::from(a) * f64::from(b))
+                            .sum::<f64>() as f32;
+                    }
+                    args.put_row(r, 0, &sums[..n]);
+                }
+            });
+            return;
+        }
         let (mt, cols) = (m.div_ceil(ROWS), COLS.min(n));
         spawn(mt * n.div_ceil(cols), &|t, scratch| {
             let (bi, bj) = (t % mt, t / mt);

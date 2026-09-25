@@ -4,8 +4,8 @@
 //!
 //! The patterns are Laya's, copied as written. Python's regexes have lookarounds and Rust's do
 //! not, so the two lookaheads and the sentence split's lookbehind are done by hand. Python's `\s`
-//! also takes the four separators U+001C to U+001F, so [`py`] adds them wherever a pattern says
-//! `\s`, and [`space`] is Python's `str.isspace`.
+//! also takes the four separators U+001C to U+001F, so `py` adds them wherever a pattern says
+//! `\s`, and `space` is Python's `str.isspace`.
 
 use std::sync::OnceLock;
 

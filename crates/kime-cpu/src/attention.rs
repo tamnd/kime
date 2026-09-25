@@ -162,6 +162,12 @@ pub unsafe fn block(
     }
 }
 
+/// Floats of scratch each task of [`block`] needs over sequences of at most `tokens` tokens.
+#[must_use]
+pub fn scratch_len(tokens: usize) -> usize {
+    QT * tokens.next_multiple_of(KT)
+}
+
 /// Queries taken together.
 const QT: usize = 4;
 /// Keys per tile.
