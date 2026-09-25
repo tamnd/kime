@@ -184,6 +184,7 @@ dependencies = [
 name = "kime-engine"
 version = "0.0.22"
 dependencies = [
+ "blake3",
  "kime-core",
  "kime-cpu",
  "kime-cuda",

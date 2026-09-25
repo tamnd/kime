@@ -19,7 +19,7 @@ use axum::routing::{get, post};
 use axum::{Extension, Router};
 use kime_core::answer::{Answer, Response};
 use kime_core::request::{Limits, Loc, Problem, Request, parse};
-use kime_engine::Error;
+use kime_engine::{CacheMode, Error};
 use serde_json::{Map, Value, json};
 
 use crate::auth::{Auth, Bucket, Denied};
@@ -360,10 +360,17 @@ struct Opts {
     entropy: bool,
     extensions: bool,
     deadline: Option<Duration>,
+    cache: CacheMode,
 }
 
 fn opts(kime: Option<&Value>) -> Result<Opts, Vec<Problem>> {
-    let mut o = Opts { precision: Some(2), entropy: false, extensions: false, deadline: None };
+    let mut o = Opts {
+        precision: Some(2),
+        entropy: false,
+        extensions: false,
+        deadline: None,
+        cache: CacheMode::Use,
+    };
     let Some(k) = kime else { return Ok(o) };
     let problem = |field: &str, kind, msg: &str, input: &Value| Problem {
         loc: vec!["body".into(), "kime".into(), Loc::from(field)],
@@ -418,6 +425,18 @@ fn opts(kime: Option<&Value>) -> Result<Opts, Vec<Problem>> {
                 "deadline_ms",
                 "int_range",
                 "deadline_ms must be a whole number of milliseconds, 1 or more",
+                v,
+            )),
+        },
+    }
+    match k.get("cache") {
+        None | Some(Value::Null) => {}
+        Some(v) => match v.as_str().and_then(CacheMode::parse) {
+            Some(c) => o.cache = c,
+            None => bad.push(problem(
+                "cache",
+                "literal_error",
+                "cache must be \"use\", \"bypass\" or \"refresh\"",
                 v,
             )),
         },
@@ -550,9 +569,13 @@ async fn systemone(
             return too_many_tokens(n, s.max_request_tokens);
         }
     }
-    let mut done = match s.models.decide(resolved.at, vec![req], o.deadline).await {
-        Ok(d) => d,
-        Err(r) => return refused(r, o.deadline),
+    // A request the answer cache holds all of is answered here, without waiting in the queue.
+    let (mut done, hit) = match s.models.cached(resolved.at, &req) {
+        Some(d) => (d, true),
+        None => match s.models.decide(resolved.at, vec![req], o.deadline).await {
+            Ok(d) => (d, false),
+            Err(r) => return refused(r, o.deadline),
+        },
     };
     let res = match done.results.pop() {
         Some(Ok(r)) => r,
@@ -577,6 +600,12 @@ async fn systemone(
                     "total": us(total),
                 },
                 "routing": s.models.routing(&resolved),
+                "cache": {"answers": match o.cache {
+                    CacheMode::Use if hit => "hit",
+                    CacheMode::Use => "miss",
+                    CacheMode::Bypass => "bypass",
+                    CacheMode::Refresh => "refresh",
+                }},
                 "answers": extras(&res, o),
             })
         });

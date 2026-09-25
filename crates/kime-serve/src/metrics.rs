@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
-use kime_engine::Memory;
+use kime_engine::{CacheStats, Memory};
 use kime_route::router::By;
 
 /// Bucket bounds for times, from 50 µs to 5 s, in seconds.
@@ -161,6 +161,12 @@ impl Stats {
         self.pass_tokens.count(p.tokens);
         self.pass_batches.count(p.batches);
     }
+
+    /// A request answered from the answer cache, which ran no forward pass.
+    pub(crate) fn cached(&self, questions: usize, tokens: usize) {
+        self.questions.fetch_add(questions as u64, Ordering::Relaxed);
+        self.input_tokens.fetch_add(tokens as u64, Ordering::Relaxed);
+    }
 }
 
 /// A model's name and live numbers, for [`Metrics::render`].
@@ -171,6 +177,7 @@ pub(crate) struct ModelView<'a> {
     pub(crate) pending: usize,
     pub(crate) per_request: Duration,
     pub(crate) memory: Memory,
+    pub(crate) cache: CacheStats,
 }
 
 /// The routes, a fixed set so clients cannot grow the metrics.
@@ -351,6 +358,34 @@ impl Metrics {
                     m.id
                 );
             }
+        }
+        for (name, help, get) in [
+            (
+                "kime_cache_hits_total",
+                "Questions answered from a cache, by cache and model. Only the answer cache for now.",
+                (|c| c.hits) as fn(&CacheStats) -> u64,
+            ),
+            ("kime_cache_misses_total", "Questions looked up in a cache and not found.", |c| {
+                c.misses
+            }),
+        ] {
+            head(&mut out, name, "counter", help);
+            for m in models.iter().filter(|m| m.cache.capacity > 0) {
+                let _ = writeln!(
+                    out,
+                    "{name}{{cache=\"answer\",model=\"{}\"}} {}",
+                    m.id,
+                    get(&m.cache)
+                );
+            }
+        }
+        head(&mut out, "kime_cache_entries", "gauge", "Answers a cache holds, by cache and model.");
+        for m in models.iter().filter(|m| m.cache.capacity > 0) {
+            let _ = writeln!(
+                out,
+                "kime_cache_entries{{cache=\"answer\",model=\"{}\"}} {}",
+                m.id, m.cache.entries
+            );
         }
         head(
             &mut out,

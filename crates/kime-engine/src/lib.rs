@@ -27,8 +27,12 @@ use kime_tok::Tokenizer;
 use kime_tok::layout::{CompatBudget, CompatSequence, Cut};
 use serde_json::Value;
 
+mod cache;
 pub mod hub;
 mod split;
+
+use cache::{AnswerCache, Entry};
+pub use cache::{CacheMode, CacheStats};
 
 /// Where the model runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -126,6 +130,7 @@ pub struct Builder {
     device: Device,
     precision: Precision,
     preload: bool,
+    answer_cache: usize,
 }
 
 impl Builder {
@@ -156,6 +161,14 @@ impl Builder {
     #[must_use]
     pub fn preload(mut self, yes: bool) -> Self {
         self.preload = yes;
+        self
+    }
+
+    /// Keeps the answers to about `entries` questions, so the same question on the same state
+    /// is answered again without the device. 0, the default, keeps none.
+    #[must_use]
+    pub fn answer_cache(mut self, entries: usize) -> Self {
+        self.answer_cache = entries;
         self
     }
 
@@ -197,6 +210,7 @@ impl Builder {
                 embed_buckets,
                 d: model.spec.encoder.d,
                 memory: [AtomicUsize::new(weights), AtomicUsize::new(plans)],
+                cache: (self.answer_cache > 0).then(|| AnswerCache::new(self.answer_cache)),
                 runner: Mutex::new(Session {
                     runner,
                     embed,
@@ -338,6 +352,7 @@ struct Inner {
     runner: Mutex<Session>,
     /// [`Memory`], kept up to date after every forward pass so reading it needs no lock.
     memory: [AtomicUsize; 2],
+    cache: Option<AnswerCache>,
 }
 
 /// A loaded model on a device. Clones share it, and it can be used from any thread.
@@ -365,6 +380,8 @@ pub struct Timing {
     pub truncated: usize,
     /// State tokens left out of those questions.
     pub cut_tokens: usize,
+    /// Questions answered from the answer cache, which took no device time.
+    pub cached: usize,
 }
 
 /// Bytes a model holds on its device.
@@ -383,6 +400,27 @@ struct Item<'a> {
     seq: CompatSequence,
     logits: Vec<f32>,
     act: [f32; 2],
+}
+
+impl Item<'_> {
+    fn key(&self) -> cache::Key {
+        AnswerCache::key(&self.seq, self.q.qtype.index() as u8)
+    }
+
+    fn fill(&mut self, e: Entry) {
+        self.logits = e.logits.into_vec();
+        self.act = e.act;
+    }
+}
+
+/// The request's `kime.cache`, the default for anything but a mode's name.
+fn mode(req: &Request) -> CacheMode {
+    req.kime
+        .as_ref()
+        .and_then(|k| k.get("cache"))
+        .and_then(Value::as_str)
+        .and_then(CacheMode::parse)
+        .unwrap_or_default()
 }
 
 impl Kime {
@@ -416,6 +454,30 @@ impl Kime {
     pub fn memory(&self) -> Memory {
         let m = &self.inner.memory;
         Memory { weights: m[0].load(Ordering::Relaxed), plans: m[1].load(Ordering::Relaxed) }
+    }
+
+    /// The answer cache's counts, all 0 when it is off.
+    #[must_use]
+    pub fn cache_stats(&self) -> CacheStats {
+        self.inner.cache.as_ref().map(AnswerCache::stats).unwrap_or_default()
+    }
+
+    /// The answer to `req` when the answer cache holds every one of its questions, found without
+    /// the device lock, so the server can answer it without queueing it. `None` otherwise, and
+    /// then nothing is counted, since the request goes on to [`Kime::decide_batch`].
+    #[must_use]
+    pub fn cached(&self, req: &Request) -> Option<Response> {
+        let cache = self.inner.cache.as_ref()?;
+        if mode(req) != CacheMode::Use || req.questions.is_empty() {
+            return None;
+        }
+        let parsed = [parse(&req.to_json(), &Limits::LAYA).ok()?];
+        let mut items = self.lay_out(&parsed).ok()?;
+        let keys: Vec<_> = items.iter().map(Item::key).collect();
+        for (it, e) in items.iter_mut().zip(cache.all(&keys)?) {
+            it.fill(e);
+        }
+        self.respond(&parsed, &items).pop()
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Session> {
@@ -463,12 +525,38 @@ impl Kime {
     ///
     /// As [`Kime::decide_batch`].
     pub fn decide_batch_timed(&self, reqs: &[Request]) -> Result<(Vec<Response>, Timing), Error> {
-        let inner = &*self.inner;
         let t0 = Instant::now();
         let mut parsed = Vec::with_capacity(reqs.len());
         for r in reqs {
             parsed.push(parse(&r.to_json(), &Limits::LAYA).map_err(Error::Invalid)?);
         }
+        let mut items = self.lay_out(&parsed)?;
+        let tokenize = t0.elapsed();
+        let t1 = Instant::now();
+        let (run, keys) = self.look_up(reqs, &mut items);
+        let batches = if run.is_empty() { 0 } else { self.run(&mut items, &run)? };
+        if let Some(c) = &self.inner.cache {
+            let keep = run.iter().filter(|&&i| mode(&reqs[items[i].req]) != CacheMode::Bypass);
+            c.insert(keep.map(|&i| {
+                (keys[i], Entry { logits: items[i].logits.clone().into(), act: items[i].act })
+            }));
+        }
+        let cached = items.len() - run.len();
+        let cut = items.iter().map(|it| it.seq.state_tokens - it.seq.state_tokens_used);
+        let timing = Timing {
+            tokenize,
+            device: t1.elapsed(),
+            batches,
+            truncated: cut.clone().filter(|&n| n > 0).count(),
+            cut_tokens: cut.sum(),
+            cached,
+        };
+        Ok((self.respond(&parsed, &items), timing))
+    }
+
+    /// Each question of `parsed` laid out as Laya lays it out, in request order.
+    fn lay_out<'a>(&self, parsed: &'a [Request]) -> Result<Vec<Item<'a>>, Error> {
+        let inner = &*self.inner;
         let mut items = Vec::new();
         for (i, r) in parsed.iter().enumerate() {
             if r.questions.is_empty() {
@@ -491,35 +579,52 @@ impl Kime {
                 items.push(Item { req: i, q, seq, logits: Vec::new(), act: [0.0; 2] });
             }
         }
-        let tokenize = t0.elapsed();
-        let t1 = Instant::now();
-        let batches = self.run(&mut items)?;
-        let cut = items.iter().map(|it| it.seq.state_tokens - it.seq.state_tokens_used);
-        let timing = Timing {
-            tokenize,
-            device: t1.elapsed(),
-            batches,
-            truncated: cut.clone().filter(|&n| n > 0).count(),
-            cut_tokens: cut.sum(),
-        };
+        Ok(items)
+    }
+
+    /// Fills the items the cache holds, for the requests that read it. It gives the items left
+    /// to run, and every item's key, none when the cache is off.
+    fn look_up(&self, reqs: &[Request], items: &mut [Item<'_>]) -> (Vec<usize>, Vec<cache::Key>) {
+        let Some(c) = &self.inner.cache else { return ((0..items.len()).collect(), Vec::new()) };
+        let keys: Vec<_> = items.iter().map(Item::key).collect();
+        let look: Vec<usize> =
+            (0..items.len()).filter(|&i| mode(&reqs[items[i].req]) == CacheMode::Use).collect();
+        let found = c.get(&look.iter().map(|&i| keys[i]).collect::<Vec<_>>());
+        let mut hit = vec![false; items.len()];
+        for (&i, e) in look.iter().zip(found) {
+            if let Some(e) = e {
+                items[i].fill(e);
+                hit[i] = true;
+            }
+        }
+        ((0..items.len()).filter(|&i| !hit[i]).collect(), keys)
+    }
+
+    /// The responses, from items whose logits are in.
+    fn respond(&self, parsed: &[Request], items: &[Item<'_>]) -> Vec<Response> {
+        let inner = &*self.inner;
         let mut out: Vec<Response> = parsed
             .iter()
             .map(|_| Response { model: LAYA_MODEL.into(), answers: Vec::new(), input_tokens: 0 })
             .collect();
-        for it in &items {
+        for it in items {
             let res = &mut out[it.req];
             res.input_tokens += it.seq.ids.len();
             res.answers
                 .push((it.q.id.clone(), laya_answer(it.q, &it.logits, it.act, &inner.temps)));
         }
-        Ok((out, timing))
+        out
     }
 
-    /// Runs every item in the batches [`split::split`] picks, and says how many it took.
-    fn run(&self, items: &mut [Item<'_>]) -> Result<usize, Error> {
+    /// Runs the items at `which` in the batches [`split::split`] picks, and says how many it
+    /// took.
+    fn run(&self, items: &mut [Item<'_>], which: &[usize]) -> Result<usize, Error> {
         let sizes: Vec<(usize, usize)> =
-            items.iter().map(|it| (it.seq.ids.len(), it.seq.markers.len())).collect();
-        let batches = split::split(&self.inner.buckets, &sizes);
+            which.iter().map(|&i| (items[i].seq.ids.len(), items[i].seq.markers.len())).collect();
+        let batches: Vec<Vec<usize>> = split::split(&self.inner.buckets, &sizes)
+            .into_iter()
+            .map(|b| b.into_iter().map(|j| which[j]).collect())
+            .collect();
         let mut s = self.lock();
         let Session { runner, buf, out, .. } = &mut *s;
         for batch in &batches {

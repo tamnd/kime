@@ -20,6 +20,7 @@ const USAGE: &str =
 options: --device auto|cpu|cuda[:N]  --threads N  --precision f16|f32|int8
          --max-batch N  --max-batch-tokens N  --max-body BYTES  --max-request-tokens N
          --max-queue-ms MS (0 is off)  --max-pending N (0 is off)  --io-threads N  --no-jev-aliases
+         --answer-cache N (answers kept per model, 100000 by default, 0 is off)
          --api-keys-file PATH  --rpm N  --tps N  --log-level info
          --log-requests  --log-format text|json  --otlp-endpoint http://HOST:4318  --otlp-service NAME
 Every option is also a kime.toml field (--max-batch is max_batch) and a KIME_ variable
@@ -28,6 +29,9 @@ laya-serve's LAYA_ variables. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_
 OTEL_SERVICE_NAME are read when the KIME_ ones are not set. The first model answers requests that name no model. API keys
 also come from KIME_API_KEYS (comma separated) and from laya-serve's LAYA_API_KEY. With no
 keys anyone can call the API.";
+
+/// Answers the answer cache keeps per model when nothing says otherwise, from spec/11-serving.md.
+const ANSWER_CACHE: usize = 100_000;
 
 /// Every setting, as a kime.toml holds it. Each source gives some of them, and a later source's
 /// value replaces an earlier one's.
@@ -46,6 +50,7 @@ struct Settings {
     max_request_tokens: Option<usize>,
     max_queue_ms: Option<u64>,
     max_pending: Option<usize>,
+    answer_cache: Option<usize>,
     io_threads: Option<usize>,
     jev_aliases: Option<bool>,
     api_keys_file: Option<String>,
@@ -74,6 +79,7 @@ impl Settings {
             max_request_tokens: over.max_request_tokens.or(self.max_request_tokens),
             max_queue_ms: over.max_queue_ms.or(self.max_queue_ms),
             max_pending: over.max_pending.or(self.max_pending),
+            answer_cache: over.answer_cache.or(self.answer_cache),
             io_threads: over.io_threads.or(self.io_threads),
             jev_aliases: over.jev_aliases.or(self.jev_aliases),
             api_keys_file: over.api_keys_file.or(self.api_keys_file),
@@ -138,6 +144,7 @@ impl Settings {
             max_request_tokens: num("KIME_MAX_REQUEST_TOKENS", var("KIME_MAX_REQUEST_TOKENS"))?,
             max_queue_ms: num("KIME_MAX_QUEUE_MS", var("KIME_MAX_QUEUE_MS"))?,
             max_pending: num("KIME_MAX_PENDING", var("KIME_MAX_PENDING"))?,
+            answer_cache: num("KIME_ANSWER_CACHE", var("KIME_ANSWER_CACHE"))?,
             io_threads: num("KIME_IO_THREADS", var("KIME_IO_THREADS"))?,
             jev_aliases: bool("KIME_JEV_ALIASES")?,
             api_keys_file: var("KIME_API_KEYS_FILE"),
@@ -224,6 +231,7 @@ impl Settings {
                 "--max-request-tokens" => s.max_request_tokens = Some(num(a, &val()?)?),
                 "--max-queue-ms" => s.max_queue_ms = Some(num(a, &val()?)?),
                 "--max-pending" => s.max_pending = Some(num(a, &val()?)?),
+                "--answer-cache" => s.answer_cache = Some(num(a, &val()?)?),
                 "--io-threads" => s.io_threads = Some(num(a, &val()?)?),
                 "--api-keys-file" => s.api_keys_file = Some(val()?),
                 "--rpm" => s.rpm = Some(num(a, &val()?)?),
@@ -335,6 +343,7 @@ fn config(s: Settings) -> Result<kime_serve::Config, String> {
             .model(name)
             .device(dev)
             .precision(prec)
+            .answer_cache(s.answer_cache.unwrap_or(ANSWER_CACHE))
             .build()
             .map_err(|e| format!("{name}: {e}"))?;
         if !quiet {

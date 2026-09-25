@@ -20,6 +20,7 @@ kime-tok.workspace = true
 kime-cpu.workspace = true
 kime-cuda = { workspace = true, optional = true }
 serde_json.workspace = true
+blake3.workspace = true
 
 [features]
 default = ["cuda"]

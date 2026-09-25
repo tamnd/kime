@@ -362,3 +362,78 @@ async fn serve_routed() {
     let _ = stop.send(());
     server.await.unwrap().unwrap();
 }
+
+/// With the answer cache on, the second of two identical requests is answered without the queue
+/// and gives the same answers, `kime.cache` is checked and followed, and `/metrics` counts the
+/// hits and misses.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn serve_answer_cache() {
+    let model =
+        std::env::var("KIME_MODELS").map_or_else(|_| "laya".into(), |d| format!("{d}/laya"));
+    let b = Kime::builder().model(model).device(Device::Cpu { threads: 0 }).answer_cache(1000);
+    let kime = match b.build() {
+        Ok(k) => k,
+        Err(e) => {
+            assert!(std::env::var_os("KIME_REQUIRE_WEIGHTS").is_none(), "{e}");
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let server = tokio::spawn(kime_serve::serve(
+        listener,
+        kime_serve::Config::new(addr, vec![kime]),
+        async {
+            let _ = stopped.await;
+        },
+    ));
+
+    let q = json!({
+        "topic": {"type": "choice", "instructions": "What does the customer want?",
+            "criteria": {"cancel": "", "refund": ""}},
+        "angry": {"type": "noul", "instructions": "Is the customer angry?"}});
+    let body = |cache: &str| {
+        json!({"state": "I was charged twice, refund me now", "questions": q,
+            "kime": {"extensions": true, "cache": cache}})
+    };
+    let mut got = Vec::new();
+    for (cache, want) in
+        [("use", "miss"), ("use", "hit"), ("bypass", "bypass"), ("refresh", "refresh")]
+    {
+        let (s, v) = post(addr, "/v1/systemone", &body(cache)).await;
+        assert_eq!(s, 200, "{v}");
+        assert_eq!(v["kime"]["cache"]["answers"], want, "{cache}");
+        got.push(v);
+    }
+    for v in &got[1..] {
+        assert_eq!((&v["answers"], &v["usage"]), (&got[0]["answers"], &got[0]["usage"]));
+    }
+    // A Laya request with the same questions is found too, and keeps Laya's shape.
+    let (s, v) = post(
+        addr,
+        "/v1/systemone",
+        &json!({"state": "I was charged twice, refund me now", "questions": q}),
+    )
+    .await;
+    assert_eq!(s, 200, "{v}");
+    assert!(v["routing"].is_object() && v.get("kime").is_none(), "{v}");
+    let (s, v) = post(addr, "/v1/systemone", &body("off")).await;
+    assert_eq!(s, 422, "{v}");
+
+    let mut s = tokio::net::TcpStream::connect(addr).await.unwrap();
+    s.write_all(b"GET /metrics HTTP/1.1\r\nhost: x\r\nconnection: close\r\n\r\n").await.unwrap();
+    let mut text = String::new();
+    s.read_to_string(&mut text).await.unwrap();
+    for line in [
+        "kime_cache_hits_total{cache=\"answer\",model=\"laya\"} 4",
+        "kime_cache_misses_total{cache=\"answer\",model=\"laya\"} 2",
+        "kime_cache_entries{cache=\"answer\",model=\"laya\"} 2",
+    ] {
+        assert!(text.contains(line), "{line} in {text}");
+    }
+
+    let _ = stop.send(());
+    server.await.unwrap().unwrap();
+}
