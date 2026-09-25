@@ -54,6 +54,8 @@ Multiple GPUs: each device has its own scheduler. A request goes to the device w
 - Size: `--answer-cache` entries (default 100k). It is only possible because the engine is deterministic.
 - `kime.cache = "bypass"` skips both caches. `"refresh"` recomputes and overwrites.
 
+What is built today: one answer cache per loaded model, on in `kime serve` and off in the library unless `Builder::answer_cache` asks for it. A question's answer depends only on its own row, since every question is its own sequence, so an entry is the logits and act output of one row, keyed by the blake3 of the row's token ids, option markers and question type, and the answer JSON is built from it again with the labels the request sent. The model, version and precision are the cache's own, so they need no place in the key. A request whose every question is cached is answered on the request thread without the queue, and in a pass only the rows not found go to the device. Eviction keeps two generations of half the size each, and a hit in the old one moves the entry back, which acts like an LRU for one hash map insert. With `extensions` on, `kime.cache.answers` is `hit` when the request was answered without the queue, `miss` when it went to the worker (where some of its rows may still have been found), or the mode it asked for.
+
 ### Tokenization cache
 
 Rendered question headers and options tokenize to the same ids across requests with the same questions, which is the common case (fixed presets, fixed agent heads). A per-worker LRU keyed by the hash of the rendered question text maps to the question tower row ids. This is laya-mlx's prefix cache, applied to the question tower.
@@ -120,7 +122,8 @@ The metrics `/metrics` has today. Times are histograms with buckets from 50 µs 
 | `kime_otel_spans_total` | outcome | spans `exported`, `dropped` because the queue was full and `failed` because the collector did not answer 2xx, when tracing is on |
 | `kime_route_decisions_total` | model, reason | requests the router sent to a model, by the rule that decided: lang, lang_guess, no_letters, script, word_lists, identifier |
 
-Cache hit ratios come with the caches.
+| `kime_cache_hits_total`, `kime_cache_misses_total` | cache, model | questions answered from a cache and questions looked up and not found. The hit ratio is hits over hits plus misses. Only `cache="answer"` for now |
+| `kime_cache_entries` | cache, model | entries a cache holds |
 
 ## Configuration
 
@@ -153,6 +156,7 @@ max_batch_tokens = 16384
 max_body = 8388608
 max_queue_ms = 500
 max_pending = 4096
+answer_cache = 100000
 io_threads = 2
 jev_aliases = true
 api_keys_file = "/run/secrets/kime-keys"
@@ -161,4 +165,4 @@ tps = 20000
 log_level = "info"
 ```
 
-The state and answer caches, `default_model` and the metrics address get their fields when they arrive.
+The state cache, `default_model` and the metrics address get their fields when they arrive.

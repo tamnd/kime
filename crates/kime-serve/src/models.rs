@@ -80,6 +80,7 @@ impl Model {
             pending: self.load.pending.load(Ordering::Relaxed),
             per_request: Duration::from_nanos(self.load.per_request.load(Ordering::Relaxed)),
             memory: self.kime.memory(),
+            cache: self.kime.cache_stats(),
         }
     }
 }
@@ -306,6 +307,16 @@ impl Models {
         self.list[r.at].stats.routed(d.by);
         let detection = d.detection.map_or(Value::Null, |a| a.to_json());
         r.route = Some(Route { reason: d.reason, detection });
+    }
+
+    /// The answer to `req` when the model's answer cache holds all of it, which then needs no
+    /// queue and no forward pass.
+    pub(crate) fn cached(&self, at: usize, req: &Request) -> Option<Done> {
+        let m = &self.list[at];
+        let res = m.kime.cached(req)?;
+        m.stats.cached(res.answers.len(), res.input_tokens);
+        let pass = Timing { cached: res.answers.len(), ..Timing::default() };
+        Some(Done { results: vec![Ok(res)], queue: Duration::ZERO, pass, shared: 1 })
     }
 
     /// Queues requests on a model's worker and waits for their answers without blocking the
