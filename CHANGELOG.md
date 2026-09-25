@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.0.20
 
 - Requests follow Laya 0.3.20's validation (#147). Noul questions take `labels`, the words the model reads in place of `false` and `true`, trimmed, and a label set that does not map exactly `false` and `true` to two different non-blank strings is a 422, as is `labels` on a choice or score question. Noul criteria keyed other than true and false are now refused in the Laya compat mode too, and a `questions` that is not an object is a 400 with laya-serve's message. On the Mac, 150 English papluca texts with four noul questions each, cycling through seven label sets (none, yes and no, a French pair, one with padding, one with `[MASK]` in it and others), got answers within 0.0001 of laya-serve 0.3.20 on all 600 questions, 592 of them identical, at 412 ms a request for kime and 422 ms for Laya with a load average of 13 to 26. Every error case in `tests/errors/cases.json` now gives the same status as laya-serve 0.3.20 except an unknown model name, which kime keeps as a 404 on purpose.
 
