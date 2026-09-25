@@ -61,7 +61,7 @@ impl CpuBackend {
 
     /// The same backend with the GEMMs over token rows in INT8 when `on`: weights rounded per
     /// output channel at upload, activations per row as they are read, sums in i32. See
-    /// [`qgemm`](crate::qgemm).
+    /// [`qgemm`].
     #[must_use]
     pub fn with_int8(mut self, on: bool) -> Self {
         self.int8 = on;
@@ -375,7 +375,7 @@ impl Backend for CpuBackend {
             }
         };
         let mut ropes: Vec<(u64, Rope)> = Vec::new();
-        let mut scratch = bucket.tokens;
+        let mut scratch = attention::scratch_len(bucket.tokens);
         let mut steps = Vec::with_capacity(graph.ops.len());
         for (i, op) in graph.ops.iter().enumerate() {
             let step = match *op {
@@ -738,6 +738,8 @@ impl Ctx<'_> {
                     // of head h.
                     unsafe {
                         let p = scratch.get(worker);
+                        // Growing it here would allocate on the warm path.
+                        debug_assert!(p.capacity() >= attention::scratch_len(cu[s + 1] - cu[s]));
                         attention::block(x, heads, (cu[s], cu[s + 1]), q0, h, window, p, &shared);
                     }
                 });
