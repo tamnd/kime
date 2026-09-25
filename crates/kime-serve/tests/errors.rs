@@ -2,7 +2,7 @@
 //! server with the Laya checkpoint on the CPU.
 //!
 //! The cases are in `tests/errors/cases.json`. Each has kime's answer as `kime` and, for the Laya
-//! shaped ones, what laya-serve 0.3.9 answered as `laya` (recorded by `tests/errors/record.py`).
+//! shaped ones, what laya-serve 0.3.20 answered as `laya` (recorded by `tests/errors/record.py`).
 //! kime must give its snapshot, and must give laya-serve's status unless the case says why it
 //! `differs`. Where both answer, the answers must agree to the fourth decimal. Where both refuse
 //! with a 400, 404 or 405, the body must be the same. Laya's 422 messages come from Python

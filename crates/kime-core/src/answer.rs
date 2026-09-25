@@ -119,9 +119,25 @@ pub fn py_round(x: f64, digits: usize) -> f64 {
 }
 
 impl Answer {
+    /// Laya's `answer_confidence` (added in 0.3.20): the probability of the answer given, which
+    /// is what the temperatures are fitted to, unlike the entropy `confidence`.
+    #[must_use]
+    pub fn answer_confidence(&self) -> f64 {
+        match self {
+            Answer::Choice { probabilities, .. } => {
+                probabilities.iter().map(|p| p.1).fold(0.0, f64::max).clamp(0.0, 1.0)
+            }
+            Answer::Score { probabilities, .. } => {
+                probabilities.iter().copied().fold(0.0, f64::max).clamp(0.0, 1.0)
+            }
+            Answer::Noul { confidence, .. } => *confidence,
+        }
+    }
+
     /// The answer in Laya's JSON shape, with every number rounded to 4 places.
     #[must_use]
     pub fn to_json(&self) -> Value {
+        let answer_confidence = py_round(self.answer_confidence(), 4);
         let r = |x: f64| py_round(x, 4);
         match self {
             Answer::Choice { choice, probabilities, confidence, act_probability } => json!({
@@ -129,6 +145,7 @@ impl Answer {
                 "choice": choice,
                 "probabilities": probabilities.iter().map(|(k, p)| (k.clone(), json!(r(*p)))).collect::<Map<_, _>>(),
                 "confidence": r(*confidence),
+                "answer_confidence": answer_confidence,
                 "action": {"act_probability": r(*act_probability)},
             }),
             Answer::Score { score, legend, probabilities, confidence, act_probability } => json!({
@@ -137,12 +154,14 @@ impl Answer {
                 "legend": legend.iter().enumerate().map(|(i, v)| (i.to_string(), v.clone())).collect::<Map<_, _>>(),
                 "probabilities": probabilities.iter().enumerate().map(|(i, p)| (i.to_string(), json!(r(*p)))).collect::<Map<_, _>>(),
                 "confidence": r(*confidence),
+                "answer_confidence": answer_confidence,
                 "action": {"act_probability": r(*act_probability)},
             }),
             Answer::Noul { noul, confidence, act_probability } => json!({
                 "type": "noul",
                 "noul": r(*noul),
                 "confidence": r(*confidence),
+                "answer_confidence": answer_confidence,
                 "action": {"act_probability": r(*act_probability)},
             }),
         }

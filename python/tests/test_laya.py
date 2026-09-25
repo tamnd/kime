@@ -38,11 +38,20 @@ def close(got, want, path=""):
         assert got == want, path
 
 
+def as_recorded(res):
+    """The answers without `answer_confidence`, which Laya added in 0.3.20 after these recordings
+    were made, once it is checked to be the largest probability, or the confidence of a noul."""
+    for a in res["answers"].values():
+        got = a.pop("answer_confidence")
+        assert got == (max(a["probabilities"].values()) if "probabilities" in a else a["confidence"])
+    return res
+
+
 def test_system_one_matches_laya(agent):
     laya = {c["id"]: c["answer"] for c in lines("laya.jsonl")}
     exact = 0
     for case in lines("cases.jsonl"):
-        got = agent.system_one(case["state"], case["questions"])
+        got = as_recorded(agent.system_one(case["state"], case["questions"]))
         close(got, laya[case["id"]], case["id"])
         exact += got == laya[case["id"]]
     # Nearly all answers come out byte for byte, and the rest differ in the last rounded digit.

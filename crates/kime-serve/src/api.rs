@@ -340,7 +340,8 @@ async fn object(body: Body, max: usize) -> Result<(Map<String, Value>, usize), H
             StatusCode::BAD_REQUEST,
             "request body must be an object with a 'questions' field",
         )),
-        Err(e) => Err(detail(StatusCode::BAD_REQUEST, format!("request body is not JSON: {e}"))),
+        // laya-serve 0.3.20's words, so a Laya client sees the same body.
+        Err(_) => Err(detail(StatusCode::BAD_REQUEST, "request body must be valid JSON")),
     }
 }
 

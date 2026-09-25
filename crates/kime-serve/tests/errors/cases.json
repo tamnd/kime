@@ -4,15 +4,16 @@
     "method": "POST",
     "path": "/v1/systemone",
     "body": "{",
-    "differs": "laya-serve lets the JSON error escape as a 500 in plain text; spec/03 says 400 and kime keeps it",
     "laya": {
-      "status": 500,
-      "body": "Internal Server Error"
+      "status": 400,
+      "body": {
+        "detail": "request body must be valid JSON"
+      }
     },
     "kime": {
       "status": 400,
       "body": {
-        "detail": "request body is not JSON: EOF while parsing an object at line 1 column 1"
+        "detail": "request body must be valid JSON"
       }
     }
   },
@@ -86,9 +87,9 @@
     "path": "/v1/systemone",
     "body": "{\"state\": \"x\", \"questions\": []}",
     "laya": {
-      "status": 422,
+      "status": 400,
       "body": {
-        "detail": "'list' object has no attribute 'keys'"
+        "detail": "'questions' must be an object"
       }
     },
     "kime": {
@@ -96,7 +97,8 @@
       "body": {
         "detail": "Input should be a valid dictionary"
       }
-    }
+    },
+    "differs": "laya-serve 0.3.20 answers 400 and kime keeps the 422 it gives every question schema error (#147)"
   },
   {
     "name": "bad-type",
@@ -194,23 +196,9 @@
     "path": "/v1/systemone",
     "body": "{\"state\": \"x\", \"questions\": {\"q\": {\"type\": \"noul\", \"instructions\": \"i\", \"criteria\": {\"maybe\": \"m\"}}}}",
     "laya": {
-      "status": 200,
+      "status": 422,
       "body": {
-        "model": "laya-rl-agent",
-        "answers": {
-          "q": {
-            "type": "noul",
-            "noul": 0.1314,
-            "confidence": 0.8686,
-            "action": {
-              "act_probability": 1.0
-            }
-          }
-        },
-        "usage": {
-          "input_tokens": 28,
-          "output_tokens": 0
-        }
+        "detail": "question 'q': a noul question takes 'criteria' keyed only 'true'/'false' (either or both, and omitted is fine), got ['maybe']. Those keys are the option texts the model reads; any other key was silently dropped and replaced with the defaults. If you want the answer worded differently, keep 'criteria' keyed 'true'/'false' and set 'labels' instead."
       }
     },
     "kime": {
@@ -222,6 +210,7 @@
             "type": "noul",
             "noul": 0.1314,
             "confidence": 0.8686,
+            "answer_confidence": 0.8686,
             "action": {
               "act_probability": 1.0
             }
@@ -232,7 +221,8 @@
           "output_tokens": 0
         }
       }
-    }
+    },
+    "differs": "laya-serve 0.3.20 refuses noul criteria keyed other than true and false, and kime still answers as 0.3.9 did (#147)"
   },
   {
     "name": "noul-upper-key",
@@ -248,6 +238,7 @@
             "type": "noul",
             "noul": 0.1427,
             "confidence": 0.8573,
+            "answer_confidence": 0.8573,
             "action": {
               "act_probability": 1.0
             }
@@ -268,6 +259,7 @@
             "type": "noul",
             "noul": 0.1427,
             "confidence": 0.8573,
+            "answer_confidence": 0.8573,
             "action": {
               "act_probability": 1.0
             }
@@ -298,6 +290,7 @@
               "b": 0.184
             },
             "confidence": 0.3113,
+            "answer_confidence": 0.816,
             "action": {
               "act_probability": 1.0
             }
@@ -322,6 +315,7 @@
               "b": 0.184
             },
             "confidence": 0.3113,
+            "answer_confidence": 0.816,
             "action": {
               "act_probability": 1.0
             }
@@ -352,6 +346,7 @@
               "b": 0.184
             },
             "confidence": 0.3113,
+            "answer_confidence": 0.816,
             "action": {
               "act_probability": 1.0
             }
@@ -376,6 +371,7 @@
               "b": 0.184
             },
             "confidence": 0.3113,
+            "answer_confidence": 0.816,
             "action": {
               "act_probability": 1.0
             }
@@ -407,6 +403,7 @@
               "b": 0.2201
             },
             "confidence": 0.2397,
+            "answer_confidence": 0.7799,
             "action": {
               "act_probability": 1.0
             }
@@ -1126,6 +1123,7 @@
               "b": 0.2201
             },
             "confidence": 0.2397,
+            "answer_confidence": 0.7799,
             "action": {
               "act_probability": 1.0
             }
@@ -1150,6 +1148,7 @@
               "b": 0.2201
             },
             "confidence": 0.2397,
+            "answer_confidence": 0.7799,
             "action": {
               "act_probability": 1.0
             }
@@ -1221,6 +1220,7 @@
             "type": "noul",
             "noul": 0.1006,
             "confidence": 0.8994,
+            "answer_confidence": 0.8994,
             "action": {
               "act_probability": 1.0
             }
