@@ -658,10 +658,13 @@ impl Backend for CudaBackend {
                         Epilogue::Relu => (2, false),
                         Epilogue::Accumulate => (0, true),
                     };
-                    let key = Key { dims: (m, a.width, out.width), ab, c: out.ty, acc };
+                    // Picks are per inner size, width and types, not rows, for the reason
+                    // RANKED_ROWS gives.
+                    let dims = (lt::RANKED_ROWS, a.width, out.width);
+                    let key = Key { dims, ab, c: out.ty, acc };
                     let g = lt::Gemm::new(
                         &self.lt,
-                        key.dims,
+                        (m, a.width, out.width),
                         ab,
                         out.ty,
                         acc,

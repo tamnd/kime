@@ -58,6 +58,11 @@ impl Ty {
 /// How many of cuBLASLt's ranked algorithms a GEMM keeps to choose from.
 pub(crate) const CANDIDATES: usize = 8;
 
+/// The rows cuBLASLt ranks algorithms for, whatever rows a GEMM has. A GEMM of a given inner size,
+/// width and types runs the same algorithm in every bucket, so each output sums its inner products
+/// in the same order and a row gets the same bits whatever else is in the batch.
+pub(crate) const RANKED_ROWS: usize = 256;
+
 /// One GEMM with its descriptors, the algorithms cuBLASLt ranks for its shape, and the one it runs.
 pub(crate) struct Gemm {
     desc: sys::cublasLtMatmulDesc_t,
@@ -83,7 +88,7 @@ unsafe impl Send for Gemm {}
 impl Gemm {
     /// Sets up `y = x wᵀ` (plus `y` when `accumulate`) for `m` rows, with `w` and `x` of type
     /// `ab` and `y` of type `c`, running the algorithm cuBLASLt ranks `pick`th (0 is its first
-    /// choice) or its first when it offers fewer.
+    /// choice) for [`RANKED_ROWS`] rows, or the first after it that takes `m` rows.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         h: &Handle,
@@ -127,14 +132,22 @@ impl Gemm {
         g.a = lt::create_matrix_layout(ab.cuda(), k, n, k as i64).map_err(err)?;
         g.b = lt::create_matrix_layout(ab.cuda(), k, m, k as i64).map_err(err)?;
         g.c = lt::create_matrix_layout(c.cuda(), n, m, n as i64).map_err(err)?;
+        let r = RANKED_ROWS as u64;
+        let rb = lt::create_matrix_layout(ab.cuda(), k, r, k as i64).map_err(err)?;
+        let rc = lt::create_matrix_layout(c.cuda(), n, r, n as i64);
+        let rc = rc.map_err(|e| {
+            // SAFETY: rb was created just above and is destroyed once, here.
+            let _ = unsafe { lt::destroy_matrix_layout(rb) };
+            err(e)
+        })?;
         let pref = lt::create_matmul_pref().map_err(err)?;
         let ws = workspace as u64;
         // SAFETY: an all zero result is a valid value for cuBLASLt to overwrite.
         let mut found: [sys::cublasLtMatmulHeuristicResult_t; CANDIDATES] =
             unsafe { std::mem::zeroed() };
         let mut count = 0;
-        // SAFETY: every descriptor is live, the attribute buffers are a u64 and a u32, and `found` has room
-        // for the CANDIDATES results asked for.
+        // SAFETY: every descriptor is live, the attribute buffers are a u64 and a u32, and `found`
+        // has room for the CANDIDATES results asked for.
         let status = unsafe {
             let set = lt::set_matmul_pref_attribute(
                 pref,
@@ -158,9 +171,9 @@ impl Gemm {
                     h.0,
                     g.desc,
                     g.a,
-                    g.b,
-                    g.c,
-                    g.c,
+                    rb,
+                    rc,
+                    rc,
                     pref,
                     CANDIDATES as i32,
                     found.as_mut_ptr(),
@@ -169,16 +182,28 @@ impl Gemm {
                 .result()
             });
             let _ = lt::destroy_matmul_pref(pref);
+            let _ = lt::destroy_matrix_layout(rb);
+            let _ = lt::destroy_matrix_layout(rc);
             status
         };
         status.map_err(err)?;
         let ok = sys::cublasStatus_t::CUBLAS_STATUS_SUCCESS;
         let n = usize::try_from(count).unwrap_or(0).min(CANDIDATES);
         g.algos = found[..n].iter().filter(|r| r.state == ok).map(|r| r.algo).collect();
-        if g.algos.is_empty() {
-            return Err(err(lt::CublasError(sys::cublasStatus_t::CUBLAS_STATUS_NOT_SUPPORTED)));
-        }
-        g.pick = if pick < g.algos.len() { pick } else { 0 };
+        let first = if pick < g.algos.len() { pick } else { 0 };
+        let takes = |a: &sys::cublasLtMatmulAlgo_t| {
+            // SAFETY: an all zero result is a valid value for cuBLASLt to overwrite, and every
+            // descriptor is live.
+            unsafe {
+                let mut r: sys::cublasLtMatmulHeuristicResult_t = std::mem::zeroed();
+                sys::cublasLtMatmulAlgoCheck(h.0, g.desc, g.a, g.b, g.c, g.c, a, &raw mut r) == ok
+                    && r.workspaceSize <= workspace
+            }
+        };
+        let order = (first..g.algos.len()).chain(0..first);
+        g.pick = order.into_iter().find(|&i| takes(&g.algos[i])).ok_or_else(|| {
+            err(lt::CublasError(sys::cublasStatus_t::CUBLAS_STATUS_NOT_SUPPORTED))
+        })?;
         Ok(g)
     }
 
