@@ -5,7 +5,7 @@
 
 use cudarc::driver::{CudaSlice, DevicePtr, DeviceRepr, LaunchConfig, PushKernelArg};
 
-use crate::plan::{ATT_Q, ATT_W, LN_ROWS, rope_tables};
+use crate::plan::{ATT_Q, ATT_W, LN_ROWS, att_tiles, rope_tables};
 use crate::{CudaBackend, Precision};
 
 /// What padding rows start as, and must still hold after a launch.
@@ -414,7 +414,10 @@ fn attention_matches_dense_masked() {
     let (cos, sin) = rope_tables(10_000.0, lay.launched);
     let (cd, sd, pd) = (up(&b, &cos), up(&b, &sin), up(&b, &lay.pos));
     let (sq, cu) = (up(&b, &lay.seq), up(&b, &lay.cu));
-    let n = up(&b, &[lay.tokens as u32, lay.seqs() as u32, 0]);
+    let mut tiles = vec![0u32; lay.launched.div_ceil(ATT_Q) + lay.seqs()];
+    let blocks = att_tiles(&lay.cu, &mut tiles);
+    let n = up(&b, &[lay.tokens as u32, lay.seqs() as u32, 0, blocks as u32]);
+    let tl = up(&b, &tiles);
     let (width, d) = (3 * heads * 64, heads * 64);
     let mut x0 = rng.vec(lay.tokens * width, 2.0);
     x0.resize(lay.launched * width, 0.0);
@@ -427,11 +430,12 @@ fn attention_matches_dense_masked() {
             let (pc, ps) = if rope { (ptr(&b, &cd), ptr(&b, &sd)) } else { (0, 0) };
             let (po, px, pp) = (out.ptr(&b), x.ptr(&b), ptr(&b, &pd));
             let (psq, pcu, pn, h) = (ptr(&b, &sq), ptr(&b, &cu), ptr(&b, &n), heads as i32);
+            let pt = ptr(&b, &tl);
             let mut l = b.stream.launch_builder(&b.k.attention[variant]);
             l.arg(&po).arg(&px).arg(&pc).arg(&ps).arg(&pp);
-            l.arg(&psq).arg(&pcu).arg(&pn).arg(&h).arg(&window);
+            l.arg(&psq).arg(&pcu).arg(&pt).arg(&pn).arg(&h).arg(&window);
             let cfg = LaunchConfig {
-                grid_dim: (lay.launched.div_ceil(ATT_Q) as u32, heads as u32, 1),
+                grid_dim: (tiles.len() as u32, heads as u32, 1),
                 block_dim: (32 * ATT_W, 1, 1),
                 shared_mem_bytes: 0,
             };

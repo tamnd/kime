@@ -161,7 +161,8 @@ extern "C" __global__ void rope_f32(float* x, const float* c, const float* s, co
 
 // Attention over [q | k | v] rows of heads of 64, with q and k rotated as they are loaded when rope
 // tables are given, within each sequence and, when window >= 0, only to keys at most `window`
-// positions away. One block per ATT_Q query rows and one head, and each
+// positions away. One block per ATT_Q query rows of one sequence and one head, the blocks' first
+// rows listed in `tile` with n[3] of them, and each
 // of the ATT_W warps keeps an online softmax for ATT_R of the rows. The keys any of the rows can
 // see are walked 32 at a time, each tile of k and v staged in shared memory once for the block,
 // with the next tile read into registers while the current one is scored. A lane scores one key
@@ -203,20 +204,21 @@ __device__ __forceinline__ void att_load(float (&kr)[ATT_E], float (&vr)[ATT_E],
 }
 
 template <typename T, typename TO>
-__device__ void attention(TO* out, const T* qkv, const float* cosv, const float* sinv, const unsigned* pos, const unsigned* seq, const unsigned* cu, const unsigned* n, int heads, int window) {
+__device__ void attention(TO* out, const T* qkv, const float* cosv, const float* sinv, const unsigned* pos, const unsigned* seq, const unsigned* cu, const unsigned* tile, const unsigned* n, int heads, int window) {
     __shared__ __align__(16) float qs[ATT_Q][64];
     __shared__ __align__(16) float ks[32][ATT_KS];
     __shared__ __align__(16) float vs[32][64];
     __shared__ __align__(16) float ps[ATT_W][ATT_R][32];
     int wid = threadIdx.x / 32, lane = threadIdx.x % 32;
-    int nt = n[0];
-    int i0 = blockIdx.x * ATT_Q;
-    if (i0 >= nt) return;
+    if (blockIdx.x >= n[3]) return;
+    int i0 = tile[blockIdx.x];
+    int nt = min(i0 + ATT_Q, (int)cu[seq[i0] + 1]);
     int h = blockIdx.y;
     int d = heads * 64;
     size_t stride = 3 * (size_t)d;
-    // Rows are sorted by sequence, so both ends of a row's key range only grow with the row, and
-    // the block's range runs from its first row's start to its last row's end.
+    // Every row of the block is in one sequence, ending at nt, and both ends of a row's key range
+    // only grow with the row, so the block's range runs from its first row's start to its last
+    // row's end.
     int lo[ATT_R], hi[ATT_R];
 #pragma unroll
     for (int k = 0; k < ATT_R; k++) {
@@ -233,7 +235,7 @@ __device__ void attention(TO* out, const T* qkv, const float* cosv, const float*
             lo[k] = hi[k] = 0;
         }
     }
-    int last = min(i0 + ATT_Q, nt) - 1;
+    int last = nt - 1;
     int a = cu[seq[i0]], b = cu[seq[last] + 1];
     if (window >= 0) {
         a = max(a, i0 - window);
@@ -346,10 +348,10 @@ __device__ void attention(TO* out, const T* qkv, const float* cosv, const float*
     }
 }
 
-extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f32(float* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, n, h, w); }
-extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f16(half_t* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, n, h, w); }
-extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f32(float* o, const half_t* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, n, h, w); }
-extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f16(half_t* o, const half_t* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f32(float* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, t, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f16(half_t* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, t, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f32(float* o, const half_t* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, t, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f16(half_t* o, const half_t* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, t, n, h, w); }
 
 // out = gelu(x[:, ..inter]) * x[:, inter..], one block per token row.
 template <typename T, typename TO>
