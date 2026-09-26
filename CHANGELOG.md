@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.0.24
 
 - The engine runs on the Apple GPU (#49, #5). `Device::Metal` opens kime-metal in FP32 or FP16, so `kime predict --device metal`, `kime serve --device metal`, `Agent(device="metal")` and Laya's `LAYA_DEVICE=mps` all work, and `Device::Auto` now tries CUDA, then Metal on a Mac, then the CPU, as Laya picks cuda, then mps. Before this, `auto` on a Mac always meant the CPU, because the CUDA feature is on by default and its failure went straight to the CPU. INT8 still runs on the CPU only and Metal refuses it. On the M4 with the laya checkpoint, three states with a choice, a noul and a score question give the CPU FP32 answers to within 1e-4 on Metal FP32 and 1e-2 in FP16, which is now a test. Through `kime serve` with the answer cache off, 300 English papluca texts with 5 triage questions each from 8 clients took 43.3 s on Metal FP16 and 59.3 s in FP32, against 67.1 s for laya-serve 0.3.20 on MPS in the same hour (and 50.4 s in a quieter hour yesterday) and 122.1 s for kime on the CPU. One client at a time is level with laya-serve on MPS, a median of 196, 202 and 238 ms against 180, 201 and 217 ms over three rounds taken in turn. The load average was 20 to 58 from other work, and kime's device time for the same request moved from 139 to 253 ms with it, so part of the Metal pass still waits on the CPU. That is the next thing to fix.
 

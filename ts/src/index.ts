@@ -662,7 +662,7 @@ const describeRuntime = () => {
 };
 
 /** The version of this package. */
-export const VERSION = "0.0.23";
+export const VERSION = "0.0.24";
 /** The TypeSafe SDK version this package follows. */
 export const TYPESAFE_SDK_VERSION = "0.6.0";
 /** The API that requires a key. */
