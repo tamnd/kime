@@ -149,6 +149,7 @@ struct Index {
     mcu: usize,
     mrow: usize,
     qtype: usize,
+    tile: usize,
     len: usize,
 }
 
@@ -161,7 +162,8 @@ impl Index {
         let mcu = cu + b.seqs + 1;
         let mrow = mcu + b.seqs + 1;
         let qtype = mrow + b.markers;
-        Self { ids, pos, seq, cu, mcu, mrow, qtype, len: qtype + b.seqs }
+        let tile = qtype + b.seqs;
+        Self { ids, pos, seq, cu, mcu, mrow, qtype, tile, len: tile + att_blocks(b) }
     }
 }
 
@@ -176,6 +178,7 @@ struct Ptrs {
     mcu: u64,
     mrow: u64,
     qtype: u64,
+    tile: u64,
 }
 
 impl Ptrs {
@@ -190,6 +193,7 @@ impl Ptrs {
             mcu: a(at.mcu),
             mrow: a(at.mrow),
             qtype: a(at.qtype),
+            tile: a(at.tile),
         }
     }
 }
@@ -381,7 +385,7 @@ impl CudaBackend {
 
     fn launch_step(&self, p: &CudaPlan, step: &Step) -> Result<()> {
         let b = p.bucket;
-        let Ptrs { n, ids, pos, seq, cu, mcu, mrow, qtype } = p.ptrs;
+        let Ptrs { n, ids, pos, seq, cu, mcu, mrow, qtype, tile } = p.ptrs;
         let s = &self.stream;
         // SAFETY for every launch below: lowering checked that each value's arena range holds its
         // bucket sized rows at its type, each kernel touches rows below the batch's real count
@@ -445,10 +449,10 @@ impl CudaBackend {
                     &self.k.attention[2 * usize::from(qkv.half()) + usize::from(out.half())],
                 );
                 l.arg(&out.ptr).arg(&qkv.ptr).arg(&cos).arg(&sin).arg(&pos);
-                l.arg(&seq).arg(&cu).arg(&n);
+                l.arg(&seq).arg(&cu).arg(&tile).arg(&n);
                 l.arg(&heads).arg(&window);
                 let cfg = LaunchConfig {
-                    grid_dim: (b.tokens.div_ceil(ATT_Q) as u32, heads as u32, 1),
+                    grid_dim: (att_blocks(b) as u32, heads as u32, 1),
                     block_dim: (32 * ATT_W, 1, 1),
                     shared_mem_bytes: 0,
                 };
@@ -658,10 +662,13 @@ impl Backend for CudaBackend {
                         Epilogue::Relu => (2, false),
                         Epilogue::Accumulate => (0, true),
                     };
-                    let key = Key { dims: (m, a.width, out.width), ab, c: out.ty, acc };
+                    // Picks are per inner size, width and types, not rows, for the reason
+                    // RANKED_ROWS gives.
+                    let dims = (lt::RANKED_ROWS, a.width, out.width);
+                    let key = Key { dims, ab, c: out.ty, acc };
                     let g = lt::Gemm::new(
                         &self.lt,
-                        key.dims,
+                        (m, a.width, out.width),
                         ab,
                         out.ty,
                         acc,
@@ -815,7 +822,8 @@ impl Backend for CudaBackend {
         let (t, s, m) = (batch.ids.len(), batch.seqs(), batch.markers.len());
         let at = p.at;
         let h = p.index_host.as_mut_slice().map_err(dev)?;
-        h[..4].copy_from_slice(&[t as u32, s as u32, m as u32, 0]);
+        let blocks = att_tiles(batch.cu, &mut h[at.tile..at.tile + att_blocks(p.bucket)]);
+        h[..4].copy_from_slice(&[t as u32, s as u32, m as u32, blocks as u32]);
         h[at.ids..at.ids + t].copy_from_slice(batch.ids);
         h[at.cu..=at.cu + s].copy_from_slice(batch.cu);
         h[at.mcu..=at.mcu + s].copy_from_slice(batch.mcu);
@@ -856,6 +864,26 @@ impl Backend for CudaBackend {
         out.act.extend(act[..2 * s].as_chunks::<2>().0.iter().copied());
         Ok(())
     }
+}
+
+/// Attention blocks a bucket launches: enough for every sequence to start its own.
+pub(crate) fn att_blocks(b: Bucket) -> usize {
+    b.tokens.div_ceil(ATT_Q) + b.seqs
+}
+
+/// Writes the first row of each attention block to `out` and returns how many there are. Blocks
+/// start at every `ATT_Q`th row of each sequence, so the rows a block holds and the key tiles it
+/// walks depend only on positions within its sequence, never on where the sequence sits in the
+/// batch, and a row gets the same bits alone or batched.
+pub(crate) fn att_tiles(cu: &[u32], out: &mut [u32]) -> usize {
+    let mut k = 0;
+    for w in cu.windows(2) {
+        for i in (w[0]..w[1]).step_by(ATT_Q) {
+            out[k] = i;
+            k += 1;
+        }
+    }
+    k
 }
 
 /// cos and sin tables `[len, 32]` for heads of 64, computed as the CPU backend does.

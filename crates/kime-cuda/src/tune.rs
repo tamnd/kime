@@ -84,7 +84,9 @@ pub(crate) fn enabled() -> bool {
 
 /// Times every rank of every GEMM, in plan order so each reads its weights cold as a real run
 /// does, and sets each shape to its fastest. A rank has to beat cuBLASLt's first choice by 2% to
-/// replace it, so noise does not fill the table. Prints a table line for every shape.
+/// replace it, so noise does not fill the table. Prints a table line for every shape with the
+/// time of every rank, since a shape runs one rank in every bucket and the line to keep is the
+/// rank that does best across them.
 ///
 /// The GEMMs read and write whatever the arena holds, which no run depends on: a run writes every
 /// value before it reads it.
@@ -149,11 +151,12 @@ pub(crate) fn tune(
         }
         best.insert(*key, pick);
         let calls = keys.iter().filter(|k| *k == key).count() as f32;
+        let each: Vec<String> = t.iter().map(|x| format!("{:.2}", 1e3 * x / calls)).collect();
         println!(
-            "{}    # {:.2} us against {:.2} us for rank 0",
+            "{}    # {} rows, us by rank: {}",
             key.line(gpu, pick),
-            1e3 * at / calls,
-            1e3 * t[0] / calls
+            gemms[keys.iter().position(|k| k == key).unwrap_or(0)].dims.0,
+            each.join(" ")
         );
     }
     for (g, key) in gemms.iter_mut().zip(keys) {

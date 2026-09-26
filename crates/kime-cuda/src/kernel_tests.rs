@@ -5,7 +5,7 @@
 
 use cudarc::driver::{CudaSlice, DevicePtr, DeviceRepr, LaunchConfig, PushKernelArg};
 
-use crate::plan::{ATT_Q, ATT_W, LN_ROWS, rope_tables};
+use crate::plan::{ATT_Q, ATT_W, LN_ROWS, att_tiles, rope_tables};
 use crate::{CudaBackend, Precision};
 
 /// What padding rows start as, and must still hold after a launch.
@@ -414,7 +414,10 @@ fn attention_matches_dense_masked() {
     let (cos, sin) = rope_tables(10_000.0, lay.launched);
     let (cd, sd, pd) = (up(&b, &cos), up(&b, &sin), up(&b, &lay.pos));
     let (sq, cu) = (up(&b, &lay.seq), up(&b, &lay.cu));
-    let n = up(&b, &[lay.tokens as u32, lay.seqs() as u32, 0]);
+    let mut tiles = vec![0u32; lay.launched.div_ceil(ATT_Q) + lay.seqs()];
+    let blocks = att_tiles(&lay.cu, &mut tiles);
+    let n = up(&b, &[lay.tokens as u32, lay.seqs() as u32, 0, blocks as u32]);
+    let tl = up(&b, &tiles);
     let (width, d) = (3 * heads * 64, heads * 64);
     let mut x0 = rng.vec(lay.tokens * width, 2.0);
     x0.resize(lay.launched * width, 0.0);
@@ -427,11 +430,12 @@ fn attention_matches_dense_masked() {
             let (pc, ps) = if rope { (ptr(&b, &cd), ptr(&b, &sd)) } else { (0, 0) };
             let (po, px, pp) = (out.ptr(&b), x.ptr(&b), ptr(&b, &pd));
             let (psq, pcu, pn, h) = (ptr(&b, &sq), ptr(&b, &cu), ptr(&b, &n), heads as i32);
+            let pt = ptr(&b, &tl);
             let mut l = b.stream.launch_builder(&b.k.attention[variant]);
             l.arg(&po).arg(&px).arg(&pc).arg(&ps).arg(&pp);
-            l.arg(&psq).arg(&pcu).arg(&pn).arg(&h).arg(&window);
+            l.arg(&psq).arg(&pcu).arg(&pt).arg(&pn).arg(&h).arg(&window);
             let cfg = LaunchConfig {
-                grid_dim: (lay.launched.div_ceil(ATT_Q) as u32, heads as u32, 1),
+                grid_dim: (tiles.len() as u32, heads as u32, 1),
                 block_dim: (32 * ATT_W, 1, 1),
                 shared_mem_bytes: 0,
             };
@@ -581,4 +585,50 @@ fn act_features_match_naive() {
         o[d + 2] = (-ent / kf.ln()) as f32;
     }
     check("act features", &out.read(&b), &want, seqs * (d + 4), 1e-5);
+}
+
+#[test]
+fn gemm_rows_do_not_depend_on_the_row_count() {
+    use crate::WORKSPACE;
+    use crate::lt::{Gemm, Ty};
+    let Some(b) = gpu() else { return };
+    let mut rng = Rng(47);
+    let ws = b.workspace_ptr();
+    // Laya's encoder shapes: attention in and out, and the two MLP halves.
+    for (k, n) in [(1024, 3072), (1024, 1024), (1024, 5248), (2624, 1024)] {
+        for half in [false, true] {
+            let most = 1024;
+            let (w, _) = input(&b, &rng.vec(n * k, 0.05), half);
+            let (x, _) = input(&b, &rng.vec(most * k, 1.0), half);
+            let ab = if half { Ty::F16 } else { Ty::F32 };
+            let mut first: Option<Vec<u32>> = None;
+            for m in [1, 3, 16, 50, 128, 256, 300, 1024] {
+                let y = output(&b, m * n, half);
+                let g = Gemm::new(
+                    &b.lt,
+                    (m, k, n),
+                    ab,
+                    ab,
+                    false,
+                    WORKSPACE,
+                    (w.ptr(&b), x.ptr(&b), y.ptr(&b)),
+                    0,
+                )
+                .unwrap();
+                // SAFETY: the buffers hold the shapes the GEMM was set up for.
+                unsafe { g.run(&b.lt, ws, WORKSPACE, b.stream.cu_stream().cast()) }.unwrap();
+                let row: Vec<u32> = y.read(&b)[..n].iter().map(|v| v.to_bits()).collect();
+                match &first {
+                    None => first = Some(row),
+                    Some(f) => {
+                        let diff = f.iter().zip(&row).filter(|(a, b)| a != b).count();
+                        assert_eq!(
+                            diff, 0,
+                            "k {k} n {n} half {half}: row 0 at {m} rows differs from 1 row in {diff} of {n}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

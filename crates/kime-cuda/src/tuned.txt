@@ -1,80 +1,15 @@
 # Which of cuBLASLt's ranked algorithms each GEMM runs, per GPU as the driver names it. Rank 0 is
 # cuBLASLt's own first choice and is what any shape or GPU not listed here gets. The lines come
-# from a run with KIME_CUDA_TUNE=1, which times every rank in place and prints them.
+# from a run with KIME_CUDA_TUNE=1, which times every rank in place and prints them. A shape runs
+# one rank in every bucket, so the rank kept is the one closest on average to each bucket's fastest.
 #
 # gpu | rows inner columns | input output set-or-add | rank
 #
-# RTX 4090, tuned on driver 610.62 with CUDA 13.1, Laya English and multilingual shapes.
-NVIDIA GeForce RTX 4090 | 32 1024 1024 | f16 f16 set | 4
-NVIDIA GeForce RTX 4090 | 80 1024 4096 | f16 f16 set | 3
-NVIDIA GeForce RTX 4090 | 96 1024 5248 | f16 f16 set | 1
-NVIDIA GeForce RTX 4090 | 112 1024 5248 | f16 f16 set | 4
-NVIDIA GeForce RTX 4090 | 128 1024 5248 | f16 f16 set | 1
-NVIDIA GeForce RTX 4090 | 160 1024 4096 | f16 f16 set | 2
-NVIDIA GeForce RTX 4090 | 224 1024 5248 | f16 f16 set | 1
-NVIDIA GeForce RTX 4090 | 256 1024 5248 | f16 f16 set | 1
-NVIDIA GeForce RTX 4090 | 288 1024 1024 | f16 f16 set | 1
-NVIDIA GeForce RTX 4090 | 320 1024 1024 | f16 f16 set | 2
-NVIDIA GeForce RTX 4090 | 384 1024 4096 | f16 f16 set | 1
-NVIDIA GeForce RTX 4090 | 1024 1024 1024 | f16 f16 set | 1
-NVIDIA GeForce RTX 4090 | 8192 1024 4096 | f16 f16 set | 2
-NVIDIA GeForce RTX 4090 | 32 1024 1024 | f16 f32 add | 4
-NVIDIA GeForce RTX 4090 | 48 4096 1024 | f16 f32 add | 2
-NVIDIA GeForce RTX 4090 | 64 2624 1024 | f16 f32 add | 2
-NVIDIA GeForce RTX 4090 | 80 4096 1024 | f16 f32 add | 7
-NVIDIA GeForce RTX 4090 | 112 2624 1024 | f16 f32 add | 5
-NVIDIA GeForce RTX 4090 | 128 4096 1024 | f16 f32 add | 3
-NVIDIA GeForce RTX 4090 | 288 1024 1024 | f16 f32 add | 2
-NVIDIA GeForce RTX 4090 | 320 1024 1024 | f16 f32 add | 2
-NVIDIA GeForce RTX 4090 | 384 2624 1024 | f16 f32 add | 1
-NVIDIA GeForce RTX 4090 | 1024 1024 1024 | f16 f32 add | 1
-NVIDIA GeForce RTX 4090 | 4096 2624 1024 | f16 f32 add | 3
-NVIDIA GeForce RTX 4090 | 8192 4096 1024 | f16 f32 add | 4
-NVIDIA GeForce RTX 4090 | 80 1024 3072 | f16 f32 set | 2
-NVIDIA GeForce RTX 4090 | 96 1024 3072 | f16 f32 set | 2
-NVIDIA GeForce RTX 4090 | 112 1024 3072 | f16 f32 set | 2
-NVIDIA GeForce RTX 4090 | 128 1024 3072 | f16 f32 set | 2
-NVIDIA GeForce RTX 4090 | 192 1024 3072 | f16 f32 set | 1
-NVIDIA GeForce RTX 4090 | 384 1024 3072 | f16 f32 set | 2
-NVIDIA GeForce RTX 4090 | 512 1024 3072 | f16 f32 set | 1
-NVIDIA GeForce RTX 4090 | 4096 1024 1 | f16 f32 set | 1
-NVIDIA GeForce RTX 4090 | 8192 1024 1 | f16 f32 set | 2
-NVIDIA GeForce RTX 4090 | 48 4096 1024 | f32 f32 add | 3
-NVIDIA GeForce RTX 4090 | 64 1024 1024 | f32 f32 add | 4
-NVIDIA GeForce RTX 4090 | 80 4096 1024 | f32 f32 add | 4
-NVIDIA GeForce RTX 4090 | 96 2624 1024 | f32 f32 add | 3
-NVIDIA GeForce RTX 4090 | 112 1024 1024 | f32 f32 add | 1
-NVIDIA GeForce RTX 4090 | 160 1024 1024 | f32 f32 add | 2
-NVIDIA GeForce RTX 4090 | 192 1024 1024 | f32 f32 add | 3
-NVIDIA GeForce RTX 4090 | 224 1024 1024 | f32 f32 add | 2
-NVIDIA GeForce RTX 4090 | 256 1024 1024 | f32 f32 add | 3
-NVIDIA GeForce RTX 4090 | 384 4096 1024 | f32 f32 add | 3
-NVIDIA GeForce RTX 4090 | 512 4096 1024 | f32 f32 add | 6
-NVIDIA GeForce RTX 4090 | 2048 4096 1024 | f32 f32 add | 3
-NVIDIA GeForce RTX 4090 | 4096 4096 1024 | f32 f32 add | 3
-NVIDIA GeForce RTX 4090 | 8192 4096 1024 | f32 f32 add | 3
-NVIDIA GeForce RTX 4090 | 8 1028 256 | f32 f32 set | 1
-NVIDIA GeForce RTX 4090 | 12 1028 256 | f32 f32 set | 6
-NVIDIA GeForce RTX 4090 | 20 256 2 | f32 f32 set | 5
-NVIDIA GeForce RTX 4090 | 24 256 2 | f32 f32 set | 5
-NVIDIA GeForce RTX 4090 | 28 256 2 | f32 f32 set | 3
-NVIDIA GeForce RTX 4090 | 32 1028 256 | f32 f32 set | 1
-NVIDIA GeForce RTX 4090 | 40 256 2 | f32 f32 set | 5
-NVIDIA GeForce RTX 4090 | 48 1024 3072 | f32 f32 set | 1
-NVIDIA GeForce RTX 4090 | 56 256 2 | f32 f32 set | 3
-NVIDIA GeForce RTX 4090 | 64 1024 3072 | f32 f32 set | 1
-NVIDIA GeForce RTX 4090 | 72 256 2 | f32 f32 set | 2
-NVIDIA GeForce RTX 4090 | 80 1024 3072 | f32 f32 set | 1
-NVIDIA GeForce RTX 4090 | 96 1024 3072 | f32 f32 set | 1
-NVIDIA GeForce RTX 4090 | 128 256 2 | f32 f32 set | 2
-NVIDIA GeForce RTX 4090 | 192 1024 1024 | f32 f32 set | 1
-NVIDIA GeForce RTX 4090 | 224 1024 4096 | f32 f32 set | 7
-NVIDIA GeForce RTX 4090 | 256 1024 5248 | f32 f32 set | 7
-NVIDIA GeForce RTX 4090 | 288 1024 5248 | f32 f32 set | 3
-NVIDIA GeForce RTX 4090 | 320 1024 1 | f32 f32 set | 7
-NVIDIA GeForce RTX 4090 | 384 1024 5248 | f32 f32 set | 6
-NVIDIA GeForce RTX 4090 | 512 1024 3072 | f32 f32 set | 7
-NVIDIA GeForce RTX 4090 | 1024 1024 3072 | f32 f32 set | 2
-NVIDIA GeForce RTX 4090 | 2048 1024 3072 | f32 f32 set | 4
-NVIDIA GeForce RTX 4090 | 4096 1024 3072 | f32 f32 set | 2
-NVIDIA GeForce RTX 4090 | 8192 1024 4096 | f32 f32 set | 4
+# RTX 4090, tuned on driver 610.62 with CUDA 13.1, Laya English and multilingual shapes, ranked at
+# 256 rows with no split K.
+NVIDIA GeForce RTX 4090 | 256 1024 1024 | f16 f32 add | 1    # 1.06 of each bucket's best, rank 0 1.09
+NVIDIA GeForce RTX 4090 | 256 1024 3072 | f16 f32 set | 2    # 1.01 of each bucket's best, rank 0 1.09
+NVIDIA GeForce RTX 4090 | 256 1024 3072 | f32 f32 set | 1    # 1.13 of each bucket's best, rank 0 1.88
+NVIDIA GeForce RTX 4090 | 256 1024 4096 | f16 f16 set | 2    # 1.02 of each bucket's best, rank 0 1.09
+NVIDIA GeForce RTX 4090 | 256 1024 4096 | f32 f32 set | 1    # 1.11 of each bucket's best, rank 0 1.60
+NVIDIA GeForce RTX 4090 | 256 1024 5248 | f32 f32 set | 1    # 1.08 of each bucket's best, rank 0 1.49
