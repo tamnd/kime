@@ -133,7 +133,7 @@ impl Gemm {
         let mut found: [sys::cublasLtMatmulHeuristicResult_t; CANDIDATES] =
             unsafe { std::mem::zeroed() };
         let mut count = 0;
-        // SAFETY: every descriptor is live, the attribute buffer is one u64, and `found` has room
+        // SAFETY: every descriptor is live, the attribute buffers are a u64 and a u32, and `found` has room
         // for the CANDIDATES results asked for.
         let status = unsafe {
             let set = lt::set_matmul_pref_attribute(
@@ -142,6 +142,17 @@ impl Gemm {
                 (&raw const ws).cast::<c_void>(),
                 size_of::<u64>(),
             );
+            // No split K: only algorithms that sum each output over the whole inner size in one
+            // pass, so a row's result does not depend on how many other rows are in the batch.
+            let none: u32 = 0;
+            let set = set.and_then(|()| {
+                lt::set_matmul_pref_attribute(
+                    pref,
+                    sys::cublasLtMatmulPreferenceAttributes_t::CUBLASLT_MATMUL_PREF_REDUCTION_SCHEME_MASK,
+                    (&raw const none).cast::<c_void>(),
+                    size_of::<u32>(),
+                )
+            });
             let status = set.and_then(|()| {
                 sys::cublasLtMatmulAlgoGetHeuristic(
                     h.0,
