@@ -116,10 +116,14 @@ fn request(o: &Opts) -> Result<Request, String> {
     let body = match (&o.request, &o.state, &o.questions) {
         (Some(r), None, None) => json(&read(r)?, "the request")?,
         (None, Some(s), Some(q)) => {
-            // A state read from a file is JSON when it parses as JSON, and text otherwise.
+            // A state read from a file is JSON when it parses as JSON, and text otherwise. Text
+            // loses the line breaks at its end, as `$(cat file)` does, since the model reads them
+            // as a token: Laya's CLI strips its text too.
             let text = read(s)?;
             let state = match s.starts_with('@') {
-                true => serde_json::from_str(&text).unwrap_or(Value::String(text)),
+                true => serde_json::from_str(&text).unwrap_or_else(|_| {
+                    Value::String(text.trim_end_matches(['\n', '\r']).to_string())
+                }),
                 false => Value::String(text),
             };
             json!({"state": state, "questions": json(&read(q)?, "the questions")?})
@@ -250,4 +254,40 @@ fn table(res: &Response) -> String {
         s.push('\n');
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state(file: &str, body: &str) -> Value {
+        let path = std::env::temp_dir().join(file);
+        std::fs::write(&path, body).unwrap();
+        let args: Vec<String> = [
+            "--state",
+            &format!("@{}", path.display()),
+            "--questions",
+            r#"{"q": {"type": "noul", "instructions": "Late?"}}"#,
+        ]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
+        let r = request(&opts(&args).unwrap()).unwrap();
+        std::fs::remove_file(path).unwrap();
+        r.state
+    }
+
+    #[test]
+    fn a_state_file_loses_its_final_line_breaks() {
+        let pid = std::process::id();
+        assert_eq!(
+            state(&format!("kime-{pid}-a.txt"), "Where is my parcel?\n"),
+            "Where is my parcel?"
+        );
+        assert_eq!(
+            state(&format!("kime-{pid}-b.txt"), "Two lines\nhere\r\n\r\n"),
+            "Two lines\nhere"
+        );
+        assert_eq!(state(&format!("kime-{pid}-c.json"), "{\"id\": 7}\n"), json!({"id": 7}));
+    }
 }
