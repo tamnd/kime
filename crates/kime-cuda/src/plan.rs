@@ -254,8 +254,9 @@ impl CudaPlan {
         self.arena.len()
     }
 
-    /// Times every step from now on. Each step then waits for the GPU and the graph is not used,
-    /// so this is for finding where the time goes, not for measuring the total.
+    /// Times every step from now on, with an event after each. The graph is not used, so the steps
+    /// are launched one by one, and this is for finding where the time goes, not for measuring the
+    /// total.
     pub fn profile(&mut self) {
         self.profile = Some(vec![0; self.steps.len()]);
         self.profiled = 0;
@@ -839,18 +840,23 @@ impl Backend for CudaBackend {
             h[at.qtype + q] = u32::from(batch.qtype[q]);
         }
         if p.profile.is_some() {
+            // An event after every step, read once at the end, so a step's time is the GPU's and
+            // not a host round trip per step.
+            let timed = Some(sys::CUevent_flags::CU_EVENT_DEFAULT);
             self.copy_in(p)?;
-            self.stream.synchronize().map_err(dev)?;
+            let mut marks = vec![self.stream.record_event(timed).map_err(dev)?];
             for i in 0..p.steps.len() {
-                let t = std::time::Instant::now();
                 self.launch_step(p, &p.steps[i])?;
-                self.stream.synchronize().map_err(dev)?;
-                let ns = t.elapsed().as_nanos() as u64;
-                if let Some(v) = p.profile.as_mut() {
-                    v[i] += ns;
-                }
+                marks.push(self.stream.record_event(timed).map_err(dev)?);
             }
             self.copy_out(p)?;
+            self.stream.synchronize().map_err(dev)?;
+            for (i, w) in marks.windows(2).enumerate() {
+                let ms = w[0].elapsed_ms(&w[1]).map_err(dev)?;
+                if let Some(v) = p.profile.as_mut() {
+                    v[i] += (f64::from(ms) * 1e6) as u64;
+                }
+            }
             p.profiled += 1;
         } else if let Some(g) = &p.graph {
             g.0.launch().map_err(dev)?;
