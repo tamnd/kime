@@ -1,6 +1,8 @@
 //! `kime-train`: fine tunes a compat checkpoint on training lines and writes a checkpoint kime
 //! serves. `kime train` runs this binary.
 
+#![forbid(unsafe_code)]
+
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
