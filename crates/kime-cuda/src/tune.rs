@@ -114,12 +114,12 @@ pub(crate) fn tune(
             for (i, g) in gemms.iter_mut().enumerate() {
                 if rank < g.candidates() {
                     let keep = g.pick;
-                    g.pick = rank;
+                    g.set_pick(rank);
                     // SAFETY: the GEMM's buffers were set up for its shape when it was lowered,
                     // and the workspace is used by nothing else on the stream.
                     let run = unsafe { g.run(h, workspace, WORKSPACE, s.cu_stream().cast()) };
                     ran[i] = run.is_ok();
-                    g.pick = keep;
+                    g.set_pick(keep);
                 }
                 marks[i + 1].record(s).map_err(dev)?;
             }
@@ -160,7 +160,7 @@ pub(crate) fn tune(
         );
     }
     for (g, key) in gemms.iter_mut().zip(keys) {
-        g.pick = best[key];
+        g.set_pick(best[key]);
     }
     Ok(())
 }

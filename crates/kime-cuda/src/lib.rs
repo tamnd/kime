@@ -23,7 +23,7 @@ mod tune;
 pub use compat::executor;
 pub use plan::{CudaPlan, Weights};
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cudarc::driver::{CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, DevicePtr};
 use cudarc::nvrtc::{CompileOptions, compile_ptx_with_opts};
@@ -110,6 +110,7 @@ pub struct CudaBackend {
     arch: (i32, i32),
     precision: Precision,
     picks: tune::Picks,
+    probe: Mutex<lt::Probe>,
 }
 
 impl std::fmt::Debug for CudaBackend {
@@ -155,7 +156,7 @@ impl CudaBackend {
         let workspace = stream.alloc_zeros::<u8>(WORKSPACE).map_err(dev)?;
         let name = ctx.name().map_err(dev)?;
         let picks = tune::Picks::for_gpu(&name);
-        Ok(Self { stream, k, lt, workspace, name, arch, precision, picks })
+        Ok(Self { stream, k, lt, workspace, name, arch, precision, picks, probe: Mutex::default() })
     }
 
     /// The GPU's name, as the driver reports it.

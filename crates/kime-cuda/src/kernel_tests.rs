@@ -622,17 +622,18 @@ fn gemm_rows_do_not_depend_on_the_row_count() {
     let Some(b) = gpu() else { return };
     let mut rng = Rng(47);
     let ws = b.workspace_ptr();
+    let mut probe = crate::lt::Probe::default();
     // Laya's encoder shapes: attention in and out, and the two MLP halves.
     for (k, n) in [(1024, 3072), (1024, 1024), (1024, 5248), (2624, 1024)] {
         for half in [false, true] {
-            let most = 1024;
+            let most = 4096;
             let (w, _) = input(&b, &rng.vec(n * k, 0.05), half);
             let (x, _) = input(&b, &rng.vec(most * k, 1.0), half);
             let ab = if half { Ty::F16 } else { Ty::F32 };
             let mut first: Option<Vec<u32>> = None;
-            for m in [1, 3, 16, 50, 128, 256, 300, 1024] {
+            for m in [1, 3, 16, 50, 128, 256, 300, 1024, 4096] {
                 let y = output(&b, m * n, half);
-                let g = Gemm::new(
+                let mut g = Gemm::new(
                     &b.lt,
                     (m, k, n),
                     ab,
@@ -643,6 +644,7 @@ fn gemm_rows_do_not_depend_on_the_row_count() {
                     0,
                 )
                 .unwrap();
+                g.faster(&b.lt, &mut probe, &b.stream, ws).unwrap();
                 // SAFETY: the buffers hold the shapes the GEMM was set up for.
                 unsafe { g.run(&b.lt, ws, WORKSPACE, b.stream.cu_stream().cast()) }.unwrap();
                 let row: Vec<u32> = y.read(&b)[..n].iter().map(|v| v.to_bits()).collect();

@@ -827,6 +827,11 @@ impl Backend for CudaBackend {
             let ws = self.workspace_ptr();
             tune::tune(&self.lt, &self.stream, ws, &mut plan.gemms, &keys, &self.name)?;
         }
+        let mut probe = self.probe.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        for g in &mut plan.gemms {
+            g.faster(&self.lt, &mut probe, &self.stream, self.workspace_ptr())?;
+        }
+        drop(probe);
         plan.graph = Some(self.capture(&mut plan)?);
         Ok(plan)
     }
