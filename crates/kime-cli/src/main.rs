@@ -1,6 +1,6 @@
 //! The `kime` binary. One binary with subcommands, per spec/14-sdks-cli.md.
 //!
-//! Today it answers `--version`, `doctor`, `convert`, `eval`, `predict`, `pull` and `serve`, and names the milestone that brings each of the other
+//! Today it answers `--version`, `doctor`, `contam`, `convert`, `eval`, `predict`, `pull` and `serve`, and names the milestone that brings each of the other
 //! subcommands. A command that exists and says when it will work is more useful than one that is
 //! missing, because the help text is where people look first.
 
@@ -8,6 +8,7 @@
 
 use std::process::ExitCode;
 
+mod contam;
 mod convert;
 mod eval;
 mod predict;
@@ -40,6 +41,7 @@ fn main() -> ExitCode {
             doctor();
             ExitCode::SUCCESS
         }
+        Some("contam") => contam::run(&args[1..]),
         Some("convert") => convert::run(&args[1..]),
         Some("eval") => eval::run(&args[1..]),
         Some("predict") => predict::run(&args[1..]),
@@ -66,6 +68,7 @@ fn help() {
     println!("kime {}: typed decisions over text\n", env!("CARGO_PKG_VERSION"));
     println!("usage: kime <command> [options]\n");
     println!("  {:<10} print what this machine offers kime", "doctor");
+    println!("  {:<10} drop training lines too close to a test set", "contam");
     println!("  {:<10} pack a Laya checkpoint to .kime, unpack one, or check one", "convert");
     println!("  {:<10} run the quality suites, or score another engine's answers", "eval");
     println!("  {:<10} answer questions from the command line", "predict");

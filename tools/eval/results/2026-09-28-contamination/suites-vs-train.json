@@ -1,0 +1,976 @@
+{
+  "kime": "0.1.1",
+  "method": {
+    "shingle_words": 5,
+    "perms": 128,
+    "bands": 64,
+    "threshold": 0.5
+  },
+  "tests": {
+    "files": [
+      "LocalLLaMA__typed-decisions.all.train",
+      "SetFit__enron_spam.default.train",
+      "SetFit__sst2.default.train",
+      "SetFit__sst5.default.train",
+      "clinc__clinc_oos.plus.train",
+      "dair-ai__emotion.split.train",
+      "deepset__prompt-injections.default.train",
+      "facebook__xnli.en.train",
+      "fancyzhx__ag_news.default.train",
+      "google-research-datasets__mbpp.full.train",
+      "google__boolq.default.train",
+      "lmsys__toxic-chat.toxicchat0124.train",
+      "microsoft__ms_marco.v1.1.train",
+      "mteb__amazon_massive_intent.ar.train",
+      "mteb__amazon_massive_intent.de.train",
+      "mteb__amazon_massive_intent.en.train",
+      "mteb__amazon_massive_intent.es.train",
+      "mteb__amazon_massive_intent.fr.train",
+      "mteb__amazon_massive_intent.hi.train",
+      "mteb__amazon_massive_intent.ja.train",
+      "mteb__amazon_massive_intent.ko.train",
+      "mteb__amazon_massive_intent.pt.train",
+      "mteb__amazon_massive_intent.ru.train",
+      "mteb__amazon_massive_intent.sw.train",
+      "mteb__amazon_massive_intent.ta.train",
+      "mteb__amazon_massive_intent.tr.train",
+      "mteb__amazon_massive_intent.zh-CN.train",
+      "mteb__banking77.default.train",
+      "openai__gsm8k.main.train"
+    ],
+    "texts": 1462564,
+    "distinct": 1444249,
+    "index_secs": 12.251691084
+  },
+  "data": {
+    "lines": 28187,
+    "near_duplicates": 2792,
+    "check_secs": 0.266899625,
+    "files": [
+      {
+        "file": "app.email_spam",
+        "lines": 400,
+        "near_duplicates": 165,
+        "exact": 70,
+        "by_test": {
+          "SetFit__enron_spam.default.train": 165
+        }
+      },
+      {
+        "file": "app.guardrails_jailbreak",
+        "lines": 400,
+        "near_duplicates": 59,
+        "exact": 28,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 1,
+          "lmsys__toxic-chat.toxicchat0124.train": 57,
+          "mteb__amazon_massive_intent.en.train": 3
+        }
+      },
+      {
+        "file": "app.model_routing_domain",
+        "lines": 399,
+        "near_duplicates": 21,
+        "exact": 1,
+        "by_test": {
+          "fancyzhx__ag_news.default.train": 14,
+          "google-research-datasets__mbpp.full.train": 6,
+          "lmsys__toxic-chat.toxicchat0124.train": 1
+        }
+      },
+      {
+        "file": "app.moderation_toxicity",
+        "lines": 400,
+        "near_duplicates": 46,
+        "exact": 18,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 1,
+          "lmsys__toxic-chat.toxicchat0124.train": 44,
+          "mteb__amazon_massive_intent.en.train": 3
+        }
+      },
+      {
+        "file": "app.phishing",
+        "lines": 400,
+        "near_duplicates": 208,
+        "exact": 185,
+        "by_test": {
+          "SetFit__enron_spam.default.train": 208
+        }
+      },
+      {
+        "file": "app.rag_relevance",
+        "lines": 400,
+        "near_duplicates": 93,
+        "exact": 0,
+        "by_test": {
+          "google__boolq.default.train": 1,
+          "microsoft__ms_marco.v1.1.train": 92
+        }
+      },
+      {
+        "file": "app.support_triage",
+        "lines": 400,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "en.ag_news",
+        "lines": 600,
+        "near_duplicates": 88,
+        "exact": 2,
+        "by_test": {
+          "fancyzhx__ag_news.default.train": 88
+        }
+      },
+      {
+        "file": "en.banking77_full",
+        "lines": 500,
+        "near_duplicates": 41,
+        "exact": 3,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 7,
+          "mteb__banking77.default.train": 34
+        }
+      },
+      {
+        "file": "en.boolq",
+        "lines": 600,
+        "near_duplicates": 204,
+        "exact": 1,
+        "by_test": {
+          "google__boolq.default.train": 200,
+          "microsoft__ms_marco.v1.1.train": 4
+        }
+      },
+      {
+        "file": "en.clinc150",
+        "lines": 1000,
+        "near_duplicates": 54,
+        "exact": 12,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 42,
+          "lmsys__toxic-chat.toxicchat0124.train": 3,
+          "mteb__amazon_massive_intent.en.train": 11,
+          "mteb__banking77.default.train": 1
+        }
+      },
+      {
+        "file": "en.emotion",
+        "lines": 600,
+        "near_duplicates": 6,
+        "exact": 6,
+        "by_test": {
+          "dair-ai__emotion.split.train": 6
+        }
+      },
+      {
+        "file": "en.prompt_injections",
+        "lines": 116,
+        "near_duplicates": 8,
+        "exact": 1,
+        "by_test": {
+          "deepset__prompt-injections.default.train": 6,
+          "lmsys__toxic-chat.toxicchat0124.train": 1,
+          "mteb__amazon_massive_intent.en.train": 1
+        }
+      },
+      {
+        "file": "en.sst2",
+        "lines": 872,
+        "near_duplicates": 1,
+        "exact": 1,
+        "by_test": {
+          "SetFit__sst2.default.train": 1,
+          "SetFit__sst5.default.train": 1
+        }
+      },
+      {
+        "file": "en.sst5",
+        "lines": 600,
+        "near_duplicates": 1,
+        "exact": 1,
+        "by_test": {
+          "SetFit__sst2.default.train": 1,
+          "SetFit__sst5.default.train": 1,
+          "clinc__clinc_oos.plus.train": 1
+        }
+      },
+      {
+        "file": "massive_intent.ar",
+        "lines": 300,
+        "near_duplicates": 38,
+        "exact": 37,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 38
+        }
+      },
+      {
+        "file": "massive_intent.de",
+        "lines": 300,
+        "near_duplicates": 37,
+        "exact": 28,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.de.train": 36
+        }
+      },
+      {
+        "file": "massive_intent.en",
+        "lines": 300,
+        "near_duplicates": 35,
+        "exact": 13,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 16,
+          "deepset__prompt-injections.default.train": 2,
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.en.train": 21
+        }
+      },
+      {
+        "file": "massive_intent.es",
+        "lines": 300,
+        "near_duplicates": 59,
+        "exact": 39,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.es.train": 58
+        }
+      },
+      {
+        "file": "massive_intent.fr",
+        "lines": 300,
+        "near_duplicates": 69,
+        "exact": 45,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 1,
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.en.train": 1,
+          "mteb__amazon_massive_intent.fr.train": 68
+        }
+      },
+      {
+        "file": "massive_intent.hi",
+        "lines": 300,
+        "near_duplicates": 47,
+        "exact": 31,
+        "by_test": {
+          "mteb__amazon_massive_intent.hi.train": 47
+        }
+      },
+      {
+        "file": "massive_intent.ja",
+        "lines": 300,
+        "near_duplicates": 107,
+        "exact": 57,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.ja.train": 106
+        }
+      },
+      {
+        "file": "massive_intent.ko",
+        "lines": 300,
+        "near_duplicates": 47,
+        "exact": 45,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.ko.train": 46
+        }
+      },
+      {
+        "file": "massive_intent.pt",
+        "lines": 300,
+        "near_duplicates": 60,
+        "exact": 47,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.pt.train": 59
+        }
+      },
+      {
+        "file": "massive_intent.ru",
+        "lines": 300,
+        "near_duplicates": 47,
+        "exact": 45,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.ru.train": 46
+        }
+      },
+      {
+        "file": "massive_intent.sw",
+        "lines": 300,
+        "near_duplicates": 51,
+        "exact": 46,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.sw.train": 50
+        }
+      },
+      {
+        "file": "massive_intent.ta",
+        "lines": 300,
+        "near_duplicates": 47,
+        "exact": 35,
+        "by_test": {
+          "mteb__amazon_massive_intent.ta.train": 47
+        }
+      },
+      {
+        "file": "massive_intent.tr",
+        "lines": 300,
+        "near_duplicates": 36,
+        "exact": 35,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.tr.train": 35
+        }
+      },
+      {
+        "file": "massive_intent.zh-CN",
+        "lines": 300,
+        "near_duplicates": 62,
+        "exact": 42,
+        "by_test": {
+          "mteb__amazon_massive_intent.zh-CN.train": 62
+        }
+      },
+      {
+        "file": "massive_scenario.ar",
+        "lines": 300,
+        "near_duplicates": 38,
+        "exact": 37,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 38
+        }
+      },
+      {
+        "file": "massive_scenario.de",
+        "lines": 300,
+        "near_duplicates": 37,
+        "exact": 28,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.de.train": 36
+        }
+      },
+      {
+        "file": "massive_scenario.en",
+        "lines": 300,
+        "near_duplicates": 35,
+        "exact": 13,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 16,
+          "deepset__prompt-injections.default.train": 2,
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.en.train": 21
+        }
+      },
+      {
+        "file": "massive_scenario.es",
+        "lines": 300,
+        "near_duplicates": 59,
+        "exact": 39,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.es.train": 58
+        }
+      },
+      {
+        "file": "massive_scenario.fr",
+        "lines": 300,
+        "near_duplicates": 69,
+        "exact": 45,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 1,
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.en.train": 1,
+          "mteb__amazon_massive_intent.fr.train": 68
+        }
+      },
+      {
+        "file": "massive_scenario.hi",
+        "lines": 300,
+        "near_duplicates": 47,
+        "exact": 31,
+        "by_test": {
+          "mteb__amazon_massive_intent.hi.train": 47
+        }
+      },
+      {
+        "file": "massive_scenario.ja",
+        "lines": 300,
+        "near_duplicates": 107,
+        "exact": 57,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.ja.train": 106
+        }
+      },
+      {
+        "file": "massive_scenario.ko",
+        "lines": 300,
+        "near_duplicates": 47,
+        "exact": 45,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.ko.train": 46
+        }
+      },
+      {
+        "file": "massive_scenario.pt",
+        "lines": 300,
+        "near_duplicates": 60,
+        "exact": 47,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.pt.train": 59
+        }
+      },
+      {
+        "file": "massive_scenario.ru",
+        "lines": 300,
+        "near_duplicates": 47,
+        "exact": 45,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.ru.train": 46
+        }
+      },
+      {
+        "file": "massive_scenario.sw",
+        "lines": 300,
+        "near_duplicates": 51,
+        "exact": 46,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.sw.train": 50
+        }
+      },
+      {
+        "file": "massive_scenario.ta",
+        "lines": 300,
+        "near_duplicates": 47,
+        "exact": 35,
+        "by_test": {
+          "mteb__amazon_massive_intent.ta.train": 47
+        }
+      },
+      {
+        "file": "massive_scenario.tr",
+        "lines": 300,
+        "near_duplicates": 36,
+        "exact": 35,
+        "by_test": {
+          "mteb__amazon_massive_intent.ar.train": 1,
+          "mteb__amazon_massive_intent.tr.train": 35
+        }
+      },
+      {
+        "file": "massive_scenario.zh-CN",
+        "lines": 300,
+        "near_duplicates": 62,
+        "exact": 42,
+        "by_test": {
+          "mteb__amazon_massive_intent.zh-CN.train": 62
+        }
+      },
+      {
+        "file": "order.en.emotion",
+        "lines": 3600,
+        "near_duplicates": 36,
+        "exact": 36,
+        "by_test": {
+          "dair-ai__emotion.split.train": 36
+        }
+      },
+      {
+        "file": "order.massive_intent.en",
+        "lines": 1800,
+        "near_duplicates": 210,
+        "exact": 78,
+        "by_test": {
+          "clinc__clinc_oos.plus.train": 96,
+          "deepset__prompt-injections.default.train": 12,
+          "mteb__amazon_massive_intent.ar.train": 6,
+          "mteb__amazon_massive_intent.en.train": 126
+        }
+      },
+      {
+        "file": "order.xnli.en",
+        "lines": 1800,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "typed_decisions",
+        "lines": 400,
+        "near_duplicates": 67,
+        "exact": 7,
+        "by_test": {
+          "LocalLLaMA__typed-decisions.all.train": 67
+        }
+      },
+      {
+        "file": "xnli.ar",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.bg",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.de",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.el",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.en",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.es",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.fr",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.hi",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.ru",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.sw",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.th",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.tr",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.ur",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.vi",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      },
+      {
+        "file": "xnli.zh",
+        "lines": 300,
+        "near_duplicates": 0,
+        "exact": 0,
+        "by_test": {}
+      }
+    ]
+  },
+  "examples": [
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-0",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "475",
+      "jaccard": 0.8288
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-1",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "18976",
+      "jaccard": 0.7551
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-2",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "9775",
+      "jaccard": 0.8667
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-3",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "28282",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-4",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "20244",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-5",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "21853",
+      "jaccard": 0.5538
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-7",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "9012",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-10",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "3685",
+      "jaccard": 0.856
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-11",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "6678",
+      "jaccard": 0.5508
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-13",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "20127",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-14",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "13086",
+      "jaccard": 0.7699
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-18",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "26457",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-23",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "23242",
+      "jaccard": 0.8166
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-24",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "17775",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-28",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "14036",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-29",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "410",
+      "jaccard": 0.7101
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-30",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "21872",
+      "jaccard": 0.937
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-36",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "555",
+      "jaccard": 0.6
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-37",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "4303",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-38",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "22710",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-39",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "10843",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-40",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "17395",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-41",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "7041",
+      "jaccard": 0.5688
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-44",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "13799",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-45",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "767",
+      "jaccard": 0.5102
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-47",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "23251",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-49",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "10873",
+      "jaccard": 0.8645
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-50",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "28348",
+      "jaccard": 0.9473
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-68",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "10291",
+      "jaccard": 0.9792
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-70",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "1448",
+      "jaccard": 0.7054
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-72",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "9535",
+      "jaccard": 0.641
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-75",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "29987",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-79",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "3785",
+      "jaccard": 0.6111
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-89",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "1189",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-92",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "18580",
+      "jaccard": 0.9236
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-94",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "19632",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-95",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "27185",
+      "jaccard": 0.5625
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-98",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "6800",
+      "jaccard": 0.8009
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-103",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "7567",
+      "jaccard": 0.7799
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-104",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "26162",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-107",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "28958",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-108",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "11576",
+      "jaccard": 0.6531
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-113",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "3458",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-114",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "18858",
+      "jaccard": 0.9093
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-117",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "26513",
+      "jaccard": 0.7057
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-118",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "26050",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-123",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "9449",
+      "jaccard": 0.5812
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-125",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "4216",
+      "jaccard": 0.8218
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-126",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "5924",
+      "jaccard": 1.0
+    },
+    {
+      "file": "app.email_spam",
+      "id": "app.email_spam-128",
+      "test": "SetFit__enron_spam.default.train",
+      "test_id": "5814",
+      "jaccard": 0.7143
+    }
+  ]
+}
