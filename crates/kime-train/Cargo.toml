@@ -22,8 +22,10 @@ cuda = ["burn/cuda"]
 
 [dependencies]
 burn.workspace = true
+half.workspace = true
 kime-core.workspace = true
 kime-model.workspace = true
+kime-tensor.workspace = true
 kime-tok.workspace = true
 serde_json.workspace = true
 zstd.workspace = true

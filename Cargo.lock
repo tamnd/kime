@@ -3287,9 +3287,11 @@ name = "kime-train"
 version = "0.1.2"
 dependencies = [
  "burn",
+ "half",
  "kime-core",
  "kime-cpu",
  "kime-model",
+ "kime-tensor",
  "kime-tok",
  "serde_json",
  "zstd 0.14.0",

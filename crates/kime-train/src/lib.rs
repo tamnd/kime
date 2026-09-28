@@ -6,7 +6,11 @@
 #![forbid(unsafe_code)]
 
 pub mod data;
+pub mod export;
+pub mod loss;
 pub mod model;
+pub mod rng;
+pub mod train;
 
 /// The backend forward passes run on.
 #[cfg(feature = "cuda")]

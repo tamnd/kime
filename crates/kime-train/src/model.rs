@@ -158,10 +158,22 @@ impl<B: Backend> Batch<B> {
     /// If `qs` is empty, a question has no tokens, or a marker is past its sequence.
     #[must_use]
     pub fn new(qs: &[Question], shape: &Shape, dev: &B::Device) -> Self {
+        let t = qs.iter().map(|q| q.ids.len()).max().unwrap_or(0);
+        Self::padded(qs, t, shape, dev)
+    }
+
+    /// Pads `qs` to `t` tokens, so batches of different questions can share one shape and the
+    /// kernels compiled for it.
+    ///
+    /// # Panics
+    ///
+    /// As [`Batch::new`], and if a question is longer than `t`.
+    #[must_use]
+    pub fn padded(qs: &[Question], t: usize, shape: &Shape, dev: &B::Device) -> Self {
         assert!(!qs.is_empty(), "an empty batch");
         let n = qs.len();
-        let t = qs.iter().map(|q| q.ids.len()).max().unwrap_or(0);
         assert!(t > 0, "a question with no tokens");
+        assert!(qs.iter().all(|q| q.ids.len() <= t), "a question longer than {t}");
         let mut ids = vec![0i64; n * t];
         let (mut full, mut local) = (vec![0f32; n * t * t], vec![0f32; n * t * t]);
         let half = shape.window / 2;
@@ -271,6 +283,33 @@ impl<B: Backend> Compat<B> {
         &self.shape
     }
 
+    /// Freezes the embeddings and every encoder layer but the top `train` ones, so only those
+    /// layers, the final norm and the heads learn. Frozen weights get no gradients and no
+    /// optimizer state, and nothing under them is kept for the backward pass, which is what lets
+    /// a 400M model train in a few GB.
+    #[must_use]
+    pub fn freeze_below(mut self, train: usize) -> Self {
+        let keep = self.layers.len().saturating_sub(train);
+        if keep == 0 {
+            return self;
+        }
+        self.tok_embeddings = self.tok_embeddings.set_require_grad(false);
+        self.embed_norm = self.embed_norm.set_require_grad(false);
+        self.layers = self
+            .layers
+            .into_iter()
+            .enumerate()
+            .map(|(i, l)| if i < keep { l.no_grad() } else { l })
+            .collect();
+        self
+    }
+
+    /// Encoder layers in the model.
+    #[must_use]
+    pub fn depth(&self) -> usize {
+        self.layers.len()
+    }
+
     /// Loads every weight of a compat checkpoint onto `dev` as f32.
     ///
     /// # Panics
@@ -362,6 +401,71 @@ impl<B: Backend> Compat<B> {
                 norm_eps: e.norm_eps,
             },
         }
+    }
+
+    /// Every weight under its checkpoint name and in its checkpoint shape, in the order of
+    /// `LayaSpec::expected` apart from `temperature`, which is not trained.
+    #[must_use]
+    pub fn weights(&self) -> Vec<(String, Vec<usize>, Vec<f32>)> {
+        // Everything goes through as 2D, vectors as [1, len] with a note to drop the 1.
+        let mut all: Vec<(String, Tensor<B, 2>, bool)> = Vec::new();
+        let mut put = |name: String, (t, vector): (Tensor<B, 2>, bool)| all.push((name, t, vector));
+        let one = |p: &Param<Tensor<B, 1>>| (p.val().unsqueeze::<2>(), true);
+        // Linear weights go back to the checkpoint's [out, in].
+        let lin = |p: &Param<Tensor<B, 2>>| (p.val().transpose(), false);
+        put("encoder.embeddings.tok_embeddings.weight".into(), (self.tok_embeddings.val(), false));
+        put("encoder.embeddings.norm.weight".into(), one(&self.embed_norm));
+        for (i, l) in self.layers.iter().enumerate() {
+            let p = format!("encoder.layers.{i}");
+            if let Some(w) = &l.attn_norm {
+                put(format!("{p}.attn_norm.weight"), one(w));
+            }
+            put(format!("{p}.attn.Wqkv.weight"), lin(&l.wqkv));
+            put(format!("{p}.attn.Wo.weight"), lin(&l.wo));
+            put(format!("{p}.mlp_norm.weight"), one(&l.mlp_norm));
+            put(format!("{p}.mlp.Wi.weight"), lin(&l.wi));
+            put(format!("{p}.mlp.Wo.weight"), lin(&l.mlp_wo));
+        }
+        put("encoder.final_norm.weight".into(), one(&self.final_norm));
+        put("type_emb.weight".into(), (self.type_emb.val(), false));
+        for (i, l) in self.head.iter().enumerate() {
+            let p = format!("head.layers.{i}");
+            put(format!("{p}.self_attn.in_proj_weight"), lin(&l.in_proj.w));
+            put(format!("{p}.self_attn.in_proj_bias"), one(&l.in_proj.b));
+            for (n, a) in [
+                ("self_attn.out_proj", &l.out_proj),
+                ("linear1", &l.linear1),
+                ("linear2", &l.linear2),
+            ] {
+                put(format!("{p}.{n}.weight"), lin(&a.w));
+                put(format!("{p}.{n}.bias"), one(&a.b));
+            }
+            for (n, a) in [("norm1", &l.norm1), ("norm2", &l.norm2)] {
+                put(format!("{p}.{n}.weight"), one(&a.w));
+                put(format!("{p}.{n}.bias"), one(&a.b));
+            }
+        }
+        put("scorer.0.weight".into(), one(&self.scorer_norm.w));
+        put("scorer.0.bias".into(), one(&self.scorer_norm.b));
+        let affines = [
+            ("scorer.1", &self.scorer_in),
+            ("scorer.3", &self.scorer_out),
+            ("act_head.0", &self.act_in),
+            ("act_head.2", &self.act_out),
+        ];
+        for (n, a) in affines {
+            put(format!("{n}.weight"), lin(&a.w));
+            put(format!("{n}.bias"), one(&a.b));
+        }
+        all.into_iter()
+            .map(|(name, t, vector)| {
+                let mut shape = t.dims().to_vec();
+                if vector {
+                    shape.remove(0);
+                }
+                (name, shape, t.into_data().convert::<f32>().to_vec::<f32>().unwrap_or_default())
+            })
+            .collect()
     }
 
     /// The hidden states after the decision head, `[n * t, d]`.
