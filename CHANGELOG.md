@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.0.26
 
 - FP16 attention on CUDA runs on the tensor cores on sm_80 and newer (#19). The new kernel takes 64 query rows of one head in a block of four warps and does q k^T and p v with mma.sync. q, k, v and the softmax weights each go in as an f16 value plus the f16 rest, so the products carry about 22 bits, since plain f16 q and k move ModernBERT's softmax too far. On the RTX 4090 W3 takes 43.1 ms of device time a call at p50 against 51.2 ms before, and W1 is unchanged at 2.7 ms. FP32 plans keep the CUDA core kernel, whose bits do not change: its blocks still hold 16 rows, now four to each 64 row tile. Blocks still start at rows of their own sequence, and the determinism test still gets the same bits alone and in 757 random batches. The FP16 parity bound is now 1.5e-2 on any one question plus 5e-4 on average, against 6e-3 before. Adding random 1e-6 relative noise to the old kernel's output, far less than one FP16 step, moved its worst English question between 4.7e-3 and 6.1e-3, so the old bound was at the noise of FP16 GEMM inputs. The new kernel lands at 9.6e-3 on one question (143, a 0.20 to 0.80 choice) and 3.4e-4 on average, where the old one is at 4.2e-3 and 3.3e-4. Run in an FP32 plan, the new kernel matches Laya to 1.7e-5 against 1.35e-5 for the old one.
 
