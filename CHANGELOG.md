@@ -2,8 +2,11 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.1.0
 
+This release finishes M1, the API and server milestone (#2), so the minor version moves to 1.
+
+- `usage.input_tokens` is now checked against the count Laya 0.3.20 reports on the recorded requests in tamnd/kime-compat, and kime matches it on every one (#24). Every response already had `x-request-id`, `x-typesafe-request-id` and `server-timing` with queue, tokenize and device time. Jev counts in its own unit, 392 tokens on its quickstart request where Laya and kime count 205, so cost per request is the comparison to make with Jev.
 - Each CUDA bucket can now run a faster GEMM algorithm than the one ranked for 256 rows, as long as it gives the same bits (#19). Since 0.0.25 every GEMM of a shape runs the algorithm cuBLASLt ranks first for 256 rows, so a row gets the same bits in any batch. That algorithm suits one question, but in the 4,096 row bucket it runs the FP32 residual GEMMs at about 79 TFLOPS where cuBLASLt's pick for 4,096 rows runs at 141. Now, when lowering a bucket, the plan asks cuBLASLt to rank algorithms for the bucket's own rows and takes the first one that gives exactly the reference's bits. It checks this by running both on the same 256 rows of fixed inputs with the real weight and comparing every output, and it remembers the answer per shape. Algorithms that walk the inner size in the same order match bit for bit (on the 4090, cuBLASLt's algorithms 5, 6 and 21 match each other and 30 does not), so answers do not change, only speed. On the RTX 4090, W3 takes 37.4 ms of device time a call at p50 against 43.8 ms in the same session, and W1 is at 2.60 ms against 2.70 at p10, where this shared box's slow group of calls does not reach. The determinism test still gets the same bits alone and in 757 random batches in FP32 and FP16, English parity still passes, and the GEMM row test now covers 4,096 rows with the faster algorithms.
 
 ## 0.0.26
