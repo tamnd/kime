@@ -8,7 +8,7 @@ Laya's published results and the numbers can be checked against them. Each suite
 <name>.jsonl, with one request per line plus `id`, `gold` and `tags`, as crates/kime-eval/src/suite.rs
 describes. A manifest.json next to them records the dataset, config, split and revision of each.
 
-Needs `datasets` (pip install datasets).
+Needs `datasets`, and `laya` for the email suite (pip install datasets laya, laya without torch is enough).
 """
 
 import argparse
@@ -183,12 +183,170 @@ def english():
     register("en.boolq", lines, src)
 
 
+def apps():
+    # Laya's application themes, research/scripts/bench_apps.py, 400 cases each. One generator
+    # runs through the sets in the script's order, so each draws what it drew there.
+    rng = random.Random(SEED)
+    n = 400
+
+    def noul(name, rows, src):
+        lines = []
+        for i, (state, qid, q, g) in enumerate(rows):
+            lines.append({"id": "%s-%d" % (name, i), "state": state, "questions": {qid: q}, "gold": {qid: bool(g)}})
+        register(name, lines, src)
+
+    queues = {"Technical Support": "technical problems, bugs, outages, integrations",
+              "Product Support": "help using a product or feature",
+              "Customer Service": "general account or service questions",
+              "IT Support": "internal IT, devices, access, networks",
+              "Billing and Payments": "invoices, charges, refunds, payment methods",
+              "Returns and Exchanges": "returning or exchanging an item",
+              "Service Outages and Maintenance": "downtime, outages, scheduled maintenance",
+              "Sales and Pre-Sales": "pricing, quotes, buying",
+              "Human Resources": "employment, payroll, leave, hiring",
+              "General Inquiry": "anything else"}
+    d, src = data("Tobi-Bueck/customer-support-tickets", None, "train")
+    lines = []
+    for r in d:
+        if r.get("language") != "en" or r.get("queue") not in queues or not r.get("body"):
+            continue
+        q = {"type": "choice", "instructions": "Which support queue should handle this ticket?", "criteria": dict(queues)}
+        lines.append({"id": "app.support_triage-%d" % len(lines),
+                      "state": {"subject": r["subject"] or "", "body": r["body"].replace("\\n", "\n")[:3000]},
+                      "questions": {"queue": q}, "gold": {"queue": r["queue"]}})
+        if len(lines) >= n:
+            break
+    register("app.support_triage", lines, src)
+
+    from laya import email_state
+
+    d, src = data("SetFit/enron_spam", None, "test")
+    q = {"type": "noul", "instructions": "Is this email unsolicited spam or bulk marketing?"}
+    noul("app.email_spam", [(email_state(r.get("subject") or "", (r.get("message") or "")[:3000]), "is_spam", q,
+                                   int(r["label"])) for r in list(d)[:n]], src)
+
+    d, src = data("zefang-liu/phishing-email-dataset", None, "train")
+    rows = [r for r in list(d)[:6000]
+            if (r.get("Email Text") or "").strip() and r.get("Email Type") in ("Safe Email", "Phishing Email")]
+    rng.shuffle(rows)
+    q = {"type": "noul", "instructions": "Is this email a phishing or scam attempt to steal money, credentials, or personal data?",
+         "criteria": {"true": "phishing, scam, or fraud", "false": "a legitimate email (even if promotional)"}}
+    noul("app.phishing", [({"email": r["Email Text"][:3000]}, "is_phishing", q, r["Email Type"] == "Phishing Email")
+                                for r in rows[:n]], src)
+
+    d, src = data("lmsys/toxic-chat", "toxicchat0124", "test")
+    rows = [r for r in d if (r.get("user_input") or "").strip()]
+    for name, field, key, qid, instr in [
+        ("app.guardrails_jailbreak", "jailbreaking", "prompt", "jailbreak",
+         "Does `prompt` try to make an AI assistant ignore its rules, policies or system instructions?"),
+        ("app.moderation_toxicity", "toxicity", "post", "toxic",
+         "Is `post` toxic: rude, disrespectful or likely to make someone leave the discussion?"),
+    ]:
+        pos = [r for r in rows if int(r.get(field, 0)) == 1][: n // 2]
+        mix = pos + [r for r in rows if int(r.get(field, 0)) == 0][: n - len(pos)]
+        rng.shuffle(mix)
+        q = {"type": "noul", "instructions": instr}
+        noul(name, [({key: r["user_input"][:3000]}, qid, q, int(r[field])) for r in mix], src)
+
+    d, src = data("microsoft/ms_marco", "v1.1", "validation")
+    q = {"type": "noul", "instructions": "Does `passage` help answer `query`?"}
+    rows = []
+    for r in d:
+        texts, sel = r["passages"]["passage_text"], r["passages"]["is_selected"]
+        pos = [t for t, x in zip(texts, sel) if x == 1]
+        neg = [t for t, x in zip(texts, sel) if x == 0]
+        if not pos or not neg:
+            continue
+        take_pos = len(rows) % 2 == 0
+        rows.append(({"query": r["query"], "passage": rng.choice(pos if take_pos else neg)}, "relevant", q, take_pos))
+        if len(rows) >= n:
+            break
+    noul("app.rag_relevance", rows, src)
+
+    dom = {"code": "software engineering, programming, refactoring, architecture, debugging",
+           "math_or_logic": "mathematics, logic puzzles, proofs, complex calculation",
+           "writing": "creative writing, essays, emails, blog posts, copywriting",
+           "factual_lookup": "facts, definitions, trivia, history",
+           "data_analysis": "statistics, SQL, data manipulation, metrics",
+           "chitchat": "casual conversation, greetings, small talk"}
+    g, src = data("openai/gsm8k", "main", "test")
+    pool = [(r["question"], "math_or_logic") for r in list(g)[: n // 3]]
+    m, _ = data("google-research-datasets/mbpp", "full", "test")
+    pool += [(r["text"], "code") for r in list(m)[: n // 3]]
+    t, _ = data("fancyzhx/ag_news", None, "test")
+    pool += [(r["text"][:400], "factual_lookup") for r in list(t)[: n // 3]]
+    rng.shuffle(pool)
+    q = {"type": "choice", "instructions": "What domain does `request` belong to?", "criteria": dict(dom)}
+    lines = [{"id": "app.model_routing_domain-%d" % i, "state": {"request": text}, "questions": {"domain": q},
+              "gold": {"domain": g}} for i, (text, g) in enumerate(pool[:n])]
+    register("app.model_routing_domain", lines, dict(src, dataset="openai/gsm8k, google-research-datasets/mbpp, fancyzhx/ag_news"))
+
+
+def extra():
+    # Suites spec/13-benchmarks.md lists that Laya's notebook does not have.
+    d, src = data("SetFit/sst2", None, "validation")
+    lines = []
+    for i, r in enumerate(d):
+        q = {"sentiment": {"type": "choice", "instructions": "What is the sentiment of `text`?",
+                           "criteria": {"negative": None, "positive": None}}}
+        lines.append({"id": "en.sst2-%d" % i, "state": {"text": r["text"]}, "questions": q,
+                      "gold": {"sentiment": ["negative", "positive"][int(r["label"])]}})
+    register("en.sst2", lines, src)
+
+    # CLINC150 has 151 labels with out of scope, too many option names for one 512 token
+    # sequence, so each question gets 20 like MASSIVE: the gold, out of scope, and 18 at random.
+    d, src = data("clinc/clinc_oos", "plus", "test")
+    names = [x.replace("_", " ") for x in d.features["intent"].names]
+    oos = names.index("oos")
+    label = lambda i: "out of scope" if i == oos else names[i]
+    rng = random.Random(SEED)
+    pick = sorted(rng.sample(range(len(d)), 1000))
+    lines = []
+    for i in pick:
+        r = d[i]
+        g = int(r["intent"])
+        rest = [j for j in range(len(names)) if j not in (g, oos)]
+        keys = [g] + ([oos] if g != oos else []) + rng.sample(rest, N_OPTS - (1 if g == oos else 2))
+        rng.shuffle(keys)
+        q = {"intent": {"type": "choice", "instructions": "What is the user asking for in `utterance`?",
+                        "criteria": {label(k): None for k in keys}}}
+        lines.append({"id": "en.clinc150-%d" % i, "state": {"utterance": r["text"]}, "questions": q,
+                      "gold": {"intent": label(g)}, "tags": {"scope": "out" if g == oos else "in"}})
+    register("en.clinc150", lines, src)
+
+
+def order(out):
+    # Each line of the base suite, then 5 copies with the options of each choice in a random
+    # order, marked with perm_of so the report counts how often the answer moves.
+    for base in ["massive_intent.en", "en.emotion", "xnli.en"]:
+        if base in SUITES:
+            src_lines = SUITES[base]
+        else:
+            src_lines = [json.loads(l) for l in open(os.path.join(out, base + ".jsonl"), encoding="utf-8")]
+        rng = random.Random(SEED)
+        lines = []
+        for l in src_lines:
+            lines.append(l)
+            for k in range(1, 6):
+                c = json.loads(json.dumps(l))
+                c["id"] = "%s~%d" % (l["id"], k)
+                c["perm_of"] = l["id"]
+                for q in c["questions"].values():
+                    if q["type"] == "choice" and isinstance(q["criteria"], dict):
+                        items = list(q["criteria"].items())
+                        rng.shuffle(items)
+                        q["criteria"] = dict(items)
+                lines.append(c)
+        register("order." + base, lines, MANIFEST.get(base, {"from": base}))
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("out")
     p.add_argument("--only", default="")
     a = p.parse_args()
-    groups = {"typed_decisions": typed_decisions, "massive": massive, "xnli": xnli, "english": english}
+    groups = {"typed_decisions": typed_decisions, "massive": massive, "xnli": xnli, "english": english,
+              "apps": apps, "extra": extra, "order": lambda: order(a.out)}
     only = [x for x in a.only.split(",") if x]
     for name, build in groups.items():
         if only and name not in only:

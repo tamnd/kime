@@ -11,6 +11,8 @@
 //! The gold of a choice is the option label, of a score the level index, and of a noul `true` or
 //! `false`. `soft` holds soft labels in option order and `gold_score` a score that can fall
 //! between levels, both keyed by question like `gold`. `tags` are strings the report groups by.
+//! `perm_of` marks a line as a copy of another line with the options reordered, and the report
+//! counts how often the answer changes between the copies.
 
 use std::collections::BTreeMap;
 
@@ -31,6 +33,8 @@ pub struct Case {
     pub body: Value,
     /// The tags, sorted by name.
     pub tags: BTreeMap<String, String>,
+    /// The id of the line this one reorders the options of.
+    pub perm_of: Option<String>,
 }
 
 /// Reads a suite. A line that is not JSON is an error; a request that does not validate is kept,
@@ -45,7 +49,7 @@ pub fn load(text: &str) -> Result<Vec<Case>, String> {
             .map_or_else(|| (i + 1).to_string(), str::to_string);
         let mut req = body.clone();
         if let Some(m) = req.as_object_mut() {
-            for k in ["id", "gold", "soft", "gold_score", "tags"] {
+            for k in ["id", "gold", "soft", "gold_score", "tags", "perm_of"] {
                 m.remove(k);
             }
         }
@@ -62,7 +66,8 @@ pub fn load(text: &str) -> Result<Vec<Case>, String> {
                     .collect()
             })
             .unwrap_or_default();
-        out.push(Case { id, request, body, tags });
+        let perm_of = body.get("perm_of").and_then(Value::as_str).map(str::to_string);
+        out.push(Case { id, request, body, tags, perm_of });
     }
     Ok(out)
 }
@@ -86,6 +91,16 @@ fn gold_index(q: &Question, gold: &Value) -> Option<usize> {
         }
         Criteria::Score(levels) => gold.as_u64().map(|g| g as usize).filter(|g| *g < levels.len()),
         Criteria::Noul { .. } => gold.as_bool().map(usize::from),
+    }
+}
+
+/// The name of option `i` of `q`: the label of a choice, the level of a score, `true` or `false`.
+#[must_use]
+pub fn option_name(q: &Question, i: usize) -> String {
+    match &q.criteria {
+        Criteria::Choice(opts) => opts.get(i).map(|o| o.label.clone()).unwrap_or_default(),
+        Criteria::Score(_) => i.to_string(),
+        Criteria::Noul { .. } => (i == 1).to_string(),
     }
 }
 
@@ -127,6 +142,10 @@ pub struct Scored {
     pub qtype: QType,
     /// The case's tags.
     pub tags: BTreeMap<String, String>,
+    /// The case this one reorders the options of.
+    pub perm_of: Option<String>,
+    /// The name of the predicted option, which stays the same when the options move.
+    pub pred: String,
     /// The gold, the probabilities and the extras.
     pub row: Row,
 }
@@ -155,12 +174,15 @@ pub fn score(
             .and_then(Value::as_array)
             .map(|s| s.iter().filter_map(Value::as_f64).collect());
         let gold_score = field("gold_score").and_then(Value::as_f64);
+        let row = Row { gold: gi, probs: p, soft, gold_score };
         out.push(Scored {
             case: case.id.clone(),
             question: q.id.clone(),
             qtype: q.qtype,
             tags: case.tags.clone(),
-            row: Row { gold: gi, probs: p, soft, gold_score },
+            perm_of: case.perm_of.clone(),
+            pred: option_name(q, row.pred()),
+            row,
         });
     }
     (out, dropped)
@@ -192,5 +214,9 @@ mod tests {
         assert_eq!(rows[2].row.gold, 0);
         assert!((rows[2].row.probs[0] - 0.1).abs() < 1e-12);
         assert_eq!(rows[0].tags["lang"], "en");
+        assert_eq!(
+            (rows[0].pred.as_str(), rows[1].pred.as_str(), rows[2].pred.as_str()),
+            ("b", "2", "true")
+        );
     }
 }

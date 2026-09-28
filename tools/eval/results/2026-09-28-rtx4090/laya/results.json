@@ -5,6 +5,167 @@
     "model": null
   },
   "suites": {
+    "app.email_spam": {
+      "n": 400,
+      "accuracy": 0.9975,
+      "macro_f1": 0.99749,
+      "ece": 0.01079,
+      "brier": 0.00517,
+      "nll": 0.012532,
+      "aurc": 6e-6,
+      "mean_confidence": 0.989242,
+      "acc_at_50_coverage": 1.0,
+      "acc_at_80_coverage": 1.0,
+      "auroc": 1.0,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.9925,
+        1.0
+      ],
+      "ece_ci": [
+        0.006491,
+        0.016239
+      ],
+      "dropped_questions": 0
+    },
+    "app.guardrails_jailbreak": {
+      "n": 400,
+      "accuracy": 0.7125,
+      "macro_f1": 0.688514,
+      "ece": 0.264786,
+      "brier": 0.537657,
+      "nll": 1.848401,
+      "aurc": 0.219765,
+      "mean_confidence": 0.966149,
+      "acc_at_50_coverage": 0.835,
+      "acc_at_80_coverage": 0.75,
+      "auroc": 0.644012,
+      "gold_zero_rate": 0.065,
+      "accuracy_ci": [
+        0.67,
+        0.755
+      ],
+      "ece_ci": [
+        0.227238,
+        0.309456
+      ],
+      "dropped_questions": 0
+    },
+    "app.model_routing_domain": {
+      "n": 399,
+      "accuracy": 0.639098,
+      "macro_f1": 0.319778,
+      "ece": 0.078863,
+      "brier": 0.492556,
+      "nll": 1.087053,
+      "aurc": 0.174311,
+      "mean_confidence": 0.711797,
+      "acc_at_50_coverage": 0.874372,
+      "acc_at_80_coverage": 0.721003,
+      "auroc": 0.800109,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.593985,
+        0.684211
+      ],
+      "ece_ci": [
+        0.069024,
+        0.131075
+      ],
+      "dropped_questions": 0
+    },
+    "app.moderation_toxicity": {
+      "n": 400,
+      "accuracy": 0.53,
+      "macro_f1": 0.400338,
+      "ece": 0.298569,
+      "brier": 0.601743,
+      "nll": 0.886882,
+      "aurc": 0.281684,
+      "mean_confidence": 0.824341,
+      "acc_at_50_coverage": 0.735,
+      "acc_at_80_coverage": 0.60625,
+      "auroc": 0.750514,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.48,
+        0.5775
+      ],
+      "ece_ci": [
+        0.254305,
+        0.345909
+      ],
+      "dropped_questions": 0
+    },
+    "app.phishing": {
+      "n": 400,
+      "accuracy": 0.98,
+      "macro_f1": 0.978883,
+      "ece": 0.01693,
+      "brier": 0.02931,
+      "nll": 0.048075,
+      "aurc": 0.000657,
+      "mean_confidence": 0.973742,
+      "acc_at_50_coverage": 1.0,
+      "acc_at_80_coverage": 1.0,
+      "auroc": 0.97736,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.965,
+        0.9925
+      ],
+      "ece_ci": [
+        0.012444,
+        0.03067
+      ],
+      "dropped_questions": 0
+    },
+    "app.rag_relevance": {
+      "n": 400,
+      "accuracy": 0.625,
+      "macro_f1": 0.623645,
+      "ece": 0.11717,
+      "brier": 0.465209,
+      "nll": 0.670013,
+      "aurc": 0.279309,
+      "mean_confidence": 0.74217,
+      "acc_at_50_coverage": 0.72,
+      "acc_at_80_coverage": 0.678125,
+      "auroc": 0.6532,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.5775,
+        0.67
+      ],
+      "ece_ci": [
+        0.078307,
+        0.163032
+      ],
+      "dropped_questions": 0
+    },
+    "app.support_triage": {
+      "n": 400,
+      "accuracy": 0.5025,
+      "macro_f1": 0.480151,
+      "ece": 0.090133,
+      "brier": 0.643541,
+      "nll": 1.423034,
+      "aurc": 0.320845,
+      "mean_confidence": 0.506001,
+      "acc_at_50_coverage": 0.595,
+      "acc_at_80_coverage": 0.528125,
+      "auroc": 0.674117,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.4525,
+        0.5475
+      ],
+      "ece_ci": [
+        0.061975,
+        0.141134
+      ],
+      "dropped_questions": 0
+    },
     "en.ag_news": {
       "n": 600,
       "accuracy": 0.95,
@@ -16,6 +177,8 @@
       "mean_confidence": 0.92146,
       "acc_at_50_coverage": 1.0,
       "acc_at_80_coverage": 0.989583,
+      "auroc": 0.901404,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.933333,
         0.966667
@@ -37,6 +200,8 @@
       "mean_confidence": 0.778816,
       "acc_at_50_coverage": 0.66,
       "acc_at_80_coverage": 0.54,
+      "auroc": 0.76728,
+      "gold_zero_rate": 0.12,
       "accuracy_ci": [
         0.418,
         0.508
@@ -58,6 +223,8 @@
       "mean_confidence": 0.916474,
       "acc_at_50_coverage": 0.936667,
       "acc_at_80_coverage": 0.88125,
+      "auroc": 0.748415,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.798333,
         0.858333
@@ -67,6 +234,61 @@
         0.125982
       ],
       "dropped_questions": 0
+    },
+    "en.clinc150": {
+      "n": 1000,
+      "accuracy": 0.913,
+      "macro_f1": 0.91227,
+      "ece": 0.064482,
+      "brier": 0.147071,
+      "nll": 0.531195,
+      "aurc": 0.014899,
+      "mean_confidence": 0.974697,
+      "acc_at_50_coverage": 0.99,
+      "acc_at_80_coverage": 0.97875,
+      "auroc": 0.896854,
+      "gold_zero_rate": 0.012,
+      "accuracy_ci": [
+        0.894,
+        0.929
+      ],
+      "ece_ci": [
+        0.051131,
+        0.080566
+      ],
+      "dropped_questions": 0,
+      "by_tag": {
+        "scope": {
+          "in": {
+            "n": 833,
+            "accuracy": 0.963986,
+            "macro_f1": 0.963289,
+            "ece": 0.027221,
+            "brier": 0.063166,
+            "nll": 0.279193,
+            "aurc": 0.005489,
+            "mean_confidence": 0.98953,
+            "acc_at_50_coverage": 0.995192,
+            "acc_at_80_coverage": 0.990991,
+            "auroc": 0.89726,
+            "gold_zero_rate": 0.007203
+          },
+          "out": {
+            "n": 167,
+            "accuracy": 0.658683,
+            "macro_f1": 0.652091,
+            "ece": 0.25034,
+            "brier": 0.565589,
+            "nll": 1.788187,
+            "aurc": 0.255878,
+            "mean_confidence": 0.900707,
+            "acc_at_50_coverage": 0.783133,
+            "acc_at_80_coverage": 0.736842,
+            "auroc": 0.668581,
+            "gold_zero_rate": 0.035928
+          }
+        }
+      }
     },
     "en.emotion": {
       "n": 600,
@@ -79,6 +301,8 @@
       "mean_confidence": 0.896023,
       "acc_at_50_coverage": 0.68,
       "acc_at_80_coverage": 0.614583,
+      "auroc": 0.667303,
+      "gold_zero_rate": 0.011667,
       "accuracy_ci": [
         0.536667,
         0.613333
@@ -100,6 +324,8 @@
       "mean_confidence": 0.960818,
       "acc_at_50_coverage": 0.931034,
       "acc_at_80_coverage": 0.771739,
+      "auroc": 0.818687,
+      "gold_zero_rate": 0.086207,
       "accuracy_ci": [
         0.62069,
         0.793103
@@ -107,6 +333,29 @@
       "ece_ci": [
         0.197797,
         0.355687
+      ],
+      "dropped_questions": 0
+    },
+    "en.sst2": {
+      "n": 872,
+      "accuracy": 0.913991,
+      "macro_f1": 0.9138,
+      "ece": 0.017602,
+      "brier": 0.1391,
+      "nll": 0.243933,
+      "aurc": 0.028786,
+      "mean_confidence": 0.915394,
+      "acc_at_50_coverage": 0.983945,
+      "acc_at_80_coverage": 0.954089,
+      "auroc": 0.805362,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.895642,
+        0.931193
+      ],
+      "ece_ci": [
+        0.014293,
+        0.039843
       ],
       "dropped_questions": 0
     },
@@ -121,6 +370,8 @@
       "mean_confidence": 0.619342,
       "acc_at_50_coverage": 0.453333,
       "acc_at_80_coverage": 0.397917,
+      "auroc": 0.627156,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.33,
         0.408333
@@ -144,6 +395,8 @@
       "mean_confidence": 0.724467,
       "acc_at_50_coverage": 0.173333,
       "acc_at_80_coverage": 0.145833,
+      "auroc": 0.626584,
+      "gold_zero_rate": 0.256667,
       "accuracy_ci": [
         0.093333,
         0.17
@@ -165,7 +418,9 @@
             "aurc": 0.797177,
             "mean_confidence": 0.724467,
             "acc_at_50_coverage": 0.173333,
-            "acc_at_80_coverage": 0.145833
+            "acc_at_80_coverage": 0.145833,
+            "auroc": 0.626584,
+            "gold_zero_rate": 0.256667
           }
         }
       }
@@ -181,6 +436,8 @@
       "mean_confidence": 0.877462,
       "acc_at_50_coverage": 0.626667,
       "acc_at_80_coverage": 0.483333,
+      "auroc": 0.775817,
+      "gold_zero_rate": 0.196667,
       "accuracy_ci": [
         0.363333,
         0.473333
@@ -202,7 +459,9 @@
             "aurc": 0.36321,
             "mean_confidence": 0.877462,
             "acc_at_50_coverage": 0.626667,
-            "acc_at_80_coverage": 0.483333
+            "acc_at_80_coverage": 0.483333,
+            "auroc": 0.775817,
+            "gold_zero_rate": 0.196667
           }
         }
       }
@@ -218,6 +477,8 @@
       "mean_confidence": 0.960719,
       "acc_at_50_coverage": 0.94,
       "acc_at_80_coverage": 0.891667,
+      "auroc": 0.831682,
+      "gold_zero_rate": 0.06,
       "accuracy_ci": [
         0.73,
         0.826667
@@ -239,7 +500,9 @@
             "aurc": 0.084942,
             "mean_confidence": 0.960719,
             "acc_at_50_coverage": 0.94,
-            "acc_at_80_coverage": 0.891667
+            "acc_at_80_coverage": 0.891667,
+            "auroc": 0.831682,
+            "gold_zero_rate": 0.06
           }
         }
       }
@@ -255,6 +518,8 @@
       "mean_confidence": 0.89416,
       "acc_at_50_coverage": 0.64,
       "acc_at_80_coverage": 0.520833,
+      "auroc": 0.701758,
+      "gold_zero_rate": 0.196667,
       "accuracy_ci": [
         0.426667,
         0.54
@@ -276,7 +541,9 @@
             "aurc": 0.344756,
             "mean_confidence": 0.89416,
             "acc_at_50_coverage": 0.64,
-            "acc_at_80_coverage": 0.520833
+            "acc_at_80_coverage": 0.520833,
+            "auroc": 0.701758,
+            "gold_zero_rate": 0.196667
           }
         }
       }
@@ -292,6 +559,8 @@
       "mean_confidence": 0.888936,
       "acc_at_50_coverage": 0.686667,
       "acc_at_80_coverage": 0.558333,
+      "auroc": 0.775199,
+      "gold_zero_rate": 0.106667,
       "accuracy_ci": [
         0.433333,
         0.543333
@@ -313,7 +582,9 @@
             "aurc": 0.288598,
             "mean_confidence": 0.888936,
             "acc_at_50_coverage": 0.686667,
-            "acc_at_80_coverage": 0.558333
+            "acc_at_80_coverage": 0.558333,
+            "auroc": 0.775199,
+            "gold_zero_rate": 0.106667
           }
         }
       }
@@ -329,6 +600,8 @@
       "mean_confidence": 0.744542,
       "acc_at_50_coverage": 0.106667,
       "acc_at_80_coverage": 0.1,
+      "auroc": 0.532638,
+      "gold_zero_rate": 0.266667,
       "accuracy_ci": [
         0.063333,
         0.133333
@@ -350,7 +623,9 @@
             "aurc": 0.887746,
             "mean_confidence": 0.744542,
             "acc_at_50_coverage": 0.106667,
-            "acc_at_80_coverage": 0.1
+            "acc_at_80_coverage": 0.1,
+            "auroc": 0.532638,
+            "gold_zero_rate": 0.266667
           }
         }
       }
@@ -366,6 +641,8 @@
       "mean_confidence": 0.902307,
       "acc_at_50_coverage": 0.753333,
       "acc_at_80_coverage": 0.604167,
+      "auroc": 0.750179,
+      "gold_zero_rate": 0.143333,
       "accuracy_ci": [
         0.49,
         0.603333
@@ -387,7 +664,9 @@
             "aurc": 0.273334,
             "mean_confidence": 0.902307,
             "acc_at_50_coverage": 0.753333,
-            "acc_at_80_coverage": 0.604167
+            "acc_at_80_coverage": 0.604167,
+            "auroc": 0.750179,
+            "gold_zero_rate": 0.143333
           }
         }
       }
@@ -403,6 +682,8 @@
       "mean_confidence": 0.762498,
       "acc_at_50_coverage": 0.113333,
       "acc_at_80_coverage": 0.116667,
+      "auroc": 0.596834,
+      "gold_zero_rate": 0.3,
       "accuracy_ci": [
         0.07,
         0.14
@@ -424,7 +705,9 @@
             "aurc": 0.860478,
             "mean_confidence": 0.762498,
             "acc_at_50_coverage": 0.113333,
-            "acc_at_80_coverage": 0.116667
+            "acc_at_80_coverage": 0.116667,
+            "auroc": 0.596834,
+            "gold_zero_rate": 0.3
           }
         }
       }
@@ -440,6 +723,8 @@
       "mean_confidence": 0.90487,
       "acc_at_50_coverage": 0.646667,
       "acc_at_80_coverage": 0.529167,
+      "auroc": 0.754333,
+      "gold_zero_rate": 0.216667,
       "accuracy_ci": [
         0.406667,
         0.513333
@@ -461,7 +746,9 @@
             "aurc": 0.34575,
             "mean_confidence": 0.90487,
             "acc_at_50_coverage": 0.646667,
-            "acc_at_80_coverage": 0.529167
+            "acc_at_80_coverage": 0.529167,
+            "auroc": 0.754333,
+            "gold_zero_rate": 0.216667
           }
         }
       }
@@ -477,6 +764,8 @@
       "mean_confidence": 0.877549,
       "acc_at_50_coverage": 0.393333,
       "acc_at_80_coverage": 0.35,
+      "auroc": 0.701705,
+      "gold_zero_rate": 0.286667,
       "accuracy_ci": [
         0.243333,
         0.343333
@@ -498,7 +787,9 @@
             "aurc": 0.560321,
             "mean_confidence": 0.877549,
             "acc_at_50_coverage": 0.393333,
-            "acc_at_80_coverage": 0.35
+            "acc_at_80_coverage": 0.35,
+            "auroc": 0.701705,
+            "gold_zero_rate": 0.286667
           }
         }
       }
@@ -514,6 +805,8 @@
       "mean_confidence": 0.733335,
       "acc_at_50_coverage": 0.126667,
       "acc_at_80_coverage": 0.1125,
+      "auroc": 0.637407,
+      "gold_zero_rate": 0.223333,
       "accuracy_ci": [
         0.07,
         0.133333
@@ -535,7 +828,9 @@
             "aurc": 0.852167,
             "mean_confidence": 0.733335,
             "acc_at_50_coverage": 0.126667,
-            "acc_at_80_coverage": 0.1125
+            "acc_at_80_coverage": 0.1125,
+            "auroc": 0.637407,
+            "gold_zero_rate": 0.223333
           }
         }
       }
@@ -551,6 +846,8 @@
       "mean_confidence": 0.671369,
       "acc_at_50_coverage": 0.133333,
       "acc_at_80_coverage": 0.129167,
+      "auroc": 0.5659,
+      "gold_zero_rate": 0.14,
       "accuracy_ci": [
         0.08,
         0.15
@@ -572,7 +869,9 @@
             "aurc": 0.853862,
             "mean_confidence": 0.671369,
             "acc_at_50_coverage": 0.133333,
-            "acc_at_80_coverage": 0.129167
+            "acc_at_80_coverage": 0.129167,
+            "auroc": 0.5659,
+            "gold_zero_rate": 0.14
           }
         }
       }
@@ -588,6 +887,8 @@
       "mean_confidence": 0.766463,
       "acc_at_50_coverage": 0.24,
       "acc_at_80_coverage": 0.183333,
+      "auroc": 0.71552,
+      "gold_zero_rate": 0.246667,
       "accuracy_ci": [
         0.123333,
         0.21
@@ -609,7 +910,9 @@
             "aurc": 0.685552,
             "mean_confidence": 0.766463,
             "acc_at_50_coverage": 0.24,
-            "acc_at_80_coverage": 0.183333
+            "acc_at_80_coverage": 0.183333,
+            "auroc": 0.71552,
+            "gold_zero_rate": 0.246667
           }
         }
       }
@@ -625,6 +928,8 @@
       "mean_confidence": 0.930671,
       "acc_at_50_coverage": 0.76,
       "acc_at_80_coverage": 0.675,
+      "auroc": 0.759037,
+      "gold_zero_rate": 0.143333,
       "accuracy_ci": [
         0.533333,
         0.643333
@@ -646,7 +951,9 @@
             "aurc": 0.21993,
             "mean_confidence": 0.930671,
             "acc_at_50_coverage": 0.76,
-            "acc_at_80_coverage": 0.675
+            "acc_at_80_coverage": 0.675,
+            "auroc": 0.759037,
+            "gold_zero_rate": 0.143333
           }
         }
       }
@@ -662,6 +969,8 @@
       "mean_confidence": 0.777282,
       "acc_at_50_coverage": 0.113333,
       "acc_at_80_coverage": 0.120833,
+      "auroc": 0.431525,
+      "gold_zero_rate": 0.29,
       "accuracy_ci": [
         0.1,
         0.18
@@ -683,7 +992,9 @@
             "aurc": 0.877821,
             "mean_confidence": 0.777282,
             "acc_at_50_coverage": 0.113333,
-            "acc_at_80_coverage": 0.120833
+            "acc_at_80_coverage": 0.120833,
+            "auroc": 0.431525,
+            "gold_zero_rate": 0.29
           }
         }
       }
@@ -699,6 +1010,8 @@
       "mean_confidence": 0.859854,
       "acc_at_50_coverage": 0.42,
       "acc_at_80_coverage": 0.320833,
+      "auroc": 0.736442,
+      "gold_zero_rate": 0.22,
       "accuracy_ci": [
         0.236667,
         0.346667
@@ -720,7 +1033,9 @@
             "aurc": 0.518467,
             "mean_confidence": 0.859854,
             "acc_at_50_coverage": 0.42,
-            "acc_at_80_coverage": 0.320833
+            "acc_at_80_coverage": 0.320833,
+            "auroc": 0.736442,
+            "gold_zero_rate": 0.22
           }
         }
       }
@@ -736,6 +1051,8 @@
       "mean_confidence": 0.961036,
       "acc_at_50_coverage": 0.793333,
       "acc_at_80_coverage": 0.641667,
+      "auroc": 0.744692,
+      "gold_zero_rate": 0.19,
       "accuracy_ci": [
         0.55,
         0.663333
@@ -757,7 +1074,9 @@
             "aurc": 0.195616,
             "mean_confidence": 0.961036,
             "acc_at_50_coverage": 0.793333,
-            "acc_at_80_coverage": 0.641667
+            "acc_at_80_coverage": 0.641667,
+            "auroc": 0.744692,
+            "gold_zero_rate": 0.19
           }
         }
       }
@@ -773,6 +1092,8 @@
       "mean_confidence": 0.899442,
       "acc_at_50_coverage": 0.506667,
       "acc_at_80_coverage": 0.416667,
+      "auroc": 0.709233,
+      "gold_zero_rate": 0.243333,
       "accuracy_ci": [
         0.316667,
         0.42
@@ -794,7 +1115,9 @@
             "aurc": 0.453738,
             "mean_confidence": 0.899442,
             "acc_at_50_coverage": 0.506667,
-            "acc_at_80_coverage": 0.416667
+            "acc_at_80_coverage": 0.416667,
+            "auroc": 0.709233,
+            "gold_zero_rate": 0.243333
           }
         }
       }
@@ -810,6 +1133,8 @@
       "mean_confidence": 0.899726,
       "acc_at_50_coverage": 0.586667,
       "acc_at_80_coverage": 0.5,
+      "auroc": 0.711397,
+      "gold_zero_rate": 0.163333,
       "accuracy_ci": [
         0.4,
         0.516667
@@ -831,7 +1156,9 @@
             "aurc": 0.341623,
             "mean_confidence": 0.899726,
             "acc_at_50_coverage": 0.586667,
-            "acc_at_80_coverage": 0.5
+            "acc_at_80_coverage": 0.5,
+            "auroc": 0.711397,
+            "gold_zero_rate": 0.163333
           }
         }
       }
@@ -847,6 +1174,8 @@
       "mean_confidence": 0.781155,
       "acc_at_50_coverage": 0.1,
       "acc_at_80_coverage": 0.108333,
+      "auroc": 0.553251,
+      "gold_zero_rate": 0.326667,
       "accuracy_ci": [
         0.063333,
         0.133333
@@ -868,7 +1197,9 @@
             "aurc": 0.879276,
             "mean_confidence": 0.781155,
             "acc_at_50_coverage": 0.1,
-            "acc_at_80_coverage": 0.108333
+            "acc_at_80_coverage": 0.108333,
+            "auroc": 0.553251,
+            "gold_zero_rate": 0.326667
           }
         }
       }
@@ -884,6 +1215,8 @@
       "mean_confidence": 0.895726,
       "acc_at_50_coverage": 0.64,
       "acc_at_80_coverage": 0.525,
+      "auroc": 0.761898,
+      "gold_zero_rate": 0.166667,
       "accuracy_ci": [
         0.416667,
         0.523333
@@ -905,7 +1238,9 @@
             "aurc": 0.301002,
             "mean_confidence": 0.895726,
             "acc_at_50_coverage": 0.64,
-            "acc_at_80_coverage": 0.525
+            "acc_at_80_coverage": 0.525,
+            "auroc": 0.761898,
+            "gold_zero_rate": 0.166667
           }
         }
       }
@@ -921,6 +1256,8 @@
       "mean_confidence": 0.817091,
       "acc_at_50_coverage": 0.133333,
       "acc_at_80_coverage": 0.116667,
+      "auroc": 0.538871,
+      "gold_zero_rate": 0.35,
       "accuracy_ci": [
         0.093333,
         0.166667
@@ -942,7 +1279,9 @@
             "aurc": 0.815407,
             "mean_confidence": 0.817091,
             "acc_at_50_coverage": 0.133333,
-            "acc_at_80_coverage": 0.116667
+            "acc_at_80_coverage": 0.116667,
+            "auroc": 0.538871,
+            "gold_zero_rate": 0.35
           }
         }
       }
@@ -958,6 +1297,8 @@
       "mean_confidence": 0.899932,
       "acc_at_50_coverage": 0.58,
       "acc_at_80_coverage": 0.466667,
+      "auroc": 0.717661,
+      "gold_zero_rate": 0.24,
       "accuracy_ci": [
         0.36,
         0.476667
@@ -979,7 +1320,9 @@
             "aurc": 0.396834,
             "mean_confidence": 0.899932,
             "acc_at_50_coverage": 0.58,
-            "acc_at_80_coverage": 0.466667
+            "acc_at_80_coverage": 0.466667,
+            "auroc": 0.717661,
+            "gold_zero_rate": 0.24
           }
         }
       }
@@ -995,6 +1338,8 @@
       "mean_confidence": 0.873922,
       "acc_at_50_coverage": 0.406667,
       "acc_at_80_coverage": 0.370833,
+      "auroc": 0.616037,
+      "gold_zero_rate": 0.316667,
       "accuracy_ci": [
         0.29,
         0.396667
@@ -1016,7 +1361,9 @@
             "aurc": 0.568443,
             "mean_confidence": 0.873922,
             "acc_at_50_coverage": 0.406667,
-            "acc_at_80_coverage": 0.370833
+            "acc_at_80_coverage": 0.370833,
+            "auroc": 0.616037,
+            "gold_zero_rate": 0.316667
           }
         }
       }
@@ -1032,6 +1379,8 @@
       "mean_confidence": 0.778774,
       "acc_at_50_coverage": 0.1,
       "acc_at_80_coverage": 0.091667,
+      "auroc": 0.541545,
+      "gold_zero_rate": 0.403333,
       "accuracy_ci": [
         0.063333,
         0.133333
@@ -1053,7 +1402,9 @@
             "aurc": 0.884949,
             "mean_confidence": 0.778774,
             "acc_at_50_coverage": 0.1,
-            "acc_at_80_coverage": 0.091667
+            "acc_at_80_coverage": 0.091667,
+            "auroc": 0.541545,
+            "gold_zero_rate": 0.403333
           }
         }
       }
@@ -1069,6 +1420,8 @@
       "mean_confidence": 0.870822,
       "acc_at_50_coverage": 0.066667,
       "acc_at_80_coverage": 0.108333,
+      "auroc": 0.42583,
+      "gold_zero_rate": 0.4,
       "accuracy_ci": [
         0.07,
         0.14
@@ -1090,7 +1443,9 @@
             "aurc": 0.919423,
             "mean_confidence": 0.870822,
             "acc_at_50_coverage": 0.066667,
-            "acc_at_80_coverage": 0.108333
+            "acc_at_80_coverage": 0.108333,
+            "auroc": 0.42583,
+            "gold_zero_rate": 0.4
           }
         }
       }
@@ -1106,6 +1461,8 @@
       "mean_confidence": 0.786675,
       "acc_at_50_coverage": 0.326667,
       "acc_at_80_coverage": 0.25,
+      "auroc": 0.736404,
+      "gold_zero_rate": 0.306667,
       "accuracy_ci": [
         0.176667,
         0.273333
@@ -1127,7 +1484,9 @@
             "aurc": 0.584178,
             "mean_confidence": 0.786675,
             "acc_at_50_coverage": 0.326667,
-            "acc_at_80_coverage": 0.25
+            "acc_at_80_coverage": 0.25,
+            "auroc": 0.736404,
+            "gold_zero_rate": 0.306667
           }
         }
       }
@@ -1143,6 +1502,8 @@
       "mean_confidence": 0.90382,
       "acc_at_50_coverage": 0.62,
       "acc_at_80_coverage": 0.525,
+      "auroc": 0.716752,
+      "gold_zero_rate": 0.18,
       "accuracy_ci": [
         0.43,
         0.54
@@ -1164,7 +1525,132 @@
             "aurc": 0.319346,
             "mean_confidence": 0.90382,
             "acc_at_50_coverage": 0.62,
-            "acc_at_80_coverage": 0.525
+            "acc_at_80_coverage": 0.525,
+            "auroc": 0.716752,
+            "gold_zero_rate": 0.18
+          }
+        }
+      }
+    },
+    "order.en.emotion": {
+      "n": 3600,
+      "accuracy": 0.570833,
+      "macro_f1": 0.569378,
+      "ece": 0.330011,
+      "brier": 0.735552,
+      "nll": 2.182142,
+      "aurc": 0.292517,
+      "mean_confidence": 0.900845,
+      "acc_at_50_coverage": 0.693333,
+      "acc_at_80_coverage": 0.619097,
+      "auroc": 0.673785,
+      "gold_zero_rate": 0.017222,
+      "accuracy_ci": [
+        0.555556,
+        0.586944
+      ],
+      "ece_ci": [
+        0.313987,
+        0.345297
+      ],
+      "dropped_questions": 0,
+      "option_order": {
+        "questions": 600,
+        "copies": 3000,
+        "flip_rate": 0.048,
+        "any_flip_rate": 0.113333
+      }
+    },
+    "order.massive_intent.en": {
+      "n": 1800,
+      "accuracy": 0.774444,
+      "macro_f1": 0.77268,
+      "ece": 0.179669,
+      "brier": 0.391063,
+      "nll": 1.889217,
+      "aurc": 0.084837,
+      "mean_confidence": 0.954114,
+      "acc_at_50_coverage": 0.94,
+      "acc_at_80_coverage": 0.870139,
+      "auroc": 0.825299,
+      "gold_zero_rate": 0.063889,
+      "accuracy_ci": [
+        0.755,
+        0.793889
+      ],
+      "ece_ci": [
+        0.161513,
+        0.197447
+      ],
+      "dropped_questions": 0,
+      "option_order": {
+        "questions": 300,
+        "copies": 1500,
+        "flip_rate": 0.157333,
+        "any_flip_rate": 0.303333
+      },
+      "by_tag": {
+        "lang": {
+          "en": {
+            "n": 1800,
+            "accuracy": 0.774444,
+            "macro_f1": 0.77268,
+            "ece": 0.179669,
+            "brier": 0.391063,
+            "nll": 1.889217,
+            "aurc": 0.084837,
+            "mean_confidence": 0.954114,
+            "acc_at_50_coverage": 0.94,
+            "acc_at_80_coverage": 0.870139,
+            "auroc": 0.825299,
+            "gold_zero_rate": 0.063889
+          }
+        }
+      }
+    },
+    "order.xnli.en": {
+      "n": 1800,
+      "accuracy": 0.861111,
+      "macro_f1": 0.861145,
+      "ece": 0.066468,
+      "brier": 0.21817,
+      "nll": 0.395963,
+      "aurc": 0.03749,
+      "mean_confidence": 0.92214,
+      "acc_at_50_coverage": 0.98,
+      "acc_at_80_coverage": 0.922222,
+      "auroc": 0.837457,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.844444,
+        0.875
+      ],
+      "ece_ci": [
+        0.053323,
+        0.081397
+      ],
+      "dropped_questions": 0,
+      "option_order": {
+        "questions": 300,
+        "copies": 1500,
+        "flip_rate": 0.001333,
+        "any_flip_rate": 0.003333
+      },
+      "by_tag": {
+        "lang": {
+          "en": {
+            "n": 1800,
+            "accuracy": 0.861111,
+            "macro_f1": 0.861145,
+            "ece": 0.066468,
+            "brier": 0.21817,
+            "nll": 0.395963,
+            "aurc": 0.03749,
+            "mean_confidence": 0.92214,
+            "acc_at_50_coverage": 0.98,
+            "acc_at_80_coverage": 0.922222,
+            "auroc": 0.837457,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1180,6 +1666,8 @@
       "mean_confidence": 0.53636,
       "acc_at_50_coverage": 0.429,
       "acc_at_80_coverage": 0.384375,
+      "auroc": 0.584148,
+      "gold_zero_rate": 0.0005,
       "accuracy_ci": [
         0.338,
         0.382
@@ -1204,7 +1692,9 @@
           "aurc": 0.617589,
           "mean_confidence": 0.453633,
           "acc_at_50_coverage": 0.386667,
-          "acc_at_80_coverage": 0.320833
+          "acc_at_80_coverage": 0.320833,
+          "auroc": 0.650104,
+          "gold_zero_rate": 0.0
         },
         "noul": {
           "n": 600,
@@ -1216,7 +1706,9 @@
           "aurc": 0.557677,
           "mean_confidence": 0.645485,
           "acc_at_50_coverage": 0.443333,
-          "acc_at_80_coverage": 0.497917
+          "acc_at_80_coverage": 0.497917,
+          "auroc": 0.456602,
+          "gold_zero_rate": 0.001667
         },
         "score": {
           "n": 800,
@@ -1228,7 +1720,9 @@
           "aurc": 0.656587,
           "mean_confidence": 0.516562,
           "acc_at_50_coverage": 0.3325,
-          "acc_at_80_coverage": 0.314063
+          "acc_at_80_coverage": 0.314063,
+          "auroc": 0.510255,
+          "gold_zero_rate": 0.0
         }
       },
       "by_tag": {
@@ -1243,7 +1737,9 @@
             "aurc": 0.579355,
             "mean_confidence": 0.576171,
             "acc_at_50_coverage": 0.448,
-            "acc_at_80_coverage": 0.42
+            "acc_at_80_coverage": 0.42,
+            "auroc": 0.57075,
+            "gold_zero_rate": 0.0
           },
           "customer_service": {
             "n": 500,
@@ -1255,7 +1751,9 @@
             "aurc": 0.498101,
             "mean_confidence": 0.478411,
             "acc_at_50_coverage": 0.516,
-            "acc_at_80_coverage": 0.425
+            "acc_at_80_coverage": 0.425,
+            "auroc": 0.677725,
+            "gold_zero_rate": 0.0
           },
           "invoice_processing": {
             "n": 500,
@@ -1267,7 +1765,9 @@
             "aurc": 0.696165,
             "mean_confidence": 0.546255,
             "acc_at_50_coverage": 0.296,
-            "acc_at_80_coverage": 0.3425
+            "acc_at_80_coverage": 0.3425,
+            "auroc": 0.409766,
+            "gold_zero_rate": 0.002
           },
           "security_incidents": {
             "n": 500,
@@ -1279,7 +1779,9 @@
             "aurc": 0.549406,
             "mean_confidence": 0.544605,
             "acc_at_50_coverage": 0.432,
-            "acc_at_80_coverage": 0.355
+            "acc_at_80_coverage": 0.355,
+            "auroc": 0.693388,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1295,6 +1797,8 @@
       "mean_confidence": 0.713852,
       "acc_at_50_coverage": 0.48,
       "acc_at_80_coverage": 0.454167,
+      "auroc": 0.558261,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.38,
         0.5
@@ -1316,7 +1820,9 @@
             "aurc": 0.479565,
             "mean_confidence": 0.713852,
             "acc_at_50_coverage": 0.48,
-            "acc_at_80_coverage": 0.454167
+            "acc_at_80_coverage": 0.454167,
+            "auroc": 0.558261,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1332,6 +1838,8 @@
       "mean_confidence": 0.774034,
       "acc_at_50_coverage": 0.686667,
       "acc_at_80_coverage": 0.595833,
+      "auroc": 0.687321,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.486667,
         0.603333
@@ -1353,7 +1861,9 @@
             "aurc": 0.30438,
             "mean_confidence": 0.774034,
             "acc_at_50_coverage": 0.686667,
-            "acc_at_80_coverage": 0.595833
+            "acc_at_80_coverage": 0.595833,
+            "auroc": 0.687321,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1369,6 +1879,8 @@
       "mean_confidence": 0.842337,
       "acc_at_50_coverage": 0.8,
       "acc_at_80_coverage": 0.708333,
+      "auroc": 0.742488,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.58,
         0.686667
@@ -1390,7 +1902,9 @@
             "aurc": 0.207656,
             "mean_confidence": 0.842337,
             "acc_at_50_coverage": 0.8,
-            "acc_at_80_coverage": 0.708333
+            "acc_at_80_coverage": 0.708333,
+            "auroc": 0.742488,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1406,6 +1920,8 @@
       "mean_confidence": 0.732157,
       "acc_at_50_coverage": 0.626667,
       "acc_at_80_coverage": 0.566667,
+      "auroc": 0.6396,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.46,
         0.576667
@@ -1427,7 +1943,9 @@
             "aurc": 0.363298,
             "mean_confidence": 0.732157,
             "acc_at_50_coverage": 0.626667,
-            "acc_at_80_coverage": 0.566667
+            "acc_at_80_coverage": 0.566667,
+            "auroc": 0.6396,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1443,6 +1961,8 @@
       "mean_confidence": 0.920951,
       "acc_at_50_coverage": 0.98,
       "acc_at_80_coverage": 0.920833,
+      "auroc": 0.837302,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.823333,
         0.893333
@@ -1464,7 +1984,9 @@
             "aurc": 0.038141,
             "mean_confidence": 0.920951,
             "acc_at_50_coverage": 0.98,
-            "acc_at_80_coverage": 0.920833
+            "acc_at_80_coverage": 0.920833,
+            "auroc": 0.837302,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1480,6 +2002,8 @@
       "mean_confidence": 0.858838,
       "acc_at_50_coverage": 0.866667,
       "acc_at_80_coverage": 0.7625,
+      "auroc": 0.776945,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.63,
         0.736667
@@ -1501,7 +2025,9 @@
             "aurc": 0.141875,
             "mean_confidence": 0.858838,
             "acc_at_50_coverage": 0.866667,
-            "acc_at_80_coverage": 0.7625
+            "acc_at_80_coverage": 0.7625,
+            "auroc": 0.776945,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1517,6 +2043,8 @@
       "mean_confidence": 0.866111,
       "acc_at_50_coverage": 0.82,
       "acc_at_80_coverage": 0.741667,
+      "auroc": 0.735243,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.626667,
         0.733333
@@ -1538,7 +2066,9 @@
             "aurc": 0.163986,
             "mean_confidence": 0.866111,
             "acc_at_50_coverage": 0.82,
-            "acc_at_80_coverage": 0.741667
+            "acc_at_80_coverage": 0.741667,
+            "auroc": 0.735243,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1554,6 +2084,8 @@
       "mean_confidence": 0.676837,
       "acc_at_50_coverage": 0.373333,
       "acc_at_80_coverage": 0.3875,
+      "auroc": 0.490887,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.333333,
         0.443333
@@ -1575,7 +2107,9 @@
             "aurc": 0.597181,
             "mean_confidence": 0.676837,
             "acc_at_50_coverage": 0.373333,
-            "acc_at_80_coverage": 0.3875
+            "acc_at_80_coverage": 0.3875,
+            "auroc": 0.490887,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1591,6 +2125,8 @@
       "mean_confidence": 0.827544,
       "acc_at_50_coverage": 0.706667,
       "acc_at_80_coverage": 0.641667,
+      "auroc": 0.646927,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.56,
         0.666667
@@ -1612,7 +2148,9 @@
             "aurc": 0.261148,
             "mean_confidence": 0.827544,
             "acc_at_50_coverage": 0.706667,
-            "acc_at_80_coverage": 0.641667
+            "acc_at_80_coverage": 0.641667,
+            "auroc": 0.646927,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1628,6 +2166,8 @@
       "mean_confidence": 0.702287,
       "acc_at_50_coverage": 0.473333,
       "acc_at_80_coverage": 0.433333,
+      "auroc": 0.574712,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.366667,
         0.48
@@ -1649,7 +2189,9 @@
             "aurc": 0.499125,
             "mean_confidence": 0.702287,
             "acc_at_50_coverage": 0.473333,
-            "acc_at_80_coverage": 0.433333
+            "acc_at_80_coverage": 0.433333,
+            "auroc": 0.574712,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1665,6 +2207,8 @@
       "mean_confidence": 0.6015,
       "acc_at_50_coverage": 0.473333,
       "acc_at_80_coverage": 0.433333,
+      "auroc": 0.566565,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.37,
         0.476667
@@ -1686,7 +2230,9 @@
             "aurc": 0.49596,
             "mean_confidence": 0.6015,
             "acc_at_50_coverage": 0.473333,
-            "acc_at_80_coverage": 0.433333
+            "acc_at_80_coverage": 0.433333,
+            "auroc": 0.566565,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1702,6 +2248,8 @@
       "mean_confidence": 0.739321,
       "acc_at_50_coverage": 0.466667,
       "acc_at_80_coverage": 0.420833,
+      "auroc": 0.593293,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.333333,
         0.446667
@@ -1723,7 +2271,9 @@
             "aurc": 0.536218,
             "mean_confidence": 0.739321,
             "acc_at_50_coverage": 0.466667,
-            "acc_at_80_coverage": 0.420833
+            "acc_at_80_coverage": 0.420833,
+            "auroc": 0.593293,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1739,6 +2289,8 @@
       "mean_confidence": 0.693665,
       "acc_at_50_coverage": 0.4,
       "acc_at_80_coverage": 0.379167,
+      "auroc": 0.554698,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.32,
         0.423333
@@ -1760,7 +2312,9 @@
             "aurc": 0.552915,
             "mean_confidence": 0.693665,
             "acc_at_50_coverage": 0.4,
-            "acc_at_80_coverage": 0.379167
+            "acc_at_80_coverage": 0.379167,
+            "auroc": 0.554698,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1776,6 +2330,8 @@
       "mean_confidence": 0.704364,
       "acc_at_50_coverage": 0.633333,
       "acc_at_80_coverage": 0.545833,
+      "auroc": 0.670802,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.453333,
         0.563333
@@ -1797,7 +2353,9 @@
             "aurc": 0.35795,
             "mean_confidence": 0.704364,
             "acc_at_50_coverage": 0.633333,
-            "acc_at_80_coverage": 0.545833
+            "acc_at_80_coverage": 0.545833,
+            "auroc": 0.670802,
+            "gold_zero_rate": 0.0
           }
         }
       }
@@ -1813,6 +2371,8 @@
       "mean_confidence": 0.857931,
       "acc_at_50_coverage": 0.8,
       "acc_at_80_coverage": 0.725,
+      "auroc": 0.688577,
+      "gold_zero_rate": 0.0,
       "accuracy_ci": [
         0.62,
         0.716667
@@ -1834,7 +2394,9 @@
             "aurc": 0.20744,
             "mean_confidence": 0.857931,
             "acc_at_50_coverage": 0.8,
-            "acc_at_80_coverage": 0.725
+            "acc_at_80_coverage": 0.725,
+            "auroc": 0.688577,
+            "gold_zero_rate": 0.0
           }
         }
       }

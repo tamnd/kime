@@ -1,4 +1,46 @@
 {
+  "app.email_spam": {
+    "config": null,
+    "dataset": "SetFit/enron_spam",
+    "revision": "1916f66c89d52221ae33eb57d44498b4f3a5df22",
+    "split": "test"
+  },
+  "app.guardrails_jailbreak": {
+    "config": "toxicchat0124",
+    "dataset": "lmsys/toxic-chat",
+    "revision": "29df8e4dba60e1f4af4b4075c0705c5b313548a8",
+    "split": "test"
+  },
+  "app.model_routing_domain": {
+    "config": "main",
+    "dataset": "openai/gsm8k, google-research-datasets/mbpp, fancyzhx/ag_news",
+    "revision": "740312add88f781978c0658806c59bc2815b9866",
+    "split": "test"
+  },
+  "app.moderation_toxicity": {
+    "config": "toxicchat0124",
+    "dataset": "lmsys/toxic-chat",
+    "revision": "29df8e4dba60e1f4af4b4075c0705c5b313548a8",
+    "split": "test"
+  },
+  "app.phishing": {
+    "config": null,
+    "dataset": "zefang-liu/phishing-email-dataset",
+    "revision": "34085a032c123ca237f314a01a67909cdea35e34",
+    "split": "train"
+  },
+  "app.rag_relevance": {
+    "config": "v1.1",
+    "dataset": "microsoft/ms_marco",
+    "revision": "a47ee7aae8d7d466ba15f9f0bfac3b3681087b3a",
+    "split": "validation"
+  },
+  "app.support_triage": {
+    "config": null,
+    "dataset": "Tobi-Bueck/customer-support-tickets",
+    "revision": "ddf1c81a5475992c4fa6752bf1e8b4e31f07bbeb",
+    "split": "train"
+  },
   "en.ag_news": {
     "config": null,
     "dataset": "fancyzhx/ag_news",
@@ -17,6 +59,12 @@
     "revision": "35b264d03638db9f4ce671b711558bf7ff0f80d5",
     "split": "validation"
   },
+  "en.clinc150": {
+    "config": "plus",
+    "dataset": "clinc/clinc_oos",
+    "revision": "155b9c710419136e17307b80d0a13e68cd46b4ec",
+    "split": "test"
+  },
   "en.emotion": {
     "config": "split",
     "dataset": "dair-ai/emotion",
@@ -28,6 +76,12 @@
     "dataset": "deepset/prompt-injections",
     "revision": "4f61ecb038e9c3fb77e21034b22511b523772cdd",
     "split": "test"
+  },
+  "en.sst2": {
+    "config": null,
+    "dataset": "SetFit/sst2",
+    "revision": "00ea8ccb7a54b4e3780a3e51aa3f80361ff849c0",
+    "split": "validation"
   },
   "en.sst5": {
     "config": null,
@@ -202,6 +256,15 @@
     "dataset": "mteb/amazon_massive_scenario",
     "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
     "split": "test"
+  },
+  "order.en.emotion": {
+    "from": "en.emotion"
+  },
+  "order.massive_intent.en": {
+    "from": "massive_intent.en"
+  },
+  "order.xnli.en": {
+    "from": "xnli.en"
   },
   "typed_decisions": {
     "config": "all",

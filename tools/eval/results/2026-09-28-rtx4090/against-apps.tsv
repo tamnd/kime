@@ -1,0 +1,8 @@
+suite	n	laya_0.2.1_cpu_correct	kime_f16_correct	laya_4090_correct	laya_0.2.1_cpu_ece	kime_f16_ece	laya_4090_ece
+app.email_spam	400	397	399	399	0.0133	0.0109	0.0108
+app.guardrails_jailbreak	400	283	283	285	0.2591	0.2590	0.2648
+app.model_routing_domain	399	255	254	255	0.0889	0.0850	0.0789
+app.moderation_toxicity	400	212	212	212	0.2961	0.2961	0.2986
+app.phishing	400	392	392	392	0.0121	0.0121	0.0169
+app.rag_relevance	400	250	250	250	0.1175	0.1175	0.1172
+app.support_triage	400	201	201	201	0.0907	0.0907	0.0901
