@@ -238,11 +238,12 @@ jobs:
         with:
           key: msrv
       # A library people embed in their own services cannot need last week's stable Rust. The floor
-      # is raised deliberately, in a commit, not by accident in a dependency bump.
+      # is raised deliberately, in a commit, not by accident in a dependency bump. kime-train is a
+      # tool, not a library, and follows Burn's floor, which is 1.92.
       - name: cargo check
         env:
           MSRV: ${{ steps.msrv.outputs.version }}
-        run: cargo "+$MSRV" check --workspace --all-features
+        run: cargo "+$MSRV" check --workspace --exclude kime-train --all-features
 
   audit:
     name: supply chain
