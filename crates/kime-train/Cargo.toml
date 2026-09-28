@@ -3,7 +3,8 @@ name = "kime-train"
 description = "Training, distillation and calibration fitting for kime models."
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+# Burn 0.21 needs 1.92.
+rust-version = "1.92"
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -12,9 +13,23 @@ keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
+[features]
+default = ["ndarray"]
+# One Burn backend per feature. ndarray is the CPU one the tests use, metal and cuda are the GPU ones.
+ndarray = ["burn/ndarray"]
+metal = ["burn/metal"]
+cuda = ["burn/cuda"]
+
 [dependencies]
+burn.workspace = true
 kime-core.workspace = true
 kime-model.workspace = true
+kime-tok.workspace = true
+serde_json.workspace = true
+zstd.workspace = true
+
+[dev-dependencies]
+kime-cpu.workspace = true
 
 [lints]
 workspace = true

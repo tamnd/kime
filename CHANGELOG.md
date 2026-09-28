@@ -2,6 +2,10 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
+## Unreleased
+
+- kime-train has the compat graph as a Burn module and reads the training shards (#36). The model loads any compat checkpoint by name, Laya's included, so training starts from the weights kime serves. On an M4 with Burn's Metal backend it gives Laya's argmax on all 625 English parity questions, with logits at most 4.0e-4 from Laya's, probabilities at most 3.2e-5 and act logits at most 8.7e-5 relative, where Laya run with two thread counts is 9.4e-5 from itself. The shard reader lays out each line with the same parsing and layout the engine serves with, and reads all 14 shards of tools/data, 1,583,387 lines and 2,175,460 questions with 218 million tokens, in 39 seconds on one core, with no question skipped. Burn stays out of the server binary, and kime-train needs Rust 1.92 where the rest of the workspace keeps 1.90.
+
 ## 0.1.2
 
 - tools/data converts the eleven public training sources of spec/12-training.md into kime's training format from pinned revisions, and tools/data/sources.json records the license of every source considered and why fifteen are excluded (#32). Each source goes through `kime contam` against the suites and the whole splits they come from before it is sharded into zstd JSON lines, and tools/data/manifest.json lists each shard's blake3, dataset, license, split, rows and questions. The conversion gives 1,592,796 rows, drops 9,409 that are near a test text and keeps 1,583,387 with 2,175,460 questions, in 21 minutes on an M4, and gives the same bytes when run again on another machine. `kime eval --data-manifest` accepts the manifest for all 62 suites.

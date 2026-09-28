@@ -38,6 +38,8 @@ kime-train = { version = "=0.1.2", path = "crates/kime-train" }
 # The HTTP server's router, on hyper and tokio.
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "tokio"] }
 blake3 = { version = "1.8.7", features = ["rayon"] }
+# Tensors with autodiff for kime-train, which never reaches the server binary.
+burn = { version = "0.21.0", default-features = false, features = ["std", "autodiff"] }
 # The CUDA driver, NVRTC and cuBLASLt, loaded at run time so the build needs no toolkit.
 cudarc = { version = "0.19.9", default-features = false, features = ["std", "driver", "nvrtc", "cublaslt", "dynamic-loading", "cuda-12090"] }
 half = "2.7.1"
@@ -59,6 +61,8 @@ tokio = { version = "1.53.1", features = ["rt-multi-thread", "net", "signal", "m
 regex = "1.13.1"
 serde_json = { version = "1.0.151", features = ["preserve_order", "float_roundtrip"] }
 unicode-normalization = "0.1.25"
+# The training shards tools/data/convert.py writes.
+zstd = "0.14.0"
 unicode-properties = { version = "0.1.4", default-features = false, features = ["general-category"] }
 
 [workspace.lints.rust]

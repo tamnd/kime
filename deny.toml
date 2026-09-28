@@ -8,7 +8,11 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
-ignore = []
+# Both are unmaintained with no fix, not vulnerable, and reach only kime-train through burn.
+ignore = [
+  { id = "RUSTSEC-2025-0141", reason = "bincode, through burn-core, in kime-train only" },
+  { id = "RUSTSEC-2024-0436", reason = "paste, through burn, in kime-train only" },
+]
 
 [licenses]
 version = 2
@@ -24,6 +28,15 @@ allow = [
   "Unicode-3.0",
 ]
 confidence-threshold = 0.93
+# Burn's tree, in kime-train only, which never reaches the server binary. MPL-2.0 is per file and
+# asks nothing of code that only links to it, CC0-1.0 is public domain and BSL-1.0 is like MIT.
+exceptions = [
+  { name = "colored", allow = ["MPL-2.0"] },
+  { name = "option-ext", allow = ["MPL-2.0"] },
+  { name = "hexf-parse", allow = ["CC0-1.0"] },
+  { name = "tiny-keccak", allow = ["CC0-1.0"] },
+  { name = "xxhash-rust", allow = ["BSL-1.0"] },
+]
 
 [bans]
 multiple-versions = "warn"
