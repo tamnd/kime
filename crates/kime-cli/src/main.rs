@@ -1,6 +1,6 @@
 //! The `kime` binary. One binary with subcommands, per spec/14-sdks-cli.md.
 //!
-//! Today it answers `--version`, `doctor`, `convert`, `predict`, `pull` and `serve`, and names the milestone that brings each of the other
+//! Today it answers `--version`, `doctor`, `convert`, `eval`, `predict`, `pull` and `serve`, and names the milestone that brings each of the other
 //! subcommands. A command that exists and says when it will work is more useful than one that is
 //! missing, because the help text is where people look first.
 
@@ -9,6 +9,7 @@
 use std::process::ExitCode;
 
 mod convert;
+mod eval;
 mod predict;
 mod pull;
 mod serve;
@@ -17,7 +18,6 @@ mod serve;
 const PLANNED: &[(&str, &str, &str)] = &[
     ("train", "fine tune a model on labelled decisions", "M5"),
     ("calibrate", "fit temperatures on a labelled file", "M3"),
-    ("eval", "run the quality suites", "M2"),
     ("bench", "run the speed suites", "M0"),
     ("report", "build the scorecard from eval and bench output", "M5"),
     ("models", "list cached and served models", "M1"),
@@ -41,6 +41,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("convert") => convert::run(&args[1..]),
+        Some("eval") => eval::run(&args[1..]),
         Some("predict") => predict::run(&args[1..]),
         Some("pull") => pull::run(&args[1..]),
         Some("serve") => serve::run(&args[1..], false),
@@ -66,6 +67,7 @@ fn help() {
     println!("usage: kime <command> [options]\n");
     println!("  {:<10} print what this machine offers kime", "doctor");
     println!("  {:<10} pack a Laya checkpoint to .kime, unpack one, or check one", "convert");
+    println!("  {:<10} run the quality suites, or score another engine's answers", "eval");
     println!("  {:<10} answer questions from the command line", "predict");
     println!("  {:<10} download a model into the cache", "pull");
     println!("  {:<10} run the HTTP server", "serve");

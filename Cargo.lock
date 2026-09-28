@@ -431,6 +431,7 @@ name = "kime-cli"
 version = "0.1.0"
 dependencies = [
  "kime",
+ "kime-eval",
  "kime-model",
  "kime-serve",
  "serde",
