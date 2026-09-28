@@ -9,7 +9,7 @@ use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::tensor::{ElementConversion, Tensor};
 
 use crate::data::{Example, Renderer};
-use crate::loss::{Targets, proper_score};
+use crate::loss::{Objective, Targets, cross_entropy, proper_score, rlcd_pg};
 use crate::model::{Batch, Compat, Question};
 use crate::rng::Rng;
 
@@ -46,6 +46,8 @@ pub struct Config {
     pub shuffle_options: bool,
     /// Evaluate every this many steps, 0 for only at the end.
     pub eval_every: usize,
+    /// What training minimizes. Evaluation always reports the proper score.
+    pub objective: Objective,
 }
 
 impl Default for Config {
@@ -66,6 +68,7 @@ impl Default for Config {
             seed: 13,
             shuffle_options: true,
             eval_every: 0,
+            objective: Objective::Proper,
         }
     }
 }
@@ -79,6 +82,14 @@ pub fn lr_at(cfg: &Config, step: usize, total: usize) -> f64 {
     }
     let done = (step - warm) as f64 / (total - warm).max(1) as f64;
     cfg.min_lr + 0.5 * (cfg.lr - cfg.min_lr) * (1.0 + (std::f64::consts::PI * done.min(1.0)).cos())
+}
+
+/// The noise width of `rlcd_pg` at `step` of `total`, 1.0 falling linearly to 0.3 as spec/12-training.md
+/// sets it.
+#[must_use]
+pub fn sigma_at(step: usize, total: usize) -> f64 {
+    let done = step as f64 / total.saturating_sub(1).max(1) as f64;
+    1.0 - 0.7 * done.min(1.0)
 }
 
 /// Micro batches for one epoch: each is a padded length and the examples in it. Examples of the
@@ -254,6 +265,8 @@ pub fn fit<B: AutodiffBackend>(
     mut report: impl FnMut(&Event),
 ) -> Compat<B> {
     let mut rng = Rng::new(cfg.seed);
+    // The policy gradient's noise has its own generator, so every objective sees the same batches.
+    let mut noise = Rng::new(cfg.seed ^ 0x7267_5f70);
     let mut optim = AdamWConfig::new()
         .with_beta_1(cfg.betas.0 as f32)
         .with_beta_2(cfg.betas.1 as f32)
@@ -288,7 +301,14 @@ pub fn fit<B: AutodiffBackend>(
                 let qs: Vec<Question> = refs.iter().map(|e| e.q.clone()).collect();
                 let batch = Batch::<B>::padded(&qs, *t, model.shape(), dev);
                 let (z, _) = model.forward(&batch);
-                let (loss, _) = proper_score(z, &Targets::new(&refs, dev));
+                let targets = Targets::new(&refs, dev);
+                let (loss, _) = match cfg.objective {
+                    Objective::Proper => proper_score(z, &targets),
+                    Objective::CrossEntropy => cross_entropy(z, &targets),
+                    Objective::Pg { samples } => {
+                        rlcd_pg(z, &targets, samples, sigma_at(step, total), &mut noise)
+                    }
+                };
                 let loss = loss / group.len() as f64;
                 loss_sum += loss.clone().into_scalar().elem::<f64>();
                 acc.accumulate(&model, GradientsParams::from_grads(loss.backward(), &model));

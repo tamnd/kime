@@ -11,6 +11,7 @@ use std::time::Instant;
 use burn::module::AutodiffModule;
 use kime_model::Model;
 use kime_train::data::{Example, Renderer, lines};
+use kime_train::loss::Objective;
 use kime_train::model::Compat;
 use kime_train::rng::Rng;
 use kime_train::train::{Config, Event, evaluate, fit, render_all};
@@ -21,11 +22,14 @@ const USAGE: &str =
     "usage: kime-train --base <checkpoint dir> --data <file or dir>[,...] --out <dir>
     [--only source,...] [--max-lines N] [--eval-frac 0.02] [--eval-max 5000]
     [--epochs 1] [--steps N] [--lr 3e-5] [--warmup 0.02] [--tokens 8192] [--accum 1]
-    [--seed 13] [--no-shuffle] [--eval-every N] [--train-layers N] [--log run.jsonl] [--dump <dir>]
+    [--seed 13] [--no-shuffle] [--eval-every N] [--train-layers N] [--loss proper|ce|pg] [--pg-samples 8]
+    [--log run.jsonl] [--dump <dir>]
 
 --data takes .jsonl or .jsonl.zst files, or folders of them, such as the shards/ folder
 tools/data/convert.py writes. --only keeps the shards whose names start with the given sources.
 --train-layers trains only the top N encoder layers and the heads, which needs far less memory.
+--loss picks what training minimizes: the proper score, cross entropy, or the rlcd_pg estimate of
+the proper score with --pg-samples perturbations a question. Evaluation always reports the proper score.
 --dump writes the laid out questions of the first epoch and the held out lines to <dir>/train.jsonl
 and <dir>/eval.jsonl and stops, for tools/ref/train_ref.py to train on the same questions.";
 
@@ -46,6 +50,7 @@ struct Args {
 fn parse_args() -> Result<Args, String> {
     let mut it = std::env::args().skip(1);
     let (mut base, mut data, mut out) = (None, Vec::new(), None);
+    let mut pg_samples = None;
     let mut a = Args {
         base: PathBuf::new(),
         data: Vec::new(),
@@ -89,8 +94,20 @@ fn parse_args() -> Result<Args, String> {
             "--log" => a.log = Some(PathBuf::from(v)),
             "--train-layers" => a.train_layers = Some(int(&v)?),
             "--dump" => a.dump = Some(PathBuf::from(v)),
+            "--loss" => {
+                a.cfg.objective = match v.as_str() {
+                    "proper" => Objective::Proper,
+                    "ce" => Objective::CrossEntropy,
+                    "pg" => Objective::Pg { samples: 8 },
+                    _ => return Err(format!("--loss: proper, ce or pg, not {v}")),
+                }
+            }
+            "--pg-samples" => pg_samples = Some(int(&v)?),
             _ => return Err(format!("unknown flag {flag}")),
         }
+    }
+    if let (Objective::Pg { samples }, Some(n)) = (&mut a.cfg.objective, pg_samples) {
+        *samples = n;
     }
     a.base = base.ok_or("--base is required")?;
     a.out = out.ok_or("--out is required")?;
@@ -246,6 +263,7 @@ fn run(a: &Args) -> Result<(), String> {
         "accum": a.cfg.accum,
         "seed": a.cfg.seed,
         "shuffle_options": a.cfg.shuffle_options,
+        "loss": a.cfg.objective.name(),
         "train_layers": a.train_layers.unwrap_or(depth).min(depth),
         "seconds": secs.round(),
         "held_out_before": {"loss": before.loss, "accuracy": before.accuracy, "nll": before.nll},

@@ -30,6 +30,13 @@ impl Rng {
         (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
     }
 
+    /// A standard normal number, by Box-Muller.
+    pub fn normal(&mut self) -> f64 {
+        let u = 1.0 - self.unit();
+        let v = self.unit();
+        (-2.0 * u.ln()).sqrt() * (std::f64::consts::TAU * v).cos()
+    }
+
     /// Fisher-Yates.
     pub fn shuffle<T>(&mut self, v: &mut [T]) {
         for i in (1..v.len()).rev() {
