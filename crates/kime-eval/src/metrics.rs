@@ -59,6 +59,10 @@ pub struct Hard {
     pub mean_confidence: f64,
     pub acc_at_50: f64,
     pub acc_at_80: f64,
+    /// How well confidence separates right answers from wrong ones, NaN when all are one kind.
+    pub auroc: f64,
+    /// The share of questions whose gold option gets under 5e-5, which the API prints as 0.
+    pub gold_zero: f64,
 }
 
 /// Expected calibration error over `bins` equal bins of confidence.
@@ -105,6 +109,32 @@ fn macro_f1(rows: &[Row]) -> f64 {
         sum += 2.0 * tp as f64 / (2 * tp + fp + fn_).max(1) as f64;
     }
     sum / classes.len().max(1) as f64
+}
+
+/// The probability that a right answer has higher confidence than a wrong one, ties counting
+/// half, from the ranks of the confidences (Mann-Whitney U).
+#[must_use]
+pub fn auroc(conf: &[f64], correct: &[bool]) -> f64 {
+    let pos = correct.iter().filter(|c| **c).count();
+    let neg = correct.len() - pos;
+    if pos == 0 || neg == 0 {
+        return f64::NAN;
+    }
+    let mut order: Vec<usize> = (0..conf.len()).collect();
+    order.sort_by(|a, b| conf[*a].total_cmp(&conf[*b]));
+    let mut rank_sum = 0.0;
+    let mut i = 0;
+    while i < order.len() {
+        let mut j = i;
+        while j + 1 < order.len() && conf[order[j + 1]].to_bits() == conf[order[i]].to_bits() {
+            j += 1;
+        }
+        // Tied confidences share the mean of ranks i + 1 to j + 1.
+        let rank = (i + j + 2) as f64 / 2.0;
+        rank_sum += rank * order[i..=j].iter().filter(|k| correct[**k]).count() as f64;
+        i = j + 1;
+    }
+    (rank_sum - (pos * (pos + 1)) as f64 / 2.0) / (pos * neg) as f64
 }
 
 /// The row indices by confidence, highest first, ties in row order.
@@ -155,6 +185,8 @@ pub fn hard(rows: &[Row]) -> Hard {
         mean_confidence: conf.iter().sum::<f64>() / n as f64,
         acc_at_50: accuracy_at_coverage(rows, 0.5),
         acc_at_80: accuracy_at_coverage(rows, 0.8),
+        auroc: auroc(&conf, &correct),
+        gold_zero: mean(&|r| f64::from(u8::from(r.probs.get(r.gold).is_none_or(|p| *p < 5e-5)))),
     }
 }
 
@@ -280,6 +312,18 @@ mod tests {
         assert!((h.acc_at_50 - 1.0).abs() < 1e-12);
         assert!((h.acc_at_80 - 2.0 / 3.0).abs() < 1e-12);
         assert!((h.macro_f1 - 0.5).abs() < 1e-12);
+        // Right at 0.9 and 0.8, wrong at 0.7 and 0.6: every right answer is above every wrong one.
+        assert!((h.auroc - 1.0).abs() < 1e-12);
+        assert!(h.gold_zero.abs() < 1e-12);
+    }
+
+    #[test]
+    fn auroc_counts_ties_as_half() {
+        // Right at 0.9 and 0.5, wrong at 0.5 and 0.1: pairs (0.9, 0.5), (0.9, 0.1), (0.5, 0.1)
+        // are ordered and (0.5, 0.5) ties, so 3.5 of 4.
+        let a = auroc(&[0.9, 0.5, 0.5, 0.1], &[true, true, false, false]);
+        assert!((a - 0.875).abs() < 1e-12, "{a}");
+        assert!(auroc(&[0.3, 0.4], &[true, true]).is_nan());
     }
 
     #[test]
