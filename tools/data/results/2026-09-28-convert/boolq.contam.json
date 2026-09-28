@@ -1,0 +1,508 @@
+{
+  "kime": "0.1.1",
+  "method": {
+    "shingle_words": 5,
+    "perms": 128,
+    "bands": 64,
+    "threshold": 0.5
+  },
+  "tests": {
+    "files": [
+      "LocalLLaMA__typed-decisions.all.test",
+      "SetFit__enron_spam.default.test",
+      "SetFit__sst2.default.validation",
+      "SetFit__sst5.default.test",
+      "Tobi-Bueck__customer-support-tickets.default.train",
+      "clinc__clinc_oos.plus.test",
+      "dair-ai__emotion.split.test",
+      "deepset__prompt-injections.default.test",
+      "facebook__xnli.ar.test",
+      "facebook__xnli.bg.test",
+      "facebook__xnli.de.test",
+      "facebook__xnli.el.test",
+      "facebook__xnli.en.test",
+      "facebook__xnli.es.test",
+      "facebook__xnli.fr.test",
+      "facebook__xnli.hi.test",
+      "facebook__xnli.ru.test",
+      "facebook__xnli.sw.test",
+      "facebook__xnli.th.test",
+      "facebook__xnli.tr.test",
+      "facebook__xnli.ur.test",
+      "facebook__xnli.vi.test",
+      "facebook__xnli.zh.test",
+      "fancyzhx__ag_news.default.test",
+      "google-research-datasets__mbpp.full.test",
+      "google__boolq.default.validation",
+      "lmsys__toxic-chat.toxicchat0124.test",
+      "microsoft__ms_marco.v1.1.validation",
+      "mteb__amazon_massive_intent.ar.test",
+      "mteb__amazon_massive_intent.de.test",
+      "mteb__amazon_massive_intent.en.test",
+      "mteb__amazon_massive_intent.es.test",
+      "mteb__amazon_massive_intent.fr.test",
+      "mteb__amazon_massive_intent.hi.test",
+      "mteb__amazon_massive_intent.ja.test",
+      "mteb__amazon_massive_intent.ko.test",
+      "mteb__amazon_massive_intent.pt.test",
+      "mteb__amazon_massive_intent.ru.test",
+      "mteb__amazon_massive_intent.sw.test",
+      "mteb__amazon_massive_intent.ta.test",
+      "mteb__amazon_massive_intent.tr.test",
+      "mteb__amazon_massive_intent.zh-CN.test",
+      "mteb__amazon_massive_scenario.ar.test",
+      "mteb__amazon_massive_scenario.de.test",
+      "mteb__amazon_massive_scenario.en.test",
+      "mteb__amazon_massive_scenario.es.test",
+      "mteb__amazon_massive_scenario.fr.test",
+      "mteb__amazon_massive_scenario.hi.test",
+      "mteb__amazon_massive_scenario.ja.test",
+      "mteb__amazon_massive_scenario.ko.test",
+      "mteb__amazon_massive_scenario.pt.test",
+      "mteb__amazon_massive_scenario.ru.test",
+      "mteb__amazon_massive_scenario.sw.test",
+      "mteb__amazon_massive_scenario.ta.test",
+      "mteb__amazon_massive_scenario.tr.test",
+      "mteb__amazon_massive_scenario.zh-CN.test",
+      "mteb__banking77.default.test",
+      "openai__gsm8k.main.test",
+      "zefang-liu__phishing-email-dataset.default.train",
+      "app.email_spam",
+      "app.guardrails_jailbreak",
+      "app.model_routing_domain",
+      "app.moderation_toxicity",
+      "app.phishing",
+      "app.rag_relevance",
+      "app.support_triage",
+      "en.ag_news",
+      "en.banking77_full",
+      "en.boolq",
+      "en.clinc150",
+      "en.emotion",
+      "en.prompt_injections",
+      "en.sst2",
+      "en.sst5",
+      "massive_intent.ar",
+      "massive_intent.de",
+      "massive_intent.en",
+      "massive_intent.es",
+      "massive_intent.fr",
+      "massive_intent.hi",
+      "massive_intent.ja",
+      "massive_intent.ko",
+      "massive_intent.pt",
+      "massive_intent.ru",
+      "massive_intent.sw",
+      "massive_intent.ta",
+      "massive_intent.tr",
+      "massive_intent.zh-CN",
+      "massive_scenario.ar",
+      "massive_scenario.de",
+      "massive_scenario.en",
+      "massive_scenario.es",
+      "massive_scenario.fr",
+      "massive_scenario.hi",
+      "massive_scenario.ja",
+      "massive_scenario.ko",
+      "massive_scenario.pt",
+      "massive_scenario.ru",
+      "massive_scenario.sw",
+      "massive_scenario.ta",
+      "massive_scenario.tr",
+      "massive_scenario.zh-CN",
+      "order.en.emotion",
+      "order.massive_intent.en",
+      "order.xnli.en",
+      "typed_decisions",
+      "xnli.ar",
+      "xnli.bg",
+      "xnli.de",
+      "xnli.el",
+      "xnli.en",
+      "xnli.es",
+      "xnli.fr",
+      "xnli.hi",
+      "xnli.ru",
+      "xnli.sw",
+      "xnli.th",
+      "xnli.tr",
+      "xnli.ur",
+      "xnli.vi",
+      "xnli.zh"
+    ],
+    "texts": 383311,
+    "distinct": 302821,
+    "index_secs": 3.531195709
+  },
+  "data": {
+    "lines": 9427,
+    "near_duplicates": 1655,
+    "check_secs": 0.094437292,
+    "files": [
+      {
+        "file": "boolq",
+        "lines": 9427,
+        "near_duplicates": 1655,
+        "exact": 1,
+        "by_test": {
+          "app.rag_relevance": 1,
+          "en.boolq": 350,
+          "google__boolq.default.validation": 1647,
+          "microsoft__ms_marco.v1.1.validation": 8
+        }
+      }
+    ]
+  },
+  "examples": [
+    {
+      "file": "boolq",
+      "id": "boolq-3",
+      "test": "google__boolq.default.validation",
+      "test_id": "442",
+      "jaccard": 0.8353
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-11",
+      "test": "google__boolq.default.validation",
+      "test_id": "2356",
+      "jaccard": 0.8644
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-14",
+      "test": "google__boolq.default.validation",
+      "test_id": "380",
+      "jaccard": 0.7752
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-15",
+      "test": "google__boolq.default.validation",
+      "test_id": "420",
+      "jaccard": 0.8291
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-25",
+      "test": "google__boolq.default.validation",
+      "test_id": "664",
+      "jaccard": 0.8584
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-32",
+      "test": "google__boolq.default.validation",
+      "test_id": "1703",
+      "jaccard": 0.8125
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-34",
+      "test": "google__boolq.default.validation",
+      "test_id": "2744",
+      "jaccard": 0.9148
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-35",
+      "test": "google__boolq.default.validation",
+      "test_id": "3018",
+      "jaccard": 0.8
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-37",
+      "test": "google__boolq.default.validation",
+      "test_id": "1881",
+      "jaccard": 0.6341
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-39",
+      "test": "google__boolq.default.validation",
+      "test_id": "43",
+      "jaccard": 0.6875
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-46",
+      "test": "google__boolq.default.validation",
+      "test_id": "1001",
+      "jaccard": 0.7821
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-56",
+      "test": "google__boolq.default.validation",
+      "test_id": "1012",
+      "jaccard": 0.7949
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-58",
+      "test": "google__boolq.default.validation",
+      "test_id": "1987",
+      "jaccard": 0.9099
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-66",
+      "test": "google__boolq.default.validation",
+      "test_id": "1880",
+      "jaccard": 0.8584
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-68",
+      "test": "google__boolq.default.validation",
+      "test_id": "2865",
+      "jaccard": 0.7778
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-69",
+      "test": "google__boolq.default.validation",
+      "test_id": "992",
+      "jaccard": 0.8211
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-75",
+      "test": "google__boolq.default.validation",
+      "test_id": "1560",
+      "jaccard": 0.893
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-78",
+      "test": "google__boolq.default.validation",
+      "test_id": "2480",
+      "jaccard": 0.6232
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-81",
+      "test": "google__boolq.default.validation",
+      "test_id": "1912",
+      "jaccard": 0.9296
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-92",
+      "test": "google__boolq.default.validation",
+      "test_id": "2943",
+      "jaccard": 0.8783
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-104",
+      "test": "google__boolq.default.validation",
+      "test_id": "415",
+      "jaccard": 0.8621
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-113",
+      "test": "google__boolq.default.validation",
+      "test_id": "1404",
+      "jaccard": 0.75
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-114",
+      "test": "google__boolq.default.validation",
+      "test_id": "923",
+      "jaccard": 0.6848
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-126",
+      "test": "google__boolq.default.validation",
+      "test_id": "1035",
+      "jaccard": 0.8696
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-129",
+      "test": "google__boolq.default.validation",
+      "test_id": "2615",
+      "jaccard": 0.8391
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-154",
+      "test": "google__boolq.default.validation",
+      "test_id": "425",
+      "jaccard": 0.8881
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-156",
+      "test": "google__boolq.default.validation",
+      "test_id": "1234",
+      "jaccard": 0.8808
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-165",
+      "test": "google__boolq.default.validation",
+      "test_id": "15",
+      "jaccard": 0.7761
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-173",
+      "test": "google__boolq.default.validation",
+      "test_id": "351",
+      "jaccard": 0.7571
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-177",
+      "test": "google__boolq.default.validation",
+      "test_id": "747",
+      "jaccard": 0.7213
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-180",
+      "test": "google__boolq.default.validation",
+      "test_id": "59",
+      "jaccard": 0.6533
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-185",
+      "test": "google__boolq.default.validation",
+      "test_id": "630",
+      "jaccard": 0.8261
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-187",
+      "test": "google__boolq.default.validation",
+      "test_id": "2965",
+      "jaccard": 0.9149
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-188",
+      "test": "google__boolq.default.validation",
+      "test_id": "688",
+      "jaccard": 0.8475
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-189",
+      "test": "google__boolq.default.validation",
+      "test_id": "420",
+      "jaccard": 0.8596
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-194",
+      "test": "google__boolq.default.validation",
+      "test_id": "905",
+      "jaccard": 0.9333
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-200",
+      "test": "google__boolq.default.validation",
+      "test_id": "1664",
+      "jaccard": 0.8571
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-203",
+      "test": "google__boolq.default.validation",
+      "test_id": "801",
+      "jaccard": 0.7255
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-205",
+      "test": "google__boolq.default.validation",
+      "test_id": "3070",
+      "jaccard": 0.7468
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-207",
+      "test": "google__boolq.default.validation",
+      "test_id": "3044",
+      "jaccard": 0.907
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-208",
+      "test": "google__boolq.default.validation",
+      "test_id": "313",
+      "jaccard": 0.9
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-211",
+      "test": "google__boolq.default.validation",
+      "test_id": "992",
+      "jaccard": 0.8404
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-212",
+      "test": "google__boolq.default.validation",
+      "test_id": "3035",
+      "jaccard": 0.8913
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-213",
+      "test": "google__boolq.default.validation",
+      "test_id": "578",
+      "jaccard": 0.8571
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-225",
+      "test": "google__boolq.default.validation",
+      "test_id": "801",
+      "jaccard": 0.7255
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-233",
+      "test": "google__boolq.default.validation",
+      "test_id": "3035",
+      "jaccard": 0.9121
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-243",
+      "test": "google__boolq.default.validation",
+      "test_id": "2678",
+      "jaccard": 0.6825
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-245",
+      "test": "google__boolq.default.validation",
+      "test_id": "420",
+      "jaccard": 0.8596
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-250",
+      "test": "google__boolq.default.validation",
+      "test_id": "3005",
+      "jaccard": 0.7705
+    },
+    {
+      "file": "boolq",
+      "id": "boolq-253",
+      "test": "google__boolq.default.validation",
+      "test_id": "2748",
+      "jaccard": 0.7419
+    }
+  ]
+}

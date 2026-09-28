@@ -1,0 +1,524 @@
+{
+  "kime": "0.1.1",
+  "method": {
+    "shingle_words": 5,
+    "perms": 128,
+    "bands": 64,
+    "threshold": 0.5
+  },
+  "tests": {
+    "files": [
+      "LocalLLaMA__typed-decisions.all.test",
+      "SetFit__enron_spam.default.test",
+      "SetFit__sst2.default.validation",
+      "SetFit__sst5.default.test",
+      "Tobi-Bueck__customer-support-tickets.default.train",
+      "clinc__clinc_oos.plus.test",
+      "dair-ai__emotion.split.test",
+      "deepset__prompt-injections.default.test",
+      "facebook__xnli.ar.test",
+      "facebook__xnli.bg.test",
+      "facebook__xnli.de.test",
+      "facebook__xnli.el.test",
+      "facebook__xnli.en.test",
+      "facebook__xnli.es.test",
+      "facebook__xnli.fr.test",
+      "facebook__xnli.hi.test",
+      "facebook__xnli.ru.test",
+      "facebook__xnli.sw.test",
+      "facebook__xnli.th.test",
+      "facebook__xnli.tr.test",
+      "facebook__xnli.ur.test",
+      "facebook__xnli.vi.test",
+      "facebook__xnli.zh.test",
+      "fancyzhx__ag_news.default.test",
+      "google-research-datasets__mbpp.full.test",
+      "google__boolq.default.validation",
+      "lmsys__toxic-chat.toxicchat0124.test",
+      "microsoft__ms_marco.v1.1.validation",
+      "mteb__amazon_massive_intent.ar.test",
+      "mteb__amazon_massive_intent.de.test",
+      "mteb__amazon_massive_intent.en.test",
+      "mteb__amazon_massive_intent.es.test",
+      "mteb__amazon_massive_intent.fr.test",
+      "mteb__amazon_massive_intent.hi.test",
+      "mteb__amazon_massive_intent.ja.test",
+      "mteb__amazon_massive_intent.ko.test",
+      "mteb__amazon_massive_intent.pt.test",
+      "mteb__amazon_massive_intent.ru.test",
+      "mteb__amazon_massive_intent.sw.test",
+      "mteb__amazon_massive_intent.ta.test",
+      "mteb__amazon_massive_intent.tr.test",
+      "mteb__amazon_massive_intent.zh-CN.test",
+      "mteb__amazon_massive_scenario.ar.test",
+      "mteb__amazon_massive_scenario.de.test",
+      "mteb__amazon_massive_scenario.en.test",
+      "mteb__amazon_massive_scenario.es.test",
+      "mteb__amazon_massive_scenario.fr.test",
+      "mteb__amazon_massive_scenario.hi.test",
+      "mteb__amazon_massive_scenario.ja.test",
+      "mteb__amazon_massive_scenario.ko.test",
+      "mteb__amazon_massive_scenario.pt.test",
+      "mteb__amazon_massive_scenario.ru.test",
+      "mteb__amazon_massive_scenario.sw.test",
+      "mteb__amazon_massive_scenario.ta.test",
+      "mteb__amazon_massive_scenario.tr.test",
+      "mteb__amazon_massive_scenario.zh-CN.test",
+      "mteb__banking77.default.test",
+      "openai__gsm8k.main.test",
+      "zefang-liu__phishing-email-dataset.default.train",
+      "app.email_spam",
+      "app.guardrails_jailbreak",
+      "app.model_routing_domain",
+      "app.moderation_toxicity",
+      "app.phishing",
+      "app.rag_relevance",
+      "app.support_triage",
+      "en.ag_news",
+      "en.banking77_full",
+      "en.boolq",
+      "en.clinc150",
+      "en.emotion",
+      "en.prompt_injections",
+      "en.sst2",
+      "en.sst5",
+      "massive_intent.ar",
+      "massive_intent.de",
+      "massive_intent.en",
+      "massive_intent.es",
+      "massive_intent.fr",
+      "massive_intent.hi",
+      "massive_intent.ja",
+      "massive_intent.ko",
+      "massive_intent.pt",
+      "massive_intent.ru",
+      "massive_intent.sw",
+      "massive_intent.ta",
+      "massive_intent.tr",
+      "massive_intent.zh-CN",
+      "massive_scenario.ar",
+      "massive_scenario.de",
+      "massive_scenario.en",
+      "massive_scenario.es",
+      "massive_scenario.fr",
+      "massive_scenario.hi",
+      "massive_scenario.ja",
+      "massive_scenario.ko",
+      "massive_scenario.pt",
+      "massive_scenario.ru",
+      "massive_scenario.sw",
+      "massive_scenario.ta",
+      "massive_scenario.tr",
+      "massive_scenario.zh-CN",
+      "order.en.emotion",
+      "order.massive_intent.en",
+      "order.xnli.en",
+      "typed_decisions",
+      "xnli.ar",
+      "xnli.bg",
+      "xnli.de",
+      "xnli.el",
+      "xnli.en",
+      "xnli.es",
+      "xnli.fr",
+      "xnli.hi",
+      "xnli.ru",
+      "xnli.sw",
+      "xnli.th",
+      "xnli.tr",
+      "xnli.ur",
+      "xnli.vi",
+      "xnli.zh"
+    ],
+    "texts": 383311,
+    "distinct": 302821,
+    "index_secs": 5.080554625
+  },
+  "data": {
+    "lines": 15250,
+    "near_duplicates": 383,
+    "check_secs": 0.154882,
+    "files": [
+      {
+        "file": "clinc150",
+        "lines": 15250,
+        "near_duplicates": 383,
+        "exact": 63,
+        "by_test": {
+          "SetFit__sst5.default.test": 1,
+          "app.guardrails_jailbreak": 1,
+          "app.moderation_toxicity": 1,
+          "clinc__clinc_oos.plus.test": 317,
+          "en.banking77_full": 7,
+          "en.clinc150": 54,
+          "en.sst5": 1,
+          "lmsys__toxic-chat.toxicchat0124.test": 23,
+          "massive_intent.en": 14,
+          "massive_intent.fr": 1,
+          "massive_scenario.en": 14,
+          "massive_scenario.fr": 1,
+          "mteb__amazon_massive_intent.de.test": 1,
+          "mteb__amazon_massive_intent.en.test": 37,
+          "mteb__amazon_massive_intent.fr.test": 2,
+          "mteb__amazon_massive_scenario.de.test": 1,
+          "mteb__amazon_massive_scenario.en.test": 37,
+          "mteb__amazon_massive_scenario.fr.test": 2,
+          "mteb__banking77.default.test": 11,
+          "order.massive_intent.en": 14
+        }
+      }
+    ]
+  },
+  "examples": [
+    {
+      "file": "clinc150",
+      "id": "clinc150-13",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "14",
+      "jaccard": 0.7143
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-68",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "20",
+      "jaccard": 0.75
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-84",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "10",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-200",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "60",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-202",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "87",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-338",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "109",
+      "jaccard": 0.6
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-387",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "109",
+      "jaccard": 0.6
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-422",
+      "test": "lmsys__toxic-chat.toxicchat0124.test",
+      "test_id": "3172",
+      "jaccard": 0.6667
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-432",
+      "test": "lmsys__toxic-chat.toxicchat0124.test",
+      "test_id": "3056",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-444",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "125",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-459",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "106",
+      "jaccard": 0.6
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-461",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "106",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-482",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "146",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-534",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "153",
+      "jaccard": 0.5714
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-619",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "188",
+      "jaccard": 0.6667
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-628",
+      "test": "mteb__banking77.default.test",
+      "test_id": "1642",
+      "jaccard": 1.0
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-636",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "180",
+      "jaccard": 0.6
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-656",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "5489",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-668",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "180",
+      "jaccard": 0.75
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-690",
+      "test": "mteb__banking77.default.test",
+      "test_id": "1672",
+      "jaccard": 1.0
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-710",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "232",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-711",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "232",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-719",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "232",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-724",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "232",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-743",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "210",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-762",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "232",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-914",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "278",
+      "jaccard": 0.5714
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-990",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "4755",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1063",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "303",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1075",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "302",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1082",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "302",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1086",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "302",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1200",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "389",
+      "jaccard": 0.6667
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1233",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "384",
+      "jaccard": 0.6667
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1277",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "1353",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1299",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "371",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1341",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "5415",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1411",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "425",
+      "jaccard": 0.6
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1412",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "433",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1417",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "425",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1420",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "434",
+      "jaccard": 0.5714
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1427",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "427",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1443",
+      "test": "lmsys__toxic-chat.toxicchat0124.test",
+      "test_id": "4595",
+      "jaccard": 1.0
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1453",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "427",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1454",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "428",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1457",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "431",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1458",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "429",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1464",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "433",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1467",
+      "test": "clinc__clinc_oos.plus.test",
+      "test_id": "433",
+      "jaccard": 0.5
+    },
+    {
+      "file": "clinc150",
+      "id": "clinc150-1478",
+      "test": "mteb__amazon_massive_intent.en.test",
+      "test_id": "2320",
+      "jaccard": 0.5
+    }
+  ]
+}
