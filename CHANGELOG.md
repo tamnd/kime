@@ -2,6 +2,10 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
+## Unreleased
+
+- `kime eval` scores quality suites (#39). A suite is JSON lines of requests with their gold answers, and `kime eval` runs them through kime, or reads answers another engine wrote with `--answers`, and writes report.md, results.json and rows.tsv with accuracy, macro F1, ECE, Brier, NLL, AURC, accuracy at 50 and 80 percent coverage, bootstrap intervals for accuracy and ECE, and soft accuracy and score MAE where the suite has them. tools/eval builds the 51 suites of Laya's benchmark notebook from the public datasets with the notebook's seed and answers them with Laya the way the notebook does. On the RTX 4090 in FP16, kime gets the same number of questions right as Laya's published T4 run on 40 of the 49 suites the run covers and is 9 of 17,416 questions off in all, where Laya 0.3.20 on the same GPU is 47 off. AG News is 0.9467, BoolQ 0.8300 and XNLI English 0.8600 in both.
+
 ## 0.1.0
 
 This release finishes M1, the API and server milestone (#2), so the minor version moves to 1.

@@ -1,0 +1,302 @@
+{
+  "en.ag_news": {
+    "config": null,
+    "dataset": "fancyzhx/ag_news",
+    "revision": "eb185aade064a813bc0b7f42de02595523103ca4",
+    "split": "test"
+  },
+  "en.banking77_full": {
+    "config": null,
+    "dataset": "mteb/banking77",
+    "revision": "18072d2685ea682290f7b8924d94c62acc19c0b2",
+    "split": "test"
+  },
+  "en.boolq": {
+    "config": null,
+    "dataset": "google/boolq",
+    "revision": "35b264d03638db9f4ce671b711558bf7ff0f80d5",
+    "split": "validation"
+  },
+  "en.emotion": {
+    "config": "split",
+    "dataset": "dair-ai/emotion",
+    "revision": "cab853a1dbdf4c42c2b3ef2173804746df8825fe",
+    "split": "test"
+  },
+  "en.prompt_injections": {
+    "config": null,
+    "dataset": "deepset/prompt-injections",
+    "revision": "4f61ecb038e9c3fb77e21034b22511b523772cdd",
+    "split": "test"
+  },
+  "en.sst5": {
+    "config": null,
+    "dataset": "SetFit/sst5",
+    "revision": "e51bdcd8cd3a30da231967c1a249ba59361279a3",
+    "split": "test"
+  },
+  "massive_intent.ar": {
+    "config": "ar",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.de": {
+    "config": "de",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.en": {
+    "config": "en",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.es": {
+    "config": "es",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.fr": {
+    "config": "fr",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.hi": {
+    "config": "hi",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.ja": {
+    "config": "ja",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.ko": {
+    "config": "ko",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.pt": {
+    "config": "pt",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.ru": {
+    "config": "ru",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.sw": {
+    "config": "sw",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.ta": {
+    "config": "ta",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.tr": {
+    "config": "tr",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_intent.zh-CN": {
+    "config": "zh-CN",
+    "dataset": "mteb/amazon_massive_intent",
+    "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+    "split": "test"
+  },
+  "massive_scenario.ar": {
+    "config": "ar",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.de": {
+    "config": "de",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.en": {
+    "config": "en",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.es": {
+    "config": "es",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.fr": {
+    "config": "fr",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.hi": {
+    "config": "hi",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.ja": {
+    "config": "ja",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.ko": {
+    "config": "ko",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.pt": {
+    "config": "pt",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.ru": {
+    "config": "ru",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.sw": {
+    "config": "sw",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.ta": {
+    "config": "ta",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.tr": {
+    "config": "tr",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "massive_scenario.zh-CN": {
+    "config": "zh-CN",
+    "dataset": "mteb/amazon_massive_scenario",
+    "revision": "58871793b91addb7c5f7afff26ccf08737fb6697",
+    "split": "test"
+  },
+  "typed_decisions": {
+    "config": "all",
+    "dataset": "LocalLLaMA/typed-decisions",
+    "revision": "f7a2487edd7a043a5441a5e9ccc7fe5ddbd9ebe8",
+    "split": "test"
+  },
+  "xnli.ar": {
+    "config": "ar",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.bg": {
+    "config": "bg",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.de": {
+    "config": "de",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.el": {
+    "config": "el",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.en": {
+    "config": "en",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.es": {
+    "config": "es",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.fr": {
+    "config": "fr",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.hi": {
+    "config": "hi",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.ru": {
+    "config": "ru",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.sw": {
+    "config": "sw",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.th": {
+    "config": "th",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.tr": {
+    "config": "tr",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.ur": {
+    "config": "ur",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.vi": {
+    "config": "vi",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  },
+  "xnli.zh": {
+    "config": "zh",
+    "dataset": "facebook/xnli",
+    "revision": "b8dd5d7af51114dbda02c0e3f6133f332186418e",
+    "split": "test"
+  }
+}
