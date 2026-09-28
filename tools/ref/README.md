@@ -45,3 +45,14 @@ So Laya on a GPU does not agree with Laya on a CPU for 5 of 1,250 questions. The
 ## Tokenizer corpus
 
 `tok_corpus.py` writes the MASSIVE train utterances in all 51 languages plus 200,000 fuzz strings to a JSON lines file, with the ids Hugging Face tokenizers gives for each line under both Laya tokenizers, and prints how fast Hugging Face was on one thread. The parquet files are cached in `--cache`, and a cache that already has all 51 is used without touching the network. `cargo run --release -p kime-tok --example corpus -- <models>/laya tok-corpus.jsonl` then checks kime against every line and times it the same way.
+
+## The reference trainer
+
+`train_ref.py` is a second trainer to check kime-train against, as #36 asks. It trains Laya's own `DecisionModel`, built the way `laya.Agent` builds it, with Laya's own `proper_reward` as the loss, on the questions `kime-train --dump` writes. Those are the laid out questions of kime-train's first epoch, options shuffled, so both trainers see the same ids and targets and only the trainers differ. The optimizer, schedule, clipping, batching and freezing are written again in PyTorch from spec/12-training.md, and dropout is off in both. It writes a checkpoint with the base's tensor names and dtypes, so `kime eval` scores both the same way.
+
+```
+kime-train --base <dir>/laya --data <shards> --only banking77,clinc150 --max-lines 12000 --out unused --dump data
+python tools/ref/train_ref.py --base <dir>/laya --data data --out ref --train-layers 4 --tokens 2048
+```
+
+It needs laya 0.3.20 and PyTorch, and picks MPS, then CUDA, then the CPU.
