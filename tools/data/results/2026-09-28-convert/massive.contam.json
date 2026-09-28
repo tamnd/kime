@@ -1,0 +1,575 @@
+{
+  "kime": "0.1.1",
+  "method": {
+    "shingle_words": 5,
+    "perms": 128,
+    "bands": 64,
+    "threshold": 0.5
+  },
+  "tests": {
+    "files": [
+      "LocalLLaMA__typed-decisions.all.test",
+      "SetFit__enron_spam.default.test",
+      "SetFit__sst2.default.validation",
+      "SetFit__sst5.default.test",
+      "Tobi-Bueck__customer-support-tickets.default.train",
+      "clinc__clinc_oos.plus.test",
+      "dair-ai__emotion.split.test",
+      "deepset__prompt-injections.default.test",
+      "facebook__xnli.ar.test",
+      "facebook__xnli.bg.test",
+      "facebook__xnli.de.test",
+      "facebook__xnli.el.test",
+      "facebook__xnli.en.test",
+      "facebook__xnli.es.test",
+      "facebook__xnli.fr.test",
+      "facebook__xnli.hi.test",
+      "facebook__xnli.ru.test",
+      "facebook__xnli.sw.test",
+      "facebook__xnli.th.test",
+      "facebook__xnli.tr.test",
+      "facebook__xnli.ur.test",
+      "facebook__xnli.vi.test",
+      "facebook__xnli.zh.test",
+      "fancyzhx__ag_news.default.test",
+      "google-research-datasets__mbpp.full.test",
+      "google__boolq.default.validation",
+      "lmsys__toxic-chat.toxicchat0124.test",
+      "microsoft__ms_marco.v1.1.validation",
+      "mteb__amazon_massive_intent.ar.test",
+      "mteb__amazon_massive_intent.de.test",
+      "mteb__amazon_massive_intent.en.test",
+      "mteb__amazon_massive_intent.es.test",
+      "mteb__amazon_massive_intent.fr.test",
+      "mteb__amazon_massive_intent.hi.test",
+      "mteb__amazon_massive_intent.ja.test",
+      "mteb__amazon_massive_intent.ko.test",
+      "mteb__amazon_massive_intent.pt.test",
+      "mteb__amazon_massive_intent.ru.test",
+      "mteb__amazon_massive_intent.sw.test",
+      "mteb__amazon_massive_intent.ta.test",
+      "mteb__amazon_massive_intent.tr.test",
+      "mteb__amazon_massive_intent.zh-CN.test",
+      "mteb__amazon_massive_scenario.ar.test",
+      "mteb__amazon_massive_scenario.de.test",
+      "mteb__amazon_massive_scenario.en.test",
+      "mteb__amazon_massive_scenario.es.test",
+      "mteb__amazon_massive_scenario.fr.test",
+      "mteb__amazon_massive_scenario.hi.test",
+      "mteb__amazon_massive_scenario.ja.test",
+      "mteb__amazon_massive_scenario.ko.test",
+      "mteb__amazon_massive_scenario.pt.test",
+      "mteb__amazon_massive_scenario.ru.test",
+      "mteb__amazon_massive_scenario.sw.test",
+      "mteb__amazon_massive_scenario.ta.test",
+      "mteb__amazon_massive_scenario.tr.test",
+      "mteb__amazon_massive_scenario.zh-CN.test",
+      "mteb__banking77.default.test",
+      "openai__gsm8k.main.test",
+      "zefang-liu__phishing-email-dataset.default.train",
+      "app.email_spam",
+      "app.guardrails_jailbreak",
+      "app.model_routing_domain",
+      "app.moderation_toxicity",
+      "app.phishing",
+      "app.rag_relevance",
+      "app.support_triage",
+      "en.ag_news",
+      "en.banking77_full",
+      "en.boolq",
+      "en.clinc150",
+      "en.emotion",
+      "en.prompt_injections",
+      "en.sst2",
+      "en.sst5",
+      "massive_intent.ar",
+      "massive_intent.de",
+      "massive_intent.en",
+      "massive_intent.es",
+      "massive_intent.fr",
+      "massive_intent.hi",
+      "massive_intent.ja",
+      "massive_intent.ko",
+      "massive_intent.pt",
+      "massive_intent.ru",
+      "massive_intent.sw",
+      "massive_intent.ta",
+      "massive_intent.tr",
+      "massive_intent.zh-CN",
+      "massive_scenario.ar",
+      "massive_scenario.de",
+      "massive_scenario.en",
+      "massive_scenario.es",
+      "massive_scenario.fr",
+      "massive_scenario.hi",
+      "massive_scenario.ja",
+      "massive_scenario.ko",
+      "massive_scenario.pt",
+      "massive_scenario.ru",
+      "massive_scenario.sw",
+      "massive_scenario.ta",
+      "massive_scenario.tr",
+      "massive_scenario.zh-CN",
+      "order.en.emotion",
+      "order.massive_intent.en",
+      "order.xnli.en",
+      "typed_decisions",
+      "xnli.ar",
+      "xnli.bg",
+      "xnli.de",
+      "xnli.el",
+      "xnli.en",
+      "xnli.es",
+      "xnli.fr",
+      "xnli.hi",
+      "xnli.ru",
+      "xnli.sw",
+      "xnli.th",
+      "xnli.tr",
+      "xnli.ur",
+      "xnli.vi",
+      "xnli.zh"
+    ],
+    "texts": 383311,
+    "distinct": 302821,
+    "index_secs": 3.962511958
+  },
+  "data": {
+    "lines": 587214,
+    "near_duplicates": 6659,
+    "check_secs": 18.618695042,
+    "files": [
+      {
+        "file": "massive",
+        "lines": 587214,
+        "near_duplicates": 6659,
+        "exact": 3871,
+        "by_test": {
+          "SetFit__sst2.default.validation": 1,
+          "SetFit__sst5.default.test": 1,
+          "Tobi-Bueck__customer-support-tickets.default.train": 1,
+          "app.guardrails_jailbreak": 2,
+          "app.moderation_toxicity": 2,
+          "clinc__clinc_oos.plus.test": 64,
+          "deepset__prompt-injections.default.test": 1,
+          "en.banking77_full": 1,
+          "en.clinc150": 14,
+          "en.prompt_injections": 1,
+          "en.sst2": 1,
+          "lmsys__toxic-chat.toxicchat0124.test": 37,
+          "massive_intent.ar": 68,
+          "massive_intent.de": 58,
+          "massive_intent.en": 26,
+          "massive_intent.es": 129,
+          "massive_intent.fr": 142,
+          "massive_intent.hi": 88,
+          "massive_intent.ja": 341,
+          "massive_intent.ko": 107,
+          "massive_intent.pt": 145,
+          "massive_intent.ru": 135,
+          "massive_intent.sw": 129,
+          "massive_intent.ta": 96,
+          "massive_intent.tr": 105,
+          "massive_intent.zh-CN": 164,
+          "massive_scenario.ar": 68,
+          "massive_scenario.de": 58,
+          "massive_scenario.en": 26,
+          "massive_scenario.es": 129,
+          "massive_scenario.fr": 142,
+          "massive_scenario.hi": 88,
+          "massive_scenario.ja": 341,
+          "massive_scenario.ko": 107,
+          "massive_scenario.pt": 145,
+          "massive_scenario.ru": 135,
+          "massive_scenario.sw": 129,
+          "massive_scenario.ta": 96,
+          "massive_scenario.tr": 105,
+          "massive_scenario.zh-CN": 164,
+          "mteb__amazon_massive_intent.ar.test": 518,
+          "mteb__amazon_massive_intent.de.test": 243,
+          "mteb__amazon_massive_intent.en.test": 255,
+          "mteb__amazon_massive_intent.es.test": 384,
+          "mteb__amazon_massive_intent.fr.test": 523,
+          "mteb__amazon_massive_intent.hi.test": 379,
+          "mteb__amazon_massive_intent.ja.test": 1218,
+          "mteb__amazon_massive_intent.ko.test": 307,
+          "mteb__amazon_massive_intent.pt.test": 523,
+          "mteb__amazon_massive_intent.ru.test": 423,
+          "mteb__amazon_massive_intent.sw.test": 417,
+          "mteb__amazon_massive_intent.ta.test": 429,
+          "mteb__amazon_massive_intent.tr.test": 290,
+          "mteb__amazon_massive_intent.zh-CN.test": 703,
+          "mteb__amazon_massive_scenario.ar.test": 518,
+          "mteb__amazon_massive_scenario.de.test": 243,
+          "mteb__amazon_massive_scenario.en.test": 255,
+          "mteb__amazon_massive_scenario.es.test": 384,
+          "mteb__amazon_massive_scenario.fr.test": 523,
+          "mteb__amazon_massive_scenario.hi.test": 379,
+          "mteb__amazon_massive_scenario.ja.test": 1218,
+          "mteb__amazon_massive_scenario.ko.test": 307,
+          "mteb__amazon_massive_scenario.pt.test": 523,
+          "mteb__amazon_massive_scenario.ru.test": 423,
+          "mteb__amazon_massive_scenario.sw.test": 417,
+          "mteb__amazon_massive_scenario.ta.test": 429,
+          "mteb__amazon_massive_scenario.tr.test": 290,
+          "mteb__amazon_massive_scenario.zh-CN.test": 703,
+          "mteb__banking77.default.test": 1,
+          "order.massive_intent.en": 26,
+          "zefang-liu__phishing-email-dataset.default.train": 1
+        }
+      }
+    ]
+  },
+  "examples": [
+    {
+      "file": "massive",
+      "id": "massive-af.9585",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "1597",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-af.12868",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "2115",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.5",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "1690",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.51",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "657",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.83",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "52",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.187",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "92",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.213",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "17",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.225",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "465",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.288",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "298",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.316",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "38",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.332",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "1",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.343",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "391",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.390",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "75",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.408",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "248",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.422",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "741",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.449",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "695",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.471",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "72",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.483",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "639",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.485",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "639",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.488",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "124",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.489",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "253",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.500",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "618",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.503",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "470",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.563",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "112",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.589",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "479",
+      "jaccard": 0.5
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.598",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "92",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.599",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "954",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.609",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "117",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.633",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "495",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.731",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "465",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.772",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "617",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.820",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "92",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.852",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "298",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.927",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "404",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1055",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "537",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1088",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "38",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1291",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "452",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1313",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "788",
+      "jaccard": 0.6667
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1321",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "742",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1358",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "946",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1534",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "772",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1552",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "75",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1573",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "495",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1574",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "495",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1580",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "17",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1596",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "491",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1629",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "32",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1661",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "495",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1691",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "742",
+      "jaccard": 1.0
+    },
+    {
+      "file": "massive",
+      "id": "massive-ar.1755",
+      "test": "mteb__amazon_massive_intent.ar.test",
+      "test_id": "643",
+      "jaccard": 1.0
+    }
+  ]
+}

@@ -1,0 +1,425 @@
+{
+ "created": "2026-09-28",
+ "format": "kime training JSONL, spec/12-training.md",
+ "seed": 13,
+ "shards": [
+  {
+   "blake3": "d173ce96fc9db8c2348ed24a383036c250dc4b41f86bf578d2e66815731d029f",
+   "bytes": 550276,
+   "config": null,
+   "dataset": "mteb/banking77",
+   "file": "banking77-00000.jsonl.zst",
+   "license": "CC-BY-4.0",
+   "questions": 9675,
+   "raw_bytes": 7595150,
+   "rows": 9675,
+   "source": "banking77",
+   "split": "train"
+  },
+  {
+   "blake3": "a8562ffa87584e15f7c92d6cd00854c3e7372f2fcc17c1fdba9f3c1e36a17529",
+   "bytes": 1538341,
+   "config": null,
+   "dataset": "google/boolq",
+   "file": "boolq-00000.jsonl.zst",
+   "license": "CC-BY-SA-3.0",
+   "questions": 7772,
+   "raw_bytes": 7125482,
+   "rows": 7772,
+   "source": "boolq",
+   "split": "train"
+  },
+  {
+   "blake3": "48c63c4724d9baf8e6954fe1cd0eeec1c9040a4e58765ac701ea818e3789af35",
+   "bytes": 34899501,
+   "config": null,
+   "dataset": "google/civil_comments",
+   "file": "civil_comments-00000.jsonl.zst",
+   "license": "CC0-1.0",
+   "questions": 299702,
+   "raw_bytes": 187231331,
+   "rows": 299702,
+   "source": "civil_comments",
+   "split": "train"
+  },
+  {
+   "blake3": "4d7607ab0b899a2fc316842bf770679e421ccdf7e73474319c22d9dd667c1c38",
+   "bytes": 799395,
+   "config": "plus",
+   "dataset": "clinc/clinc_oos",
+   "file": "clinc150-00000.jsonl.zst",
+   "license": "CC-BY-3.0",
+   "questions": 14867,
+   "raw_bytes": 10104300,
+   "rows": 14867,
+   "source": "clinc150",
+   "split": "train"
+  },
+  {
+   "blake3": "22051dd24c19ea9dd59835d7408a3fcc12e40d00db749e6863dfa54ae705a39b",
+   "bytes": 2758568,
+   "config": "simplified",
+   "dataset": "google-research-datasets/go_emotions",
+   "file": "go_emotions-00000.jsonl.zst",
+   "license": "Apache-2.0",
+   "questions": 50496,
+   "raw_bytes": 27492852,
+   "rows": 43394,
+   "source": "go_emotions",
+   "split": "train"
+  },
+  {
+   "blake3": "91b62be0e360ddc157965393fb2c74e46570a4182d3abe6d895621e645de357e",
+   "bytes": 19675079,
+   "config": null,
+   "dataset": "mteb/amazon_massive_intent",
+   "file": "massive-00000.jsonl.zst",
+   "license": "CC-BY-4.0",
+   "questions": 496888,
+   "raw_bytes": 268435942,
+   "rows": 248444,
+   "source": "massive",
+   "split": "train"
+  },
+  {
+   "blake3": "c22b6a95728a43eab98b9358f24ad7f01be3b8646567278b55d5c62bd24fcc1f",
+   "bytes": 19558495,
+   "config": null,
+   "dataset": "mteb/amazon_massive_intent",
+   "file": "massive-00001.jsonl.zst",
+   "license": "CC-BY-4.0",
+   "questions": 491744,
+   "raw_bytes": 268436124,
+   "rows": 245872,
+   "source": "massive",
+   "split": "train"
+  },
+  {
+   "blake3": "6d0987f20d4c712c9633eb6e46b4305fc14bb08f13df61567d02c630bf6d9c93",
+   "bytes": 6858866,
+   "config": null,
+   "dataset": "mteb/amazon_massive_intent",
+   "file": "massive-00002.jsonl.zst",
+   "license": "CC-BY-4.0",
+   "questions": 172478,
+   "raw_bytes": 93652310,
+   "rows": 86239,
+   "source": "massive",
+   "split": "train"
+  },
+  {
+   "blake3": "c89ca3de1f029d805e1d4e62b37851c040e0a2252ef5b5afcd69c35018b9501c",
+   "bytes": 29054923,
+   "config": null,
+   "dataset": "nyu-mll/multi_nli",
+   "file": "multi_nli-00000.jsonl.zst",
+   "license": "OANC, CC-BY-SA-3.0, CC-BY-3.0",
+   "questions": 391583,
+   "raw_bytes": 268435593,
+   "rows": 391583,
+   "source": "multi_nli",
+   "split": "train"
+  },
+  {
+   "blake3": "5d5fa8a30443c72823c13b7e8d4aa40c2cd3f7bb1a83b2770e7052f4ce0d143f",
+   "bytes": 89608,
+   "config": null,
+   "dataset": "nyu-mll/multi_nli",
+   "file": "multi_nli-00001.jsonl.zst",
+   "license": "OANC, CC-BY-SA-3.0, CC-BY-3.0",
+   "questions": 1081,
+   "raw_bytes": 738393,
+   "rows": 1081,
+   "source": "multi_nli",
+   "split": "train"
+  },
+  {
+   "blake3": "93cbd2c3662797580620d8ba1137825ae3c8c8980e0282f4fffe9937cd05bfe2",
+   "bytes": 25060,
+   "config": null,
+   "dataset": "deepset/prompt-injections",
+   "file": "prompt_injections-00000.jsonl.zst",
+   "license": "Apache-2.0",
+   "questions": 534,
+   "raw_bytes": 240416,
+   "rows": 534,
+   "source": "prompt_injections",
+   "split": "train"
+  },
+  {
+   "blake3": "de9cdc7be77ee7c6c2bb444c6491d9f173bd57342867a1db3e89e96aaecf8636",
+   "bytes": 8327407,
+   "config": null,
+   "dataset": "rajpurkar/squad_v2",
+   "file": "squad_v2-00000.jsonl.zst",
+   "license": "CC-BY-SA-4.0",
+   "questions": 130235,
+   "raw_bytes": 148016449,
+   "rows": 130235,
+   "source": "squad_v2",
+   "split": "train"
+  },
+  {
+   "blake3": "ad0045a292be6337d76fa46ff60ac710b224cac09c927caa4e17b5f1057f808e",
+   "bytes": 172628,
+   "config": "all",
+   "dataset": "LocalLLaMA/typed-decisions",
+   "file": "typed_decisions-00000.jsonl.zst",
+   "license": "Apache-2.0",
+   "questions": 5520,
+   "raw_bytes": 3286748,
+   "rows": 1104,
+   "source": "typed_decisions",
+   "split": "train"
+  },
+  {
+   "blake3": "3b722b9e486a8ef51d629a1a20da896e6d50742a2d9ff24cc6ec2523ad2b17c5",
+   "bytes": 5707827,
+   "config": null,
+   "dataset": "alisawuffles/WANLI",
+   "file": "wanli-00000.jsonl.zst",
+   "license": "CC-BY-4.0",
+   "questions": 102885,
+   "raw_bytes": 67301445,
+   "rows": 102885,
+   "source": "wanli",
+   "split": "train"
+  }
+ ],
+ "sources": [
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "mteb/banking77",
+   "kept": 9675,
+   "license": "CC-BY-4.0",
+   "name": "banking77",
+   "near_duplicates": 318,
+   "questions": 9675,
+   "revision": "18072d2685ea682290f7b8924d94c62acc19c0b2",
+   "rows": 9993,
+   "split": "train",
+   "task": "intent, choice of up to 20 of 77"
+  },
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "google/boolq",
+   "kept": 7772,
+   "license": "CC-BY-SA-3.0",
+   "name": "boolq",
+   "near_duplicates": 1655,
+   "questions": 7772,
+   "revision": "35b264d03638db9f4ce671b711558bf7ff0f80d5",
+   "rows": 9427,
+   "split": "train",
+   "task": "reading comprehension noul"
+  },
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "google/civil_comments",
+   "kept": 299702,
+   "license": "CC0-1.0",
+   "name": "civil_comments",
+   "near_duplicates": 148,
+   "questions": 299702,
+   "revision": "f2970eb3a55777454c94069077cc8d9b5866312d",
+   "rows": 299850,
+   "split": "train",
+   "task": "toxicity noul with the share of raters as the soft target, the Jigsaw data"
+  },
+  {
+   "config": "plus",
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "clinc/clinc_oos",
+   "kept": 14867,
+   "license": "CC-BY-3.0",
+   "name": "clinc150",
+   "near_duplicates": 383,
+   "questions": 14867,
+   "revision": "155b9c710419136e17307b80d0a13e68cd46b4ec",
+   "rows": 15250,
+   "split": "train",
+   "task": "intent with out of scope, choice of up to 20 of 151"
+  },
+  {
+   "config": "simplified",
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "google-research-datasets/go_emotions",
+   "kept": 43394,
+   "license": "Apache-2.0",
+   "name": "go_emotions",
+   "near_duplicates": 16,
+   "questions": 50496,
+   "revision": "add492243ff905527e67aeb8b80c082af02207c3",
+   "rows": 43410,
+   "split": "train",
+   "task": "emotion, choice of up to 20 of 28 for one label, noul per emotion for several"
+  },
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "mteb/amazon_massive_intent",
+   "kept": 580555,
+   "license": "CC-BY-4.0",
+   "name": "massive",
+   "near_duplicates": 6659,
+   "questions": 1161110,
+   "revision": "940fd47a81eaa7f2cc7b129674d945d618ac38c2",
+   "rows": 587214,
+   "split": "train",
+   "task": "intent and scenario, two questions over one utterance, 51 languages"
+  },
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "nyu-mll/multi_nli",
+   "kept": 392664,
+   "license": "OANC, CC-BY-SA-3.0, CC-BY-3.0",
+   "name": "multi_nli",
+   "near_duplicates": 38,
+   "questions": 392664,
+   "revision": "da70db2af9d09693783c3320c4249840212ee221",
+   "rows": 392702,
+   "split": "train",
+   "task": "NLI, choice of 3; this is XNLI's English train split"
+  },
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "deepset/prompt-injections",
+   "kept": 534,
+   "license": "Apache-2.0",
+   "name": "prompt_injections",
+   "near_duplicates": 12,
+   "questions": 534,
+   "revision": "4f61ecb038e9c3fb77e21034b22511b523772cdd",
+   "rows": 546,
+   "split": "train",
+   "task": "prompt injection noul"
+  },
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "rajpurkar/squad_v2",
+   "kept": 130235,
+   "license": "CC-BY-SA-4.0",
+   "name": "squad_v2",
+   "near_duplicates": 84,
+   "questions": 130235,
+   "revision": "3ffb306f725f7d2ce8394bc1873b24868140c412",
+   "rows": 130319,
+   "split": "train",
+   "task": "answerability noul, whether the passage answers the question"
+  },
+  {
+   "config": "all",
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "LocalLLaMA/typed-decisions",
+   "kept": 1104,
+   "license": "Apache-2.0",
+   "name": "typed_decisions",
+   "near_duplicates": 96,
+   "questions": 5520,
+   "revision": "f7a2487edd7a043a5441a5e9ccc7fe5ddbd9ebe8",
+   "rows": 1200,
+   "split": "train",
+   "task": "the typed questions with their soft gold, as given"
+  },
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 383311
+   },
+   "dataset": "alisawuffles/WANLI",
+   "kept": 102885,
+   "license": "CC-BY-4.0",
+   "name": "wanli",
+   "near_duplicates": 0,
+   "questions": 102885,
+   "revision": "61c95318fd71c55b6ba355d76253254615f387ec",
+   "rows": 102885,
+   "split": "train",
+   "task": "NLI, choice of 3"
+  }
+ ]
+}
