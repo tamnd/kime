@@ -19,10 +19,11 @@ const USAGE: &str =
     "usage: kime-train --base <checkpoint dir> --data <file or dir>[,...] --out <dir>
     [--only source,...] [--max-lines N] [--eval-frac 0.02] [--eval-max 5000]
     [--epochs 1] [--steps N] [--lr 3e-5] [--warmup 0.02] [--tokens 8192] [--accum 1]
-    [--seed 13] [--no-shuffle] [--eval-every N] [--log run.jsonl]
+    [--seed 13] [--no-shuffle] [--eval-every N] [--train-layers N] [--log run.jsonl]
 
 --data takes .jsonl or .jsonl.zst files, or folders of them, such as the shards/ folder
-tools/data/convert.py writes. --only keeps the shards whose names start with the given sources.";
+tools/data/convert.py writes. --only keeps the shards whose names start with the given sources.
+--train-layers trains only the top N encoder layers and the heads, which needs far less memory.";
 
 struct Args {
     base: PathBuf,
@@ -33,6 +34,7 @@ struct Args {
     eval_frac: f64,
     eval_max: usize,
     log: Option<PathBuf>,
+    train_layers: Option<usize>,
     cfg: Config,
 }
 
@@ -48,6 +50,7 @@ fn parse_args() -> Result<Args, String> {
         eval_frac: 0.02,
         eval_max: 5000,
         log: None,
+        train_layers: None,
         cfg: Config::default(),
     };
     while let Some(flag) = it.next() {
@@ -78,6 +81,7 @@ fn parse_args() -> Result<Args, String> {
             "--seed" => a.cfg.seed = int(&v)? as u64,
             "--eval-every" => a.cfg.eval_every = int(&v)?,
             "--log" => a.log = Some(PathBuf::from(v)),
+            "--train-layers" => a.train_layers = Some(int(&v)?),
             _ => return Err(format!("unknown flag {flag}")),
         }
     }
@@ -153,7 +157,11 @@ fn run(a: &Args) -> Result<(), String> {
     );
 
     let dev = Default::default();
-    let model = Compat::<Train>::load(&base.spec, &base.tensors, &dev);
+    let mut model = Compat::<Train>::load(&base.spec, &base.tensors, &dev);
+    let depth = model.depth();
+    if let Some(n) = a.train_layers {
+        model = model.freeze_below(n);
+    }
     let mut log = match &a.log {
         Some(p) => Some(std::fs::File::create(p).map_err(|e| format!("{}: {e}", p.display()))?),
         None => None,
@@ -213,6 +221,7 @@ fn run(a: &Args) -> Result<(), String> {
         "accum": a.cfg.accum,
         "seed": a.cfg.seed,
         "shuffle_options": a.cfg.shuffle_options,
+        "train_layers": a.train_layers.unwrap_or(depth).min(depth),
         "seconds": secs.round(),
         "held_out_before": {"loss": before.loss, "accuracy": before.accuracy, "nll": before.nll},
         "held_out_after": {"loss": after.loss, "accuracy": after.accuracy, "nll": after.nll},

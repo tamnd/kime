@@ -283,6 +283,33 @@ impl<B: Backend> Compat<B> {
         &self.shape
     }
 
+    /// Freezes the embeddings and every encoder layer but the top `train` ones, so only those
+    /// layers, the final norm and the heads learn. Frozen weights get no gradients and no
+    /// optimizer state, and nothing under them is kept for the backward pass, which is what lets
+    /// a 400M model train in a few GB.
+    #[must_use]
+    pub fn freeze_below(mut self, train: usize) -> Self {
+        let keep = self.layers.len().saturating_sub(train);
+        if keep == 0 {
+            return self;
+        }
+        self.tok_embeddings = self.tok_embeddings.set_require_grad(false);
+        self.embed_norm = self.embed_norm.set_require_grad(false);
+        self.layers = self
+            .layers
+            .into_iter()
+            .enumerate()
+            .map(|(i, l)| if i < keep { l.no_grad() } else { l })
+            .collect();
+        self
+    }
+
+    /// Encoder layers in the model.
+    #[must_use]
+    pub fn depth(&self) -> usize {
+        self.layers.len()
+    }
+
     /// Loads every weight of a compat checkpoint onto `dev` as f32.
     ///
     /// # Panics

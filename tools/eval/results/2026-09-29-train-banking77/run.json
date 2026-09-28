@@ -1,0 +1,27 @@
+{
+  "base": "laya",
+  "data": [
+    "banking77-00000.jsonl.zst"
+  ],
+  "training_lines": 9481,
+  "held_out_lines": 194,
+  "epochs": 1,
+  "max_steps": null,
+  "lr": 3e-05,
+  "tokens": 2048,
+  "accum": 1,
+  "seed": 13,
+  "shuffle_options": true,
+  "train_layers": 4,
+  "seconds": 1961.0,
+  "held_out_before": {
+    "loss": 0.12179367843362474,
+    "accuracy": 0.865979381443299,
+    "nll": 0.5610357692889342
+  },
+  "held_out_after": {
+    "loss": -0.11432753318978339,
+    "accuracy": 0.8865979381443299,
+    "nll": 0.33907637435474164
+  }
+}

@@ -186,3 +186,34 @@ fn shuffled_options_carry_their_targets() {
     }
     assert!(orders.len() > 5, "only {} orders", orders.len());
 }
+
+/// Counts the weights that still take gradients.
+struct Trainable(usize);
+
+impl<A: burn::tensor::backend::Backend> burn::module::ModuleVisitor<A> for Trainable {
+    fn visit_float<const D: usize>(&mut self, param: &Param<Tensor<A, D>>) {
+        if param.val().is_require_grad() {
+            self.0 += param.val().shape().num_elements();
+        }
+    }
+}
+
+#[test]
+fn freezing_leaves_only_the_top_layers() {
+    use burn::module::Module;
+    let Some(base) = laya() else { return };
+    let dev = Default::default();
+    let count = |n: usize| {
+        let m = Compat::<Autodiff<B>>::load(&base.spec, &base.tensors, &dev).freeze_below(n);
+        let mut t = Trainable(0);
+        m.visit(&mut t);
+        (t.0, m.num_params(), m.depth(), m.shape().d, m.shape().inter)
+    };
+    let (two, total, depth, d, inter) = count(2);
+    let (three, ..) = count(3);
+    let (all, ..) = count(depth);
+    assert_eq!(all, total, "training every layer freezes nothing");
+    // One more layer is its attention norm, the fused qkv, the output, the mlp norm and the mlp.
+    assert_eq!(three - two, d + 3 * d * d + d * d + d + d * 2 * inter + inter * d);
+    assert!(two < total / 4, "{two} of {total} still train with two layers");
+}
