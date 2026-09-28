@@ -161,9 +161,9 @@ extern "C" __global__ void rope_f32(float* x, const float* c, const float* s, co
 
 // Attention over [q | k | v] rows of heads of 64, with q and k rotated as they are loaded when rope
 // tables are given, within each sequence and, when window >= 0, only to keys at most `window`
-// positions away. One block per ATT_Q query rows of one sequence and one head, the blocks' first
-// rows listed in `tile` with n[3] of them, and each
-// of the ATT_W warps keeps an online softmax for ATT_R of the rows. The keys any of the rows can
+// positions away. The blocks' first rows are listed in `tile` with n[3] of them, ATT_T rows apart
+// within a sequence. Here each tile gets ATT_T / ATT_Q blocks of ATT_Q query rows for one head, and
+// each of the ATT_W warps keeps an online softmax for ATT_R of the rows. The keys any of the rows can
 // see are walked 32 at a time, each tile of k and v staged in shared memory once for the block,
 // with the next tile read into registers while the current one is scored. A lane scores one key
 // of the tile for all of its warp's rows, reading each k value once and the q values as
@@ -172,6 +172,7 @@ extern "C" __global__ void rope_f32(float* x, const float* c, const float* s, co
 #define ATT_W 8
 #define ATT_R 2
 #define ATT_Q (ATT_W * ATT_R)
+#define ATT_T 64
 // Elements of a k or v tile and of the q rows each thread moves, and the padded k row, which keeps
 // the lanes' 16 byte reads of 32 different rows free of bank conflicts.
 #define ATT_E (32 * 64 / (32 * ATT_W))
@@ -210,9 +211,11 @@ __device__ void attention(TO* out, const T* qkv, const float* cosv, const float*
     __shared__ __align__(16) float vs[32][64];
     __shared__ __align__(16) float ps[ATT_W][ATT_R][32];
     int wid = threadIdx.x / 32, lane = threadIdx.x % 32;
-    if (blockIdx.x >= n[3]) return;
-    int i0 = tile[blockIdx.x];
-    int nt = min(i0 + ATT_Q, (int)cu[seq[i0] + 1]);
+    if (blockIdx.x / (ATT_T / ATT_Q) >= n[3]) return;
+    int i0 = tile[blockIdx.x / (ATT_T / ATT_Q)] + blockIdx.x % (ATT_T / ATT_Q) * ATT_Q;
+    int end = cu[seq[tile[blockIdx.x / (ATT_T / ATT_Q)]] + 1];
+    if (i0 >= end) return;
+    int nt = min(i0 + ATT_Q, end);
     int h = blockIdx.y;
     int d = heads * 64;
     size_t stride = 3 * (size_t)d;
@@ -352,6 +355,298 @@ extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f32(float
 extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f32_f16(half_t* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, t, n, h, w); }
 extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f32(float* o, const half_t* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, t, n, h, w); }
 extern "C" __global__ void __launch_bounds__(32 * ATT_W) attention_f16_f16(half_t* o, const half_t* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention(o, x, c, sn, p, s, cu, t, n, h, w); }
+
+// Tensor core attention over [q | k | v] for sm_80 and newer, with the same arguments and
+// tiles as `attention`. One block of ATT_MW warps per tile of ATT_T query rows and one head, each
+// warp holding 16 of the rows. The keys are walked ATT_T at a time: the block rotates each tile of
+// k as it stages it in shared memory next to v, and reads the next tile into registers while the
+// current one is used. A warp takes q k^T and p v with mma.sync m16n8k16, f16 in and f32
+// accumulated, and keeps the online softmax of its rows in the accumulator layout, where the
+// scores of a row sit in the four lanes of a quad. q, k, v and the softmax weights are each held
+// as an f16 value and the f16 rest, and both products are summed from hi hi, hi lo and lo hi, so
+// they carry about 22 bits: the scores are large enough that f16 rounding of q and k alone moves
+// the softmax too much (see `types` in plan.rs). That is three times the tensor core work of
+// plain f16, and on an RTX 4090 it measured no slower.
+#define ATT_MW 4
+// A padded row of 64 halves, so the eight rows an ldmatrix reads fall in different banks.
+#define ATT_MS 72
+
+__device__ __forceinline__ unsigned pack2(float a, float b) { return (unsigned)f2h(a) | ((unsigned)f2h(b) << 16); }
+
+__device__ __forceinline__ unsigned smem(const void* p) {
+    unsigned a;
+    asm("{ .reg .u64 t; cvta.to.shared.u64 t, %1; cvt.u32.u64 %0, t; }" : "=r"(a) : "l"(p));
+    return a;
+}
+
+__device__ __forceinline__ void ldsm4(unsigned (&r)[4], const half_t* p) {
+    asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0,%1,%2,%3}, [%4];" : "=r"(r[0]), "=r"(r[1]), "=r"(r[2]), "=r"(r[3]) : "r"(smem(p)));
+}
+
+__device__ __forceinline__ void ldsm4t(unsigned (&r)[4], const half_t* p) {
+    asm volatile("ldmatrix.sync.aligned.m8n8.x4.trans.shared.b16 {%0,%1,%2,%3}, [%4];" : "=r"(r[0]), "=r"(r[1]), "=r"(r[2]), "=r"(r[3]) : "r"(smem(p)));
+}
+
+__device__ __forceinline__ void mma16816(float (&c)[4], const unsigned (&a)[4], unsigned b0, unsigned b1) {
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
+                 : "+f"(c[0]), "+f"(c[1]), "+f"(c[2]), "+f"(c[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b0), "r"(b1));
+}
+
+__device__ __forceinline__ void st2(float* p, size_t i, float a, float b) { *(float2*)(p + i) = make_float2(a, b); }
+__device__ __forceinline__ void st2(half_t* p, size_t i, float a, float b) { *(unsigned*)(p + i) = pack2(a, b); }
+
+// Rows of q or k a thread moves into a tile, as two runs of eight values at c and c + 32, so it
+// holds both halves of each rotary pair, with the rope table entries for them.
+struct AttRows {
+    float4 x[4], y[4], c[4], s[4];
+};
+
+__device__ __forceinline__ void att_rows(AttRows& t, const float* qkv, int r0, int lim, size_t stride, int col, const float* cosv, const float* sinv, const unsigned* pos) {
+    float4 z = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+#pragma unroll
+    for (int u = 0; u < 2; u++) {
+        int it = threadIdx.x + 32 * ATT_MW * u, r = r0 + it / 4, c = it % 4 * 8;
+        bool in = r < lim;
+        const float* at = qkv + (size_t)r * stride + col + c;
+#pragma unroll
+        for (int e = 0; e < 2; e++) {
+            t.x[2 * u + e] = in ? *(const float4*)(at + 4 * e) : z;
+            t.y[2 * u + e] = in ? *(const float4*)(at + 32 + 4 * e) : z;
+        }
+        if (cosv) {
+            unsigned p = in ? pos[r] : 0;
+#pragma unroll
+            for (int e = 0; e < 2; e++) {
+                t.c[2 * u + e] = *(const float4*)(cosv + p * 32 + c + 4 * e);
+                t.s[2 * u + e] = *(const float4*)(sinv + p * 32 + c + 4 * e);
+            }
+        }
+    }
+}
+
+// The f16 values of a and b in the low and high halves, and in `lo` the f16 values of what is left.
+__device__ __forceinline__ unsigned split2(float a, float b, unsigned& lo) {
+    half_t ha = f2h(a), hb = f2h(b);
+    lo = pack2(a - h2f(ha), b - h2f(hb));
+    return (unsigned)ha | ((unsigned)hb << 16);
+}
+
+// Rotates the rows when `rope`, scales them and stores them to the tiles as f16 and f16 rest.
+__device__ __forceinline__ void att_put(half_t (*dst)[ATT_MS], half_t (*rest)[ATT_MS], const AttRows& t, bool rope, float scale) {
+#pragma unroll
+    for (int u = 0; u < 2; u++) {
+        int it = threadIdx.x + 32 * ATT_MW * u, r = it / 4, c = it % 4 * 8;
+        const float* x = (const float*)&t.x[2 * u];
+        const float* y = (const float*)&t.y[2 * u];
+        const float* cs = (const float*)&t.c[2 * u];
+        const float* sn = (const float*)&t.s[2 * u];
+        unsigned px[4], py[4], lx[4], ly[4];
+#pragma unroll
+        for (int e = 0; e < 8; e += 2) {
+            float a0 = x[e], a1 = x[e + 1], b0 = y[e], b1 = y[e + 1];
+            if (rope) {
+                a0 = x[e] * cs[e] - y[e] * sn[e];
+                a1 = x[e + 1] * cs[e + 1] - y[e + 1] * sn[e + 1];
+                b0 = y[e] * cs[e] + x[e] * sn[e];
+                b1 = y[e + 1] * cs[e + 1] + x[e + 1] * sn[e + 1];
+            }
+            px[e / 2] = split2(a0 * scale, a1 * scale, lx[e / 2]);
+            py[e / 2] = split2(b0 * scale, b1 * scale, ly[e / 2]);
+        }
+        *(uint4*)&dst[r][c] = make_uint4(px[0], px[1], px[2], px[3]);
+        *(uint4*)&dst[r][c + 32] = make_uint4(py[0], py[1], py[2], py[3]);
+        *(uint4*)&rest[r][c] = make_uint4(lx[0], lx[1], lx[2], lx[3]);
+        *(uint4*)&rest[r][c + 32] = make_uint4(ly[0], ly[1], ly[2], ly[3]);
+    }
+}
+
+__device__ __forceinline__ void att_vrows(float4 (&v)[8], const float* qkv, int r0, int lim, size_t stride, int col) {
+    float4 z = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+#pragma unroll
+    for (int u = 0; u < 4; u++) {
+        int it = threadIdx.x + 32 * ATT_MW * u, r = r0 + it / 8, c = it % 8 * 8;
+        const float* at = qkv + (size_t)r * stride + col + c;
+        v[2 * u] = r < lim ? *(const float4*)at : z;
+        v[2 * u + 1] = r < lim ? *(const float4*)(at + 4) : z;
+    }
+}
+
+__device__ __forceinline__ void att_vput(half_t (*dst)[ATT_MS], half_t (*rest)[ATT_MS], const float4 (&v)[8]) {
+#pragma unroll
+    for (int u = 0; u < 4; u++) {
+        int it = threadIdx.x + 32 * ATT_MW * u;
+        float4 a = v[2 * u], b = v[2 * u + 1];
+        unsigned l[4];
+        uint4 h = make_uint4(split2(a.x, a.y, l[0]), split2(a.z, a.w, l[1]), split2(b.x, b.y, l[2]), split2(b.z, b.w, l[3]));
+        *(uint4*)&dst[it / 8][it % 8 * 8] = h;
+        *(uint4*)&rest[it / 8][it % 8 * 8] = make_uint4(l[0], l[1], l[2], l[3]);
+    }
+}
+
+template <typename TO>
+__device__ void attention_tc(TO* out, const float* qkv, const float* cosv, const float* sinv, const unsigned* pos, const unsigned* seq, const unsigned* cu, const unsigned* tile, const unsigned* n, int heads, int window) {
+#if __CUDA_ARCH__ >= 800
+    __shared__ __align__(16) half_t qs[ATT_T][ATT_MS];
+    __shared__ __align__(16) half_t ql[ATT_T][ATT_MS];
+    __shared__ __align__(16) half_t ks[ATT_T][ATT_MS];
+    __shared__ __align__(16) half_t kl[ATT_T][ATT_MS];
+    __shared__ __align__(16) half_t vs[ATT_T][ATT_MS];
+    int wid = threadIdx.x / 32, lane = threadIdx.x % 32, g = lane / 4, q4 = lane % 4;
+    if (blockIdx.x >= n[3]) return;
+    int i0 = tile[blockIdx.x];
+    int nt = min(i0 + ATT_T, (int)cu[seq[i0] + 1]);
+    int h = blockIdx.y;
+    int d = heads * 64;
+    size_t stride = 3 * (size_t)d;
+    // A lane holds rows g and g + 8 of its warp's 16.
+    int lo[2], hi[2];
+#pragma unroll
+    for (int k = 0; k < 2; k++) {
+        int i = i0 + wid * 16 + g + 8 * k;
+        if (i < nt) {
+            unsigned sq = seq[i];
+            lo[k] = cu[sq];
+            hi[k] = cu[sq + 1];
+            if (window >= 0) {
+                lo[k] = max(lo[k], i - window);
+                hi[k] = min(hi[k], i + window + 1);
+            }
+        } else {
+            lo[k] = hi[k] = 0;
+        }
+    }
+    int last = nt - 1;
+    int a = cu[seq[i0]], b = cu[seq[last] + 1];
+    if (window >= 0) {
+        a = max(a, i0 - window);
+        b = min(b, last + window + 1);
+    }
+    bool rope = cosv != 0;
+    AttRows qr, kr;
+    float4 vr[8];
+    att_rows(qr, qkv, i0, nt, stride, h * 64, cosv, sinv, pos);
+    att_rows(kr, qkv, a, b, stride, d + h * 64, cosv, sinv, pos);
+    att_vrows(vr, qkv, a, b, stride, 2 * d + h * 64);
+    att_put(qs, ql, qr, rope, 0.125f);
+    __syncthreads();
+    unsigned qf[4][4], qg[4][4];
+#pragma unroll
+    for (int k = 0; k < 4; k++) {
+        ldsm4(qf[k], &qs[wid * 16 + lane % 16][k * 16 + lane / 16 * 8]);
+        ldsm4(qg[k], &ql[wid * 16 + lane % 16][k * 16 + lane / 16 * 8]);
+    }
+    // The rest of v takes the place of q's once the warps hold q in registers.
+    half_t (*vl)[ATT_MS] = ql;
+    __syncthreads();
+    att_put(ks, kl, kr, rope, 1.0f);
+    att_vput(vs, vl, vr);
+    __syncthreads();
+    float o[8][4], m[2] = {-INF, -INF}, l[2] = {0.0f, 0.0f};
+#pragma unroll
+    for (int t = 0; t < 8; t++) o[t][0] = o[t][1] = o[t][2] = o[t][3] = 0.0f;
+    for (int j0 = a; j0 < b; j0 += ATT_T) {
+        bool more = j0 + ATT_T < b;
+        if (more) {
+            att_rows(kr, qkv, j0 + ATT_T, b, stride, d + h * 64, cosv, sinv, pos);
+            att_vrows(vr, qkv, j0 + ATT_T, b, stride, 2 * d + h * 64);
+        }
+        float s[8][4];
+#pragma unroll
+        for (int t = 0; t < 8; t++) {
+            s[t][0] = s[t][1] = s[t][2] = s[t][3] = 0.0f;
+#pragma unroll
+            for (int k = 0; k < 2; k++) {
+                unsigned kf[4], kg[4];
+                ldsm4(kf, &ks[t * 8 + lane % 8][k * 32 + lane / 8 * 8]);
+                ldsm4(kg, &kl[t * 8 + lane % 8][k * 32 + lane / 8 * 8]);
+                mma16816(s[t], qg[2 * k], kf[0], kf[1]);
+                mma16816(s[t], qg[2 * k + 1], kf[2], kf[3]);
+                mma16816(s[t], qf[2 * k], kg[0], kg[1]);
+                mma16816(s[t], qf[2 * k + 1], kg[2], kg[3]);
+                mma16816(s[t], qf[2 * k], kf[0], kf[1]);
+                mma16816(s[t], qf[2 * k + 1], kf[2], kf[3]);
+            }
+        }
+        float mx[2] = {-INF, -INF};
+#pragma unroll
+        for (int t = 0; t < 8; t++)
+#pragma unroll
+            for (int e = 0; e < 4; e++) {
+                int r = e / 2, j = j0 + t * 8 + q4 * 2 + e % 2;
+                if (j < lo[r] || j >= hi[r]) s[t][e] = -INF;
+                mx[r] = fmaxf(mx[r], s[t][e]);
+            }
+        float corr[2], sum[2] = {0.0f, 0.0f};
+#pragma unroll
+        for (int r = 0; r < 2; r++) {
+            mx[r] = fmaxf(mx[r], __shfl_xor_sync(0xffffffff, mx[r], 1));
+            mx[r] = fmaxf(mx[r], __shfl_xor_sync(0xffffffff, mx[r], 2));
+            float mn = fmaxf(m[r], mx[r]);
+            corr[r] = mn != -INF ? __expf(m[r] - mn) : 1.0f;
+            m[r] = mn;
+        }
+#pragma unroll
+        for (int t = 0; t < 8; t++)
+#pragma unroll
+            for (int e = 0; e < 4; e++) {
+                int r = e / 2;
+                float p = s[t][e] != -INF ? __expf(s[t][e] - m[r]) : 0.0f;
+                sum[r] += p;
+                s[t][e] = p;
+            }
+#pragma unroll
+        for (int r = 0; r < 2; r++) l[r] = l[r] * corr[r] + sum[r];
+#pragma unroll
+        for (int t = 0; t < 8; t++) {
+            o[t][0] *= corr[0];
+            o[t][1] *= corr[0];
+            o[t][2] *= corr[1];
+            o[t][3] *= corr[1];
+        }
+#pragma unroll
+        for (int k = 0; k < 4; k++) {
+            unsigned pf[4], pg[4];
+            pf[0] = split2(s[2 * k][0], s[2 * k][1], pg[0]);
+            pf[1] = split2(s[2 * k][2], s[2 * k][3], pg[1]);
+            pf[2] = split2(s[2 * k + 1][0], s[2 * k + 1][1], pg[2]);
+            pf[3] = split2(s[2 * k + 1][2], s[2 * k + 1][3], pg[3]);
+#pragma unroll
+            for (int t = 0; t < 4; t++) {
+                unsigned vf[4], vg[4];
+                const int r = k * 16 + lane % 8 + (lane / 8) % 2 * 8, c = t * 16 + lane / 16 * 8;
+                ldsm4t(vf, &vs[r][c]);
+                ldsm4t(vg, &vl[r][c]);
+                mma16816(o[2 * t], pg, vf[0], vf[1]);
+                mma16816(o[2 * t + 1], pg, vf[2], vf[3]);
+                mma16816(o[2 * t], pf, vg[0], vg[1]);
+                mma16816(o[2 * t + 1], pf, vg[2], vg[3]);
+                mma16816(o[2 * t], pf, vf[0], vf[1]);
+                mma16816(o[2 * t + 1], pf, vf[2], vf[3]);
+            }
+        }
+        __syncthreads();
+        if (more) {
+            att_put(ks, kl, kr, rope, 1.0f);
+            att_vput(vs, vl, vr);
+            __syncthreads();
+        }
+    }
+#pragma unroll
+    for (int r = 0; r < 2; r++) {
+        l[r] += __shfl_xor_sync(0xffffffff, l[r], 1);
+        l[r] += __shfl_xor_sync(0xffffffff, l[r], 2);
+        int i = i0 + wid * 16 + g + 8 * r;
+        if (i >= nt) continue;
+        float inv = l[r] > 0.0f ? 1.0f / l[r] : 0.0f;
+#pragma unroll
+        for (int t = 0; t < 8; t++) st2(out, (size_t)i * d + h * 64 + t * 8 + q4 * 2, o[t][2 * r] * inv, o[t][2 * r + 1] * inv);
+    }
+#endif
+}
+
+extern "C" __global__ void __launch_bounds__(32 * ATT_MW) attention_tc_f32_f32(float* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention_tc(o, x, c, sn, p, s, cu, t, n, h, w); }
+extern "C" __global__ void __launch_bounds__(32 * ATT_MW) attention_tc_f32_f16(half_t* o, const float* x, const float* c, const float* sn, const unsigned* p, const unsigned* s, const unsigned* cu, const unsigned* t, const unsigned* n, int h, int w) { attention_tc(o, x, c, sn, p, s, cu, t, n, h, w); }
 
 // out = gelu(x[:, ..inter]) * x[:, inter..], one block per token row.
 template <typename T, typename TO>
