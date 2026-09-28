@@ -1,6 +1,6 @@
 [package]
 name = "kime-python"
-version = "0.0.26"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.90.0"
 license = "Apache-2.0"
