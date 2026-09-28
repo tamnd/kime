@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use burn::module::AutodiffModule;
 use kime_model::Model;
-use kime_train::data::{Renderer, lines};
+use kime_train::data::{Example, Renderer, lines};
 use kime_train::model::Compat;
 use kime_train::rng::Rng;
 use kime_train::train::{Config, Event, evaluate, fit, render_all};
@@ -19,11 +19,13 @@ const USAGE: &str =
     "usage: kime-train --base <checkpoint dir> --data <file or dir>[,...] --out <dir>
     [--only source,...] [--max-lines N] [--eval-frac 0.02] [--eval-max 5000]
     [--epochs 1] [--steps N] [--lr 3e-5] [--warmup 0.02] [--tokens 8192] [--accum 1]
-    [--seed 13] [--no-shuffle] [--eval-every N] [--train-layers N] [--log run.jsonl]
+    [--seed 13] [--no-shuffle] [--eval-every N] [--train-layers N] [--log run.jsonl] [--dump <dir>]
 
 --data takes .jsonl or .jsonl.zst files, or folders of them, such as the shards/ folder
 tools/data/convert.py writes. --only keeps the shards whose names start with the given sources.
---train-layers trains only the top N encoder layers and the heads, which needs far less memory.";
+--train-layers trains only the top N encoder layers and the heads, which needs far less memory.
+--dump writes the laid out questions of the first epoch and the held out lines to <dir>/train.jsonl
+and <dir>/eval.jsonl and stops, for tools/ref/train_ref.py to train on the same questions.";
 
 struct Args {
     base: PathBuf,
@@ -35,6 +37,7 @@ struct Args {
     eval_max: usize,
     log: Option<PathBuf>,
     train_layers: Option<usize>,
+    dump: Option<PathBuf>,
     cfg: Config,
 }
 
@@ -51,6 +54,7 @@ fn parse_args() -> Result<Args, String> {
         eval_max: 5000,
         log: None,
         train_layers: None,
+        dump: None,
         cfg: Config::default(),
     };
     while let Some(flag) = it.next() {
@@ -82,6 +86,7 @@ fn parse_args() -> Result<Args, String> {
             "--eval-every" => a.cfg.eval_every = int(&v)?,
             "--log" => a.log = Some(PathBuf::from(v)),
             "--train-layers" => a.train_layers = Some(int(&v)?),
+            "--dump" => a.dump = Some(PathBuf::from(v)),
             _ => return Err(format!("unknown flag {flag}")),
         }
     }
@@ -155,6 +160,24 @@ fn run(a: &Args) -> Result<(), String> {
         eval.len(),
         t0.elapsed().as_secs_f64()
     );
+
+    if let Some(dir) = &a.dump {
+        // The first epoch of `fit` renders with a generator seeded like this one.
+        let mut rng = Rng::new(a.cfg.seed);
+        let first = render_all(&renderer, &train, a.cfg.shuffle_options.then_some(&mut rng));
+        std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        for (name, examples) in [("train.jsonl", &first), ("eval.jsonl", &eval)] {
+            let p = dir.join(name);
+            dump(&p, examples).map_err(|e| format!("{}: {e}", p.display()))?;
+        }
+        eprintln!(
+            "wrote {} training and {} held out questions to {}",
+            first.len(),
+            eval.len(),
+            dir.display()
+        );
+        return Ok(());
+    }
 
     let dev = Default::default();
     let mut model = Compat::<Train>::load(&base.spec, &base.tensors, &dev);
@@ -231,6 +254,23 @@ fn run(a: &Args) -> Result<(), String> {
         .map_err(|e| format!("{}: {e}", a.out.display()))?;
     eprintln!("trained in {secs:.0}s, wrote {}", a.out.display());
     Ok(())
+}
+
+/// Writes examples as JSON lines, one question each.
+fn dump(path: &Path, examples: &[Example]) -> std::io::Result<()> {
+    let mut f = std::io::BufWriter::new(std::fs::File::create(path)?);
+    for e in examples {
+        let v = json!({
+            "ids": e.q.ids,
+            "markers": e.q.markers,
+            "qtype": e.q.qtype,
+            "probs": e.probs,
+            "hard": e.hard,
+            "weight": e.weight,
+        });
+        writeln!(f, "{v}")?;
+    }
+    f.flush()
 }
 
 fn main() -> ExitCode {
