@@ -18,9 +18,13 @@ use crate::{CudaBackend, Precision, WORKSPACE, dev};
 /// Width of one attention head.
 const HEAD: usize = 64;
 
-/// Query rows and warps per attention block, `ATT_Q` and `ATT_W` in the kernels.
-pub(crate) const ATT_Q: usize = 16;
+/// Query rows a tile of attention rows holds, `ATT_T` in the kernels.
+pub(crate) const ATT_T: usize = 64;
+/// Blocks and warps per block the CUDA core attention launches for a tile, and warps per block
+/// of the tensor core attention, from `ATT_T / ATT_Q`, `ATT_W` and `ATT_MW` in the kernels.
+pub(crate) const ATT_SPLIT: u32 = 4;
 pub(crate) const ATT_W: u32 = 8;
+pub(crate) const ATT_MW: u32 = 4;
 
 /// Rows per layer norm block, one warp each, `LN_ROWS` in the kernels.
 pub(crate) const LN_ROWS: usize = 4;
@@ -446,15 +450,23 @@ impl CudaBackend {
             }
             Step::Attention { qkv, cos, sin, window, out } => {
                 let heads = (out.width / HEAD) as i32;
-                let mut l = s.launch_builder(
-                    &self.k.attention[2 * usize::from(qkv.half()) + usize::from(out.half())],
-                );
+                // FP16 plans on sm_80 and newer take the tensor core kernel, which carries its
+                // products to about 22 bits. FP32 plans keep the CUDA core kernel's full FP32.
+                let tc = self.precision == Precision::F16 && self.arch.0 >= 8 && !qkv.half();
+                let (f, grid, block) = if tc {
+                    (&self.k.attention_tc[usize::from(out.half())], 1, ATT_MW)
+                } else {
+                    let f =
+                        &self.k.attention[2 * usize::from(qkv.half()) + usize::from(out.half())];
+                    (f, ATT_SPLIT, ATT_W)
+                };
+                let mut l = s.launch_builder(f);
                 l.arg(&out.ptr).arg(&qkv.ptr).arg(&cos).arg(&sin).arg(&pos);
                 l.arg(&seq).arg(&cu).arg(&tile).arg(&n);
                 l.arg(&heads).arg(&window);
                 let cfg = LaunchConfig {
-                    grid_dim: (att_blocks(b) as u32, heads as u32, 1),
-                    block_dim: (32 * ATT_W, 1, 1),
+                    grid_dim: (grid * att_blocks(b) as u32, heads as u32, 1),
+                    block_dim: (32 * block, 1, 1),
                     shared_mem_bytes: 0,
                 };
                 // SAFETY: see above.
@@ -874,17 +886,17 @@ impl Backend for CudaBackend {
 
 /// Attention blocks a bucket launches: enough for every sequence to start its own.
 pub(crate) fn att_blocks(b: Bucket) -> usize {
-    b.tokens.div_ceil(ATT_Q) + b.seqs
+    b.tokens.div_ceil(ATT_T) + b.seqs
 }
 
 /// Writes the first row of each attention block to `out` and returns how many there are. Blocks
-/// start at every `ATT_Q`th row of each sequence, so the rows a block holds and the key tiles it
+/// start at every `ATT_T`th row of each sequence, so the rows a block holds and the key tiles it
 /// walks depend only on positions within its sequence, never on where the sequence sits in the
 /// batch, and a row gets the same bits alone or batched.
 pub(crate) fn att_tiles(cu: &[u32], out: &mut [u32]) -> usize {
     let mut k = 0;
     for w in cu.windows(2) {
-        for i in (w[0]..w[1]).step_by(ATT_Q) {
+        for i in (w[0]..w[1]).step_by(ATT_T) {
             out[k] = i;
             k += 1;
         }

@@ -3,9 +3,9 @@
 //! to stay as they were. Attention is checked against dense attention with the mask built as a
 //! matrix, with and without rope and a window. Skipped, with a note, without an NVIDIA GPU.
 
-use cudarc::driver::{CudaSlice, DevicePtr, DeviceRepr, LaunchConfig, PushKernelArg};
+use cudarc::driver::{CudaFunction, CudaSlice, DevicePtr, DeviceRepr, LaunchConfig, PushKernelArg};
 
-use crate::plan::{ATT_Q, ATT_W, LN_ROWS, att_tiles, rope_tables};
+use crate::plan::{ATT_MW, ATT_SPLIT, ATT_T, ATT_W, LN_ROWS, att_tiles, rope_tables};
 use crate::{CudaBackend, Precision};
 
 /// What padding rows start as, and must still hold after a launch.
@@ -404,39 +404,46 @@ fn attention_naive(qkv: &[f64], lay: &Layout, heads: usize, window: i32) -> Vec<
     out
 }
 
-#[test]
-fn attention_matches_dense_masked() {
-    let Some(b) = gpu() else { return };
+/// Runs one attention kernel over sequences that are empty, a single row, and long enough to cross
+/// key tiles and query tiles, with and without a window and rope, for inputs and outputs in f32
+/// or f16 as `variants` lists them, and returns the worst error of each variant.
+fn attention_case(
+    b: &CudaBackend,
+    f: &[CudaFunction],
+    variants: &[(bool, bool)],
+    split: u32,
+    warps: u32,
+    tol_f32: f64,
+    tol_f16: f64,
+) -> Vec<f64> {
     let mut rng = Rng(17);
     let heads = 2;
-    // An empty sequence, a single row, and sequences that cross key tiles and query blocks.
-    let lay = Layout::new(&[37, 0, 1, 70, 5], 128);
+    let lay = Layout::new(&[37, 0, 1, 150, 5], 256);
     let (cos, sin) = rope_tables(10_000.0, lay.launched);
-    let (cd, sd, pd) = (up(&b, &cos), up(&b, &sin), up(&b, &lay.pos));
-    let (sq, cu) = (up(&b, &lay.seq), up(&b, &lay.cu));
-    let mut tiles = vec![0u32; lay.launched.div_ceil(ATT_Q) + lay.seqs()];
+    let (cd, sd, pd) = (up(b, &cos), up(b, &sin), up(b, &lay.pos));
+    let (sq, cu) = (up(b, &lay.seq), up(b, &lay.cu));
+    let mut tiles = vec![0u32; lay.launched.div_ceil(ATT_T) + lay.seqs()];
     let blocks = att_tiles(&lay.cu, &mut tiles);
-    let n = up(&b, &[lay.tokens as u32, lay.seqs() as u32, 0, blocks as u32]);
-    let tl = up(&b, &tiles);
+    let n = up(b, &[lay.tokens as u32, lay.seqs() as u32, 0, blocks as u32]);
+    let tl = up(b, &tiles);
     let (width, d) = (3 * heads * 64, heads * 64);
     let mut x0 = rng.vec(lay.tokens * width, 2.0);
     x0.resize(lay.launched * width, 0.0);
-    let mut worst = [0f64; 4];
-    for (variant, worst) in worst.iter_mut().enumerate() {
-        let (half_in, half_out) = (variant >= 2, variant % 2 == 1);
-        let (x, xs) = input(&b, &x0, half_in);
+    let mut worst = vec![0f64; variants.len()];
+    for (variant, &(half_in, half_out)) in variants.iter().enumerate() {
+        let (x, xs) = input(b, &x0, half_in);
         for (window, rope) in [(-1, false), (16, false), (-1, true), (16, true)] {
-            let out = output(&b, lay.launched * d, half_out);
-            let (pc, ps) = if rope { (ptr(&b, &cd), ptr(&b, &sd)) } else { (0, 0) };
-            let (po, px, pp) = (out.ptr(&b), x.ptr(&b), ptr(&b, &pd));
-            let (psq, pcu, pn, h) = (ptr(&b, &sq), ptr(&b, &cu), ptr(&b, &n), heads as i32);
-            let pt = ptr(&b, &tl);
-            let mut l = b.stream.launch_builder(&b.k.attention[variant]);
+            let out = output(b, lay.launched * d, half_out);
+            let (pc, ps) = if rope { (ptr(b, &cd), ptr(b, &sd)) } else { (0, 0) };
+            let (po, px, pp) = (out.ptr(b), x.ptr(b), ptr(b, &pd));
+            let (psq, pcu, pn, h) = (ptr(b, &sq), ptr(b, &cu), ptr(b, &n), heads as i32);
+            let pt = ptr(b, &tl);
+            let mut l = b.stream.launch_builder(&f[variant]);
             l.arg(&po).arg(&px).arg(&pc).arg(&ps).arg(&pp);
             l.arg(&psq).arg(&pcu).arg(&pt).arg(&pn).arg(&h).arg(&window);
             let cfg = LaunchConfig {
-                grid_dim: (tiles.len() as u32, heads as u32, 1),
-                block_dim: (32 * ATT_W, 1, 1),
+                grid_dim: (split * tiles.len() as u32, heads as u32, 1),
+                block_dim: (32 * warps, 1, 1),
                 shared_mem_bytes: 0,
             };
             // SAFETY: the buffers match the sizes the kernel reads and writes.
@@ -448,14 +455,35 @@ fn attention_matches_dense_masked() {
             };
             let want = attention_naive(&qkv, &lay, heads, window);
             let what = format!("attention {variant} window {window} rope {rope}");
-            let e = check(&what, &out.read(&b), &want, lay.tokens * d, tol(half_out, 1e-4));
-            *worst = worst.max(e);
+            let tol = if half_out { tol_f16 } else { tol_f32 };
+            let e = check(&what, &out.read(b), &want, lay.tokens * d, tol);
+            worst[variant] = worst[variant].max(e);
         }
     }
-    let [a, c, e, f] = worst;
+    worst
+}
+
+#[test]
+fn attention_matches_dense_masked() {
+    let Some(b) = gpu() else { return };
+    let variants = [(false, false), (false, true), (true, false), (true, true)];
+    let w = attention_case(&b, &b.k.attention, &variants, ATT_SPLIT, ATT_W, 1e-4, 1e-3);
     eprintln!(
-        "attention max error: {a:.2e} f32 to f32, {c:.2e} f32 to f16, {e:.2e} f16 to f32, {f:.2e} f16 to f16"
+        "attention max error: {:.2e} f32 to f32, {:.2e} f32 to f16, {:.2e} f16 to f32, {:.2e} f16 to f16",
+        w[0], w[1], w[2], w[3]
     );
+}
+
+#[test]
+fn attention_tc_matches_dense_masked() {
+    let Some(b) = gpu() else { return };
+    if b.arch().0 < 8 {
+        eprintln!("skipped, the tensor core attention needs sm_80");
+        return;
+    }
+    let variants = [(false, false), (false, true)];
+    let w = attention_case(&b, &b.k.attention_tc, &variants, 1, ATT_MW, 2e-3, 2e-3);
+    eprintln!("tensor core attention max error: {:.2e} f32 to f32, {:.2e} f32 to f16", w[0], w[1]);
 }
 
 #[test]

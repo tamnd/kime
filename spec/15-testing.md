@@ -30,6 +30,8 @@ Tolerances against the FP32 reference:
 
 laya-mlx reached FP16 errors of 0.0054 and laya-coreml an ANE drift of 0.0029 at L96, so these tolerances are achievable.
 
+On CUDA the FP16 probability bound is 1.5e-2 on any one question and 5e-4 on average over the questions. The worst question there sits at the noise of FP16 GEMM inputs: random 1e-6 relative noise on the attention output, far below one FP16 step, moves the English worst case between 4.7e-3 and 6.1e-3 on an RTX 4090, while the average stays between 3.2e-4 and 3.7e-4. The logits get 1.5e-1 on CUDA for the same reason.
+
 ## Determinism
 
 For every backend in CI, each parity fixture is run:

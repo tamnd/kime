@@ -49,6 +49,8 @@ pub(crate) struct Kernels {
     pub(crate) rope: [CudaFunction; 2],
     /// Indexed like `ln`.
     pub(crate) attention: [CudaFunction; 4],
+    /// The tensor core attention, f32 qkv to f32 or f16, for sm_80 and newer.
+    pub(crate) attention_tc: [CudaFunction; 2],
     /// Indexed like `ln`.
     pub(crate) geglu: [CudaFunction; 4],
     pub(crate) add_type: CudaFunction,
@@ -72,6 +74,7 @@ impl Kernels {
                 f("attention_f16_f32")?,
                 f("attention_f16_f16")?,
             ],
+            attention_tc: [f("attention_tc_f32_f32")?, f("attention_tc_f32_f16")?],
             geglu: [
                 f("geglu_f32_f32")?,
                 f("geglu_f32_f16")?,
