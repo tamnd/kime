@@ -38,3 +38,24 @@ against-apps.tsv does the same for the application themes against research/resul
 | XNLI English | 0.001 (0.003) | 0.001 (0.003) | 0.0 |
 
 The compatible model moves its answer on 16 percent of reordered MASSIVE questions, more than the 0.13 measured for Jev, and spec/13-benchmarks.md asks 0.02 of kime's own model. CLINC150 is 0.913 with out of scope recall 0.659, SST-2 is 0.914, and 1.2 percent of Emotion questions give the gold emotion under 5e-5.
+
+## Contamination
+
+spec/12-training.md says no test split of a benchmark may be trained on, and that training text within Jaccard 0.5 of a test text, over 5-gram word shingles, is dropped. `kime contam` does that check and `kime eval --data-manifest` refuses to score a model whose data manifest lists a test split, or the split a suite was drawn from, as the manifest.json next to the suites records it. The blake3 of the manifest goes into results.json, and report.md says when no manifest was given.
+
+The suites hold samples, so `split_texts.py` writes the whole of every split they are drawn from, 355,124 texts in 59 files, and the check indexes those and the suites together:
+
+```
+python tools/eval/split_texts.py suites tests
+kime contam --tests tests --tests suites train/*.jsonl --out clean --report report.json
+```
+
+Words are lowercased runs of letters and digits, and in Chinese, Japanese, Thai and the other scripts written without spaces each character is a word. Candidates come from MinHash with 128 hash functions in 64 bands of 2, and every candidate is checked with the exact Jaccard of the two shingle sets, so nothing under 0.5 is dropped. On the train and test splits of MASSIVE English, Banking77, Emotion, CLINC150, AG News and BoolQ it finds all 5,725 lines an exhaustive search over every pair finds, where 32 bands of 4 found 5,539. Against the whole splits, 28,146 of the 28,187 suite lines are found; the 41 left are emails the suites cut to 3,000 characters or ran through Laya's email cleaning, and those are in the index as the suites have them.
+
+results/2026-09-28-contamination has the check of the train split of every dataset behind the suites against all of the test texts, 1,462,616 lines in 9.2 seconds on an M4 after 3.5 seconds of indexing, with 2.8 GB resident. 71,614 lines are near duplicates, and train-vs-test.tsv has them by split. suites-vs-train.tsv turns it around and indexes the train lines, 12.3 seconds for 1.46 million, to count the suite lines that are near a train line, which is what a score on the suite would have seen in training. Some are worth knowing before any of these sets is trained on:
+
+- 48 percent of Enron spam train is within 0.5 of a test text, 14,481 lines of it of the phishing email set app.phishing is drawn from, which holds Enron mail. 208 of the 400 app.phishing emails and 165 of the 400 app.email_spam emails are near an Enron spam train email.
+- 17.6 percent of BoolQ train shares its Wikipedia passage with a validation question, and 204 of the 600 en.boolq questions have a passage from train.
+- 6.7 percent of MS MARCO train lines share a passage with validation, and 93 of the 400 app.rag_relevance pairs are near a train pair.
+- MASSIVE train and test share 2 to 5 percent of their utterances in most languages and 10.6 percent in Japanese, where short commands that differ in one word, like 寝室の電気を消す and 浴室の電気を消す, reach 0.5 as characters. 35 of the 300 MASSIVE English questions and 107 of the Japanese ones are near a train utterance.
+- 88 of the 600 AG News questions, 67 of the 400 typed-decisions lines and 41 of the 500 Banking77 questions are near a train line. MNLI train, which is XNLI's English train split, shares 38 premises with XNLI English test, and no XNLI English question is within 0.5 of it once the hypothesis is counted.

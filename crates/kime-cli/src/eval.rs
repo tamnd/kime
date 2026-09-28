@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use kime::{Device, Kime, Precision};
+use kime_eval::contam::manifest_conflicts;
 use kime_eval::report::{markdown, rows_tsv, summarize};
 use kime_eval::suite::{Case, Scored, load, probs, probs_json, score};
 use serde_json::{Map, Value, json};
@@ -15,9 +16,13 @@ use crate::predict::{device, precision};
 
 const USAGE: &str = "usage: kime eval <suite.jsonl or directory>... [--model laya] [--device auto|cpu|cuda[:N]|metal]
        [--precision f16|f32|int8] [--answers <dir>] [--out <dir>] [--title <text>]
+       [--data-manifest <file>]
 Runs every suite through the model and writes <out>/report.md, results.json, rows.tsv and one
 <suite>.answers.jsonl per suite. With --answers, the answers are read from <dir>/<suite>.answers.jsonl,
-one {\"id\": ..., \"answers\": {...}} line per case in Laya's JSON shape, and no model is loaded.";
+one {\"id\": ..., \"answers\": {...}} line per case in Laya's JSON shape, and no model is loaded.
+--data-manifest names the training data manifest of the model under test. Its blake3 goes into
+results.json, and nothing is scored if it lists a test split or the split a suite is drawn from,
+as the manifest.json next to the suites records it.";
 
 /// Requests handed to the engine at once.
 const CHUNK: usize = 256;
@@ -30,6 +35,7 @@ struct Opts {
     answers: Option<PathBuf>,
     out: PathBuf,
     title: Option<String>,
+    data_manifest: Option<PathBuf>,
 }
 
 fn opts(args: &[String]) -> Result<Opts, String> {
@@ -41,6 +47,7 @@ fn opts(args: &[String]) -> Result<Opts, String> {
         answers: None,
         out: PathBuf::from("eval-out"),
         title: None,
+        data_manifest: None,
     };
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -52,6 +59,7 @@ fn opts(args: &[String]) -> Result<Opts, String> {
             "--answers" => o.answers = Some(val()?.into()),
             "--out" => o.out = val()?.into(),
             "--title" => o.title = Some(val()?),
+            "--data-manifest" => o.data_manifest = Some(val()?.into()),
             "--help" | "-h" => return Err(USAGE.into()),
             p if !p.starts_with('-') => {
                 let p = PathBuf::from(p);
@@ -98,8 +106,54 @@ fn write(path: &Path, text: &str) -> Result<(), String> {
     std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// Reads the data manifest, refuses it if it lists a split a suite is drawn from, and returns
+/// what results.json records about it.
+fn data_manifest(o: &Opts) -> Result<Value, String> {
+    let Some(path) = &o.data_manifest else {
+        return Ok(Value::Null);
+    };
+    let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let data: Value =
+        serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut conflicts = Vec::new();
+    let mut dirs: Vec<&Path> = o.suites.iter().filter_map(|p| p.parent()).collect();
+    dirs.dedup();
+    for dir in dirs {
+        let m = dir.join("manifest.json");
+        let tests = match std::fs::read_to_string(&m) {
+            Ok(t) => serde_json::from_str(&t).map_err(|e| format!("{}: {e}", m.display()))?,
+            Err(_) => Value::Null,
+        };
+        let used: Map<String, Value> = tests
+            .as_object()
+            .map(|t| {
+                t.iter()
+                    .filter(|(k, _)| o.suites.iter().any(|p| name(p) == **k))
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        conflicts.extend(manifest_conflicts(&data, &Value::Object(used)));
+    }
+    let blank = json!({});
+    conflicts.extend(manifest_conflicts(&data, &blank));
+    conflicts.sort();
+    conflicts.dedup();
+    if !conflicts.is_empty() {
+        return Err(format!(
+            "{} lists data the suites test on, so no result is written:\n  {}",
+            path.display(),
+            conflicts.join("\n  ")
+        ));
+    }
+    Ok(
+        json!({"file": path.display().to_string(), "blake3": blake3::hash(&bytes).to_hex().to_string()}),
+    )
+}
+
 fn eval(args: &[String]) -> Result<(), String> {
     let o = opts(args)?;
+    let manifest = data_manifest(&o)?;
     std::fs::create_dir_all(&o.out).map_err(|e| format!("{}: {e}", o.out.display()))?;
     let kime = match o.answers {
         Some(_) => None,
@@ -145,15 +199,21 @@ fn eval(args: &[String]) -> Result<(), String> {
         Some(k) => format!("kime eval, {} on {}, {:?}", k.model_id(), k.device(), o.precision),
         None => "kime eval".into(),
     });
-    let meta = json!({"title": title, "kime": env!("CARGO_PKG_VERSION"), "model": kime.as_ref().map(Kime::model_id)});
+    let meta = json!({"title": title, "kime": env!("CARGO_PKG_VERSION"),
+        "model": kime.as_ref().map(Kime::model_id), "data_manifest": manifest});
     let all = json!({"meta": meta, "suites": results});
     write(
         &o.out.join("results.json"),
         &(serde_json::to_string_pretty(&all).unwrap_or_default() + "\n"),
     )?;
-    write(&o.out.join("report.md"), &markdown(&title, &summaries))?;
+    let mut md = markdown(&title, &summaries);
+    md.push_str(&match manifest.get("blake3") {
+        Some(h) => format!("\nData manifest blake3 {}, no test split listed.\n", h.as_str().unwrap_or_default()),
+        None => "\nNo data manifest was given, so the training data of the model was not checked against the suites.\n".into(),
+    });
+    write(&o.out.join("report.md"), &md)?;
     write(&o.out.join("rows.tsv"), &tsv)?;
-    print!("{}", markdown(&title, &summaries));
+    print!("{md}");
     Ok(())
 }
 
