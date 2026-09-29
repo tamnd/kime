@@ -2,6 +2,10 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
+## Unreleased
+
+- `kime-train --loss ce` and `--loss pg` train with cross entropy against the soft target or with rlcd_pg, the Gaussian policy gradient of spec/12-training.md with 8 samples, sigma from 1.0 down to 0.3 and group normalized advantages, for the ablations of #37. The proper score stays the default. On an M4, one epoch of Banking77 and CLINC150 with the top 4 layers gives the same model with cross entropy as with the proper score (Banking77 NLL 2.87 against 2.89, CLINC150 0.454 against 0.448), while rlcd_pg leaves accuracy alone and makes the model confidently wrong, with Banking77 NLL 12.2 and CLINC150 AUROC 0.65 against 0.90. On typed_decisions, with its score and noul questions, rlcd_pg learns but trails the proper score, with accuracy 0.503 against 0.541 and score MAE 0.578 against 0.560 (tools/eval/results/2026-09-29-train-objectives).
+
 ## 0.1.3
 
 - tools/ref/train_ref.py is a PyTorch reference trainer for kime-train, and `kime-train --dump` writes the laid out questions it trains on so both see the same ids and targets (#36). On an M4, one epoch of 12,000 Banking77 and CLINC150 lines with the top 4 layers gives the same model in both to within the difference between two kime-train seeds: CLINC150 accuracy 0.9130 in both and NLL 0.4476 against 0.4451, Banking77 accuracy 0.4620 against 0.4600 and NLL 2.886 against 2.936, where two kime seeds are 0.16 apart. kime-train takes 2,175 seconds and 12.3 GB against PyTorch's 1,354 seconds and 5.7 GB (tools/eval/results/2026-09-29-train-side-by-side).
