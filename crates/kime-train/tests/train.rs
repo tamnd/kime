@@ -8,7 +8,7 @@ use burn::optim::GradientsParams;
 use burn::tensor::{Tensor, TensorData};
 use kime_model::Model;
 use kime_train::data::{Example, Renderer};
-use kime_train::loss::{Targets, proper_score};
+use kime_train::loss::{Targets, cross_entropy, proper_score, rlcd_pg};
 use kime_train::model::{Compat, Question};
 use kime_train::rng::Rng;
 use kime_train::train::{Config, clip_global, lr_at, plan};
@@ -216,4 +216,56 @@ fn freezing_leaves_only_the_top_layers() {
     // One more layer is its attention norm, the fused qkv, the output, the mlp norm and the mlp.
     assert_eq!(three - two, d + 3 * d * d + d * d + d + d * 2 * inter + inter * d);
     assert!(two < total / 4, "{two} of {total} still train with two layers");
+}
+
+#[test]
+fn cross_entropy_matches_the_formula() {
+    let dev = Default::default();
+    let a = example(3, 0, &[0.2, 0.0, 0.8], 1.0);
+    let b = example(2, 0, &[1.0, 0.0], 1.0);
+    let z = [0.0f32, 1.0, 2.0, -1.0, 1.0];
+    let ce = |z: &[f64], t: &[f64]| {
+        let s: f64 = z.iter().map(|x| x.exp()).sum();
+        -z.iter().zip(t).map(|(z, t)| t * (z - s.ln())).sum::<f64>()
+    };
+    let want = (ce(&[0.0, 1.0, 2.0], &[0.2, 0.0, 0.8]) + ce(&[-1.0, 1.0], &[1.0, 0.0])) / 2.0;
+    let logits = Tensor::<B, 1>::from_data(TensorData::new(z.to_vec(), [5]), &dev);
+    let (loss, _) = cross_entropy(logits, &Targets::new(&[&a, &b], &dev));
+    let got = f64::from(loss.into_scalar());
+    assert!((got - want).abs() < 1e-5, "{got} against {want}");
+}
+
+/// The gradient of `loss` with respect to the logits.
+fn logit_grad(
+    z: &[f32],
+    mut f: impl FnMut(Tensor<Autodiff<B>, 1>) -> Tensor<Autodiff<B>, 1>,
+) -> Vec<f32> {
+    let dev = Default::default();
+    let x = Tensor::<Autodiff<B>, 1>::from_data(TensorData::new(z.to_vec(), [z.len()]), &dev)
+        .require_grad();
+    let g = f(x.clone()).backward();
+    x.grad(&g).unwrap().into_data().to_vec::<f32>().unwrap()
+}
+
+#[test]
+fn policy_gradient_points_where_the_exact_gradient_does() {
+    let dev = Default::default();
+    let a = example(4, 0, &[0.1, 0.6, 0.2, 0.1], 1.0);
+    let b = example(3, 1, &[0.0, 0.3, 0.7], 1.0);
+    let z = [1.0f32, -0.5, 0.3, 0.0, 0.8, 0.1, -0.4];
+    let exact = logit_grad(&z, |x| proper_score(x, &Targets::new(&[&a, &b], &dev)).0);
+    let mut rng = Rng::new(7);
+    let pg = logit_grad(&z, |x| rlcd_pg(x, &Targets::new(&[&a, &b], &dev), 4096, 0.3, &mut rng).0);
+    let dot: f32 = exact.iter().zip(&pg).map(|(a, b)| a * b).sum();
+    let norm = |v: &[f32]| v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let cos = dot / (norm(&exact) * norm(&pg));
+    assert!(cos > 0.9, "cosine {cos} between {exact:?} and {pg:?}");
+    // Eight samples, as training uses, are noisy but still point the right way on average.
+    let mut sum = vec![0f32; z.len()];
+    for _ in 0..64 {
+        let g = logit_grad(&z, |x| rlcd_pg(x, &Targets::new(&[&a, &b], &dev), 8, 0.3, &mut rng).0);
+        sum.iter_mut().zip(g).for_each(|(s, g)| *s += g);
+    }
+    let dot: f32 = exact.iter().zip(&sum).map(|(a, b)| a * b).sum();
+    assert!(dot / (norm(&exact) * norm(&sum)) > 0.8);
 }
