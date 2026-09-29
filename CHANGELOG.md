@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.1.5
 
 - `kime eval` ranks the candidates of reranking suites, whose lines carry `rank` with the query and the first stage place, and reports top 1, top 5, top 10 and MRR for the first stage and the model (#39). tools/eval builds en.clerc_rerank and en.clerc_rerank_more, the CLERC setup of TypeSafe's re-ranking cookbook, 40 and 110 queries with their BM25 top 30 over a pool of 3,565 passages, and gets the cookbook's BM25 numbers back. Laya does not rerank them: top 10 is 0.250 against 0.375 for BM25 on the cookbook's 40, where the cookbook has Jev at 0.62. kime and Laya's PyTorch code agree on the 1,200 answers to 5.5e-5 (tools/eval/results/2026-09-29-clerc-rerank).
 - `kime eval` also writes rows.parquet, the per question rows of rows.tsv with the probabilities as a list of doubles, for the raw data spec/13-benchmarks.md asks every published number to come with (#39). kime-eval writes it with its own small Parquet writer, one uncompressed row group, so the workspace gains no dependency. pyarrow, polars and duckdb read the file of a 1,500 question Banking77 and CLINC150 run and give the same values as rows.tsv on every row.
