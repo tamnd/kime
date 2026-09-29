@@ -40,6 +40,8 @@ results/2026-09-29-quality-metal is the whole quality group on an M4 with Metal,
 
 results/2026-09-29-mind2web has the Mind2Web suites answered by Laya, by cklxx/laya-browser and by the baselines.
 
+`chunk_consistency.py` is the chunk consistency test of spec/15-testing.md: the same 64 option choices from banking77 and the Mind2Web target heads, scored in one pass and in chunks of 8, 16 and 32 with `kime.chunk`, and how often the sizes pick the same option. results/2026-09-30-chunking has Laya's run.
+
 against-apps.tsv does the same for the application themes against research/results/app_benchmark_results.json, which Laya 0.2.1 wrote on a CPU. kime matches it on five of the seven, ECE included to 1e-4, is one question off on model routing, and gets two more emails right on spam, as Laya 0.3.20 on the 4090 does, so the spam difference is Laya's email cleaning since 0.2.1 and not the engine.
 
 | Order suite | kime flip rate | Laya 0.3.20 flip rate | Laya's notebook, 1 order of 200 |

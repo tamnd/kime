@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 
 use kime_core::answer::{LAYA_MODEL, Response, Temperatures, laya_answer};
 use kime_core::render::{compat_question, compat_state};
-use kime_core::request::{Limits, Problem, Question, Request, parse};
+use kime_core::request::{Criteria, Limits, Problem, Question, Request, parse};
 use kime_model::Model;
 use kime_tensor::{BatchBuf, Buckets, Executor, Outputs};
 use kime_tok::Tokenizer;
@@ -28,6 +28,7 @@ use kime_tok::layout::{CompatBudget, CompatSequence, Cut};
 use serde_json::Value;
 
 mod cache;
+mod chunk;
 pub mod hub;
 mod split;
 
@@ -429,10 +430,17 @@ pub struct Memory {
     pub plans: usize,
 }
 
-/// One laid out question and where its answer goes.
+/// One laid out sequence and where its answer goes. A question is one item, or one per chunk of
+/// a choice too big for one sequence, plus one for the rerank of its best options.
 struct Item<'a> {
     req: usize,
+    /// The question's place among all questions of the call, shared by its chunks.
+    slot: usize,
     q: &'a Question,
+    /// The options this sequence holds, by index, or `None` for all of them.
+    opts: Option<Vec<usize>>,
+    /// Whether this is the joint pass over the best options of a chunked choice.
+    rerank: bool,
     seq: CompatSequence,
     logits: Vec<f32>,
     act: [f32; 2],
@@ -457,6 +465,17 @@ fn mode(req: &Request) -> CacheMode {
         .and_then(Value::as_str)
         .and_then(CacheMode::parse)
         .unwrap_or_default()
+}
+
+/// The request's `kime.chunk`, the options per chunk to score its choices with, from 2 to 255.
+fn chunk_size(req: &Request) -> Option<usize> {
+    let n = req.kime.as_ref()?.get("chunk")?.as_u64()?;
+    (2..=255).contains(&n).then_some(n as usize)
+}
+
+/// The texts at `opts`.
+fn pick(options: &[String], opts: &[usize]) -> Vec<String> {
+    opts.iter().map(|&i| options[i].clone()).collect()
 }
 
 impl Kime {
@@ -513,6 +532,12 @@ impl Kime {
         for (it, e) in items.iter_mut().zip(cache.all(&keys)?) {
             it.fill(e);
         }
+        let mut joint = self.reranks(&parsed, &items);
+        let keys: Vec<_> = joint.iter().map(Item::key).collect();
+        for (it, e) in joint.iter_mut().zip(cache.all(&keys)?) {
+            it.fill(e);
+        }
+        items.append(&mut joint);
         self.respond(&parsed, &items).pop()
     }
 
@@ -569,15 +594,13 @@ impl Kime {
         let mut items = self.lay_out(&parsed)?;
         let tokenize = t0.elapsed();
         let t1 = Instant::now();
-        let (run, keys) = self.look_up(reqs, &mut items);
-        let batches = if run.is_empty() { 0 } else { self.run(&mut items, &run)? };
-        if let Some(c) = &self.inner.cache {
-            let keep = run.iter().filter(|&&i| mode(&reqs[items[i].req]) != CacheMode::Bypass);
-            c.insert(keep.map(|&i| {
-                (keys[i], Entry { logits: items[i].logits.clone().into(), act: items[i].act })
-            }));
+        let (mut batches, mut cached) = self.pass(reqs, &mut items)?;
+        let mut joint = self.reranks(&parsed, &items);
+        if !joint.is_empty() {
+            let (b, c) = self.pass(reqs, &mut joint)?;
+            (batches, cached) = (batches + b, cached + c);
+            items.append(&mut joint);
         }
-        let cached = items.len() - run.len();
         let cut = items.iter().map(|it| it.seq.state_tokens - it.seq.state_tokens_used);
         let timing = Timing {
             tokenize,
@@ -601,21 +624,120 @@ impl Kime {
             // Laya keeps the end of a conversation and the start of anything else.
             let cut = if matches!(r.state, Value::Array(_)) { Cut::Head } else { Cut::Tail };
             let state = inner.tok.encode_state(&compat_state(&r.state, &inner.mask));
+            let size = chunk_size(r);
             for q in &r.questions {
+                let slot = items.last().map_or(0, |it: &Item<'_>| it.slot + 1);
                 let text = compat_question(q, &inner.mask);
-                let seq =
-                    inner.tok.compat_sequence(&text.head, &text.options, &state, inner.budget, cut);
-                if seq.markers.len() != q.criteria.len() {
-                    return Err(Error::TooLong {
-                        question: q.id.clone(),
-                        options: q.criteria.len(),
-                        fit: seq.markers.len(),
+                let lay = |o: &[String]| {
+                    inner.tok.compat_sequence(&text.head, o, &state, inner.budget, cut)
+                };
+                let k = q.criteria.len();
+                let choice = matches!(q.criteria, Criteria::Choice(_));
+                let whole = if choice && size.is_some() { None } else { Some(lay(&text.options)) };
+                let parts = match whole {
+                    Some(seq) if seq.markers.len() == k || !choice => vec![(None, seq)],
+                    _ => chunk::chunks(k, size.unwrap_or(chunk::CHUNK))
+                        .into_iter()
+                        .map(|c| {
+                            let seq = lay(&pick(&text.options, &c));
+                            (Some(c), seq)
+                        })
+                        .collect(),
+                };
+                for (opts, seq) in parts {
+                    let want = opts.as_ref().map_or(k, Vec::len);
+                    if seq.markers.len() != want {
+                        return Err(Error::TooLong {
+                            question: q.id.clone(),
+                            options: want,
+                            fit: seq.markers.len(),
+                        });
+                    }
+                    items.push(Item {
+                        req: i,
+                        slot,
+                        q,
+                        opts,
+                        rerank: false,
+                        seq,
+                        logits: Vec::new(),
+                        act: [0.0; 2],
                     });
                 }
-                items.push(Item { req: i, q, seq, logits: Vec::new(), act: [0.0; 2] });
             }
         }
         Ok(items)
+    }
+
+    /// The joint pass of every choice that `items` scored in more than one chunk and that has more
+    /// than [`chunk::TOP`] options: one sequence with its best options by the chunked logits.
+    fn reranks<'a>(&self, parsed: &'a [Request], items: &[Item<'a>]) -> Vec<Item<'a>> {
+        let inner = &*self.inner;
+        let mut out = Vec::new();
+        let mut state: Option<(usize, Vec<u32>)> = None;
+        for group in items.chunk_by(|a, b| a.slot == b.slot) {
+            let (first, q) = (&group[0], group[0].q);
+            if group.len() < 2 || q.criteria.len() <= chunk::TOP {
+                continue;
+            }
+            let picked = chunk::top(&Self::chunked(&group.iter().collect::<Vec<_>>()));
+            let r = &parsed[first.req];
+            if state.as_ref().is_none_or(|(i, _)| *i != first.req) {
+                state =
+                    Some((first.req, inner.tok.encode_state(&compat_state(&r.state, &inner.mask))));
+            }
+            let ids = state.as_ref().map_or(&[][..], |(_, s)| s);
+            let cut = if matches!(r.state, Value::Array(_)) { Cut::Head } else { Cut::Tail };
+            let text = compat_question(q, &inner.mask);
+            let seq = inner.tok.compat_sequence(
+                &text.head,
+                &pick(&text.options, &picked),
+                ids,
+                inner.budget,
+                cut,
+            );
+            if seq.markers.len() != picked.len() {
+                // The chunks fit, so the top rarely will not; the chunked answer stands then.
+                continue;
+            }
+            out.push(Item {
+                req: first.req,
+                slot: first.slot,
+                q,
+                opts: Some(picked),
+                rerank: true,
+                seq,
+                logits: Vec::new(),
+                act: [0.0; 2],
+            });
+        }
+        out
+    }
+
+    /// The logits of a question's chunks, in option order.
+    fn chunked(group: &[&Item<'_>]) -> Vec<f32> {
+        let mut l = vec![0.0; group[0].q.criteria.len()];
+        for it in group {
+            match &it.opts {
+                Some(o) => o.iter().zip(&it.logits).for_each(|(&i, &v)| l[i] = v),
+                None => l.copy_from_slice(&it.logits),
+            }
+        }
+        l
+    }
+
+    /// Answers `items` from the cache and the device, and fills the cache. It gives the device
+    /// batches it took and the items the cache answered.
+    fn pass(&self, reqs: &[Request], items: &mut [Item<'_>]) -> Result<(usize, usize), Error> {
+        let (run, keys) = self.look_up(reqs, items);
+        let batches = if run.is_empty() { 0 } else { self.run(items, &run)? };
+        if let Some(c) = &self.inner.cache {
+            let keep = run.iter().filter(|&&i| mode(&reqs[items[i].req]) != CacheMode::Bypass);
+            c.insert(keep.map(|&i| {
+                (keys[i], Entry { logits: items[i].logits.clone().into(), act: items[i].act })
+            }));
+        }
+        Ok((batches, items.len() - run.len()))
     }
 
     /// Fills the items the cache holds, for the requests that read it. It gives the items left
@@ -643,11 +765,35 @@ impl Kime {
             .iter()
             .map(|_| Response { model: LAYA_MODEL.into(), answers: Vec::new(), input_tokens: 0 })
             .collect();
+        let (first, joint): (Vec<&Item<'_>>, Vec<&Item<'_>>) =
+            items.iter().partition(|it| !it.rerank);
         for it in items {
-            let res = &mut out[it.req];
-            res.input_tokens += it.seq.ids.len();
-            res.answers
-                .push((it.q.id.clone(), laya_answer(it.q, &it.logits, it.act, &inner.temps)));
+            out[it.req].input_tokens += it.seq.ids.len();
+        }
+        for group in first.chunk_by(|a, b| a.slot == b.slot) {
+            let (q, req) = (group[0].q, group[0].req);
+            let answer = if group.len() == 1 && group[0].opts.is_none() {
+                laya_answer(q, &group[0].logits, group[0].act, &inner.temps)
+            } else {
+                let k = q.criteria.len();
+                let t = inner.temps.get(q.qtype, k);
+                let chunked = Self::chunked(group);
+                let p = match joint.iter().find(|j| j.slot == group[0].slot) {
+                    Some(j) => {
+                        let picked = j.opts.as_deref().unwrap_or_default();
+                        let tj = inner.temps.get(q.qtype, picked.len());
+                        chunk::merge(&chunked, t, picked, &j.logits, tj)
+                    }
+                    None => chunk::softmax(&chunked, t),
+                };
+                // The act head reads each chunk's sequence, so the answer gets their mean.
+                let n = group.len() as f32;
+                let act = group
+                    .iter()
+                    .fold([0.0; 2], |a, it| [a[0] + it.act[0] / n, a[1] + it.act[1] / n]);
+                laya_answer(q, &chunk::logits(&p, t), act, &inner.temps)
+            };
+            out[req].answers.push((q.id.clone(), answer));
         }
         out
     }
