@@ -133,3 +133,40 @@ fn truncation() {
     // Over a thousand state tokens, and the model reads at most 512 in all.
     assert!(t.cut_tokens > 2 * 500, "{}", t.cut_tokens);
 }
+
+/// A choice too big for one sequence is scored in chunks, and one that fits keeps its one pass
+/// answer whether or not a chunk size is asked for.
+#[test]
+fn chunking() {
+    let kime = match Kime::builder().model("laya").device(Device::Cpu { threads: 0 }).build() {
+        Ok(k) => k,
+        Err(e) => {
+            assert!(std::env::var_os("KIME_REQUIRE_WEIGHTS").is_none(), "{e}");
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let choice = |n: usize, chunk: Option<usize>| {
+        let mut criteria = serde_json::Map::new();
+        criteria.insert("refund".into(), Value::Null);
+        for i in 1..n {
+            criteria.insert(format!("topic {i}"), Value::Null);
+        }
+        let mut body = serde_json::json!({"state": "I was charged twice, please give me my money back.",
+            "questions": {"q": {"type": "choice", "instructions": "What does the customer want?",
+                "criteria": criteria}}});
+        if let Some(c) = chunk {
+            body["kime"] = serde_json::json!({"chunk": c});
+        }
+        parse(&body, &Limits::LAYA).unwrap()
+    };
+    let res = kime.decide(&choice(150, None)).unwrap();
+    let json = res.to_json();
+    let p = json["answers"]["q"]["probabilities"].as_object().unwrap();
+    assert_eq!(p.len(), 150);
+    let total: f64 = p.values().map(|v| v.as_f64().unwrap()).sum();
+    assert!((total - 1.0).abs() < 0.02, "{total}");
+    let one = kime.decide(&choice(20, None)).unwrap().to_json();
+    let whole = kime.decide(&choice(20, Some(20))).unwrap().to_json();
+    assert_eq!(one["answers"], whole["answers"]);
+}

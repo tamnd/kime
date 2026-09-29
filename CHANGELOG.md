@@ -2,6 +2,10 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
+## Unreleased
+
+- A choice whose options do not fit one sequence is scored in chunks of up to 32 options with the same question header, and when it has more than 16 options its best 16 are scored again together, as spec/04-semantics.md describes (#46). `kime.chunk` in a request sets the chunk size. A choice that fits is still scored in one pass, so Laya's answers do not change. Before this such a question failed with `TooLong`.
+
 ## 0.1.6
 
 - `kime eval --suite quality|order|agent|all` keeps only the suites of a group, so `kime eval <dirs> --suite quality` runs every suite of spec/13-benchmarks.md and leaves the order and Mind2Web suites out (#39). Laya through kime on an M4 with Metal gets the same number right as the RTX 4090 run on 47 of 59 suites and is one question off on the other 12 (tools/eval/results/2026-09-29-quality-metal).

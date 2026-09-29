@@ -104,6 +104,7 @@ All fields are optional.
 | `truncation` | `"head"`, `"tail"`, `"middle"`, `"error"` | `"tail"` | Where to cut an over long state. `tail` keeps the start (Laya default). `head` keeps the end, which suits conversations. `error` returns 422 instead of cutting. |
 | `route` | object | none | Router overrides: `model`, `task`, `lang`, `lang_guess`. See 11. |
 | `cache` | `"use"`, `"bypass"`, `"refresh"` | `"use"` | Controls the state memory cache and the answer cache. |
+| `chunk` | int 2 to 255 | none | Score every choice in chunks of at most this many options, with the rerank of 04. Without it a choice is scored in one pass when it fits, and in chunks of 32 when it does not. |
 | `deadline_ms` | int | none | Reject with 504 if the answer cannot be produced in time. The scheduler also uses it to order work. |
 | `state_segments` | bool | auto | Treat top level keys of an object state as independently cacheable segments. See 05. |
 | `return_embedding` | bool | false | Return the pooled state embedding (f16, base64) for client side shortlisting or dedup. |
