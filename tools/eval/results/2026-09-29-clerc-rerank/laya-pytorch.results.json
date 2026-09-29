@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "title": "kime eval",
+    "kime": "0.1.4",
+    "model": null,
+    "data_manifest": null
+  },
+  "suites": {
+    "en.clerc_rerank": {
+      "n": 1200,
+      "accuracy": 0.340833,
+      "macro_f1": 0.280686,
+      "ece": 0.269114,
+      "brier": 0.635911,
+      "nll": 0.838088,
+      "aurc": 0.749754,
+      "mean_confidence": 0.609727,
+      "acc_at_50_coverage": 0.238333,
+      "acc_at_80_coverage": 0.303125,
+      "auroc": 0.354978,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.313333,
+        0.366667
+      ],
+      "ece_ci": [
+        0.245407,
+        0.297723
+      ],
+      "dropped_questions": 0,
+      "ranking": {
+        "queries": 40,
+        "candidates": 1200,
+        "gold_listed": 1.0,
+        "model": {
+          "top_1": 0.025,
+          "top_5": 0.125,
+          "top_10": 0.25,
+          "mrr": 0.117885
+        },
+        "first_stage": {
+          "top_1": 0.05,
+          "top_5": 0.15,
+          "top_10": 0.375,
+          "mrr": 0.155215
+        }
+      }
+    }
+  }
+}

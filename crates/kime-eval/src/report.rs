@@ -57,6 +57,69 @@ pub fn flips(scored: &[Scored]) -> Option<Flips> {
     Some(f)
 }
 
+/// Reranking over the candidates of each query, for suites whose lines carry `rank`.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Ranking {
+    /// Queries, and candidates over all of them.
+    pub queries: usize,
+    pub candidates: usize,
+    /// The share of queries with the gold at or above place 1, 5 and 10 by the model.
+    pub top: [f64; 3],
+    /// The same by the first stage order.
+    pub first_stage: [f64; 3],
+    /// Mean reciprocal rank by the model and by the first stage, 0 for a query whose gold is not
+    /// among its candidates.
+    pub mrr: f64,
+    pub first_stage_mrr: f64,
+    /// The share of queries whose gold is among the candidates at all.
+    pub listed: f64,
+}
+
+/// The places counted in [`Ranking::top`].
+pub const TOP: [usize; 3] = [1, 5, 10];
+
+/// Ranks each query's candidates by the probability of `true`, ties kept in first stage order,
+/// and finds the gold's place. `None` when no line has `rank`.
+#[must_use]
+pub fn ranking(scored: &[Scored]) -> Option<Ranking> {
+    // For each query, (first stage place, p true, gold) of each candidate.
+    let mut by_q: BTreeMap<&str, Vec<(usize, f64, bool)>> = BTreeMap::new();
+    for s in scored {
+        let Some((q, at)) = &s.rank else { continue };
+        let p = s.row.probs.get(1).copied().unwrap_or(0.0);
+        by_q.entry(q).or_default().push((*at, p, s.row.gold == 1));
+    }
+    if by_q.is_empty() {
+        return None;
+    }
+    let mut r = Ranking { queries: by_q.len(), ..Ranking::default() };
+    for c in by_q.values_mut() {
+        r.candidates += c.len();
+        c.sort_by_key(|x| x.0);
+        let first = c.iter().position(|x| x.2);
+        c.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let model = c.iter().position(|x| x.2);
+        for (place, top, mrr) in
+            [(first, &mut r.first_stage, &mut r.first_stage_mrr), (model, &mut r.top, &mut r.mrr)]
+        {
+            let Some(i) = place else { continue };
+            for (k, t) in TOP.iter().zip(top.iter_mut()) {
+                *t += f64::from(u8::from(i < *k));
+            }
+            *mrr += 1.0 / (i + 1) as f64;
+        }
+        r.listed += f64::from(u8::from(first.is_some()));
+    }
+    let n = r.queries as f64;
+    for x in r.top.iter_mut().chain(r.first_stage.iter_mut()) {
+        *x /= n;
+    }
+    r.mrr /= n;
+    r.first_stage_mrr /= n;
+    r.listed /= n;
+    Some(r)
+}
+
 /// One suite's numbers.
 #[derive(Debug, Clone)]
 pub struct Summary {
@@ -77,6 +140,8 @@ pub struct Summary {
     pub by_tag: BTreeMap<String, BTreeMap<String, Hard>>,
     /// The flip rate, when the suite has reordered copies.
     pub flips: Option<Flips>,
+    /// Reranking, when the suite's lines are candidates of queries.
+    pub ranking: Option<Ranking>,
 }
 
 /// Summarizes one suite's rows.
@@ -110,6 +175,7 @@ pub fn summarize(suite: &str, scored: &[Scored], dropped: usize) -> Summary {
         by_type,
         by_tag,
         flips: flips(scored),
+        ranking: ranking(scored),
     }
 }
 
@@ -151,6 +217,19 @@ impl Summary {
                 "option_order".into(),
                 json!({"questions": f.questions, "copies": f.copies, "flip_rate": num(f.rate),
                        "any_flip_rate": num(f.any)}),
+            );
+        }
+        if let Some(r) = &self.ranking {
+            let top = |t: &[f64; 3]| {
+                TOP.iter().zip(t).map(|(k, x)| (format!("top_{k}"), num(*x))).collect::<Map<_, _>>()
+            };
+            let (mut model, mut first) = (top(&r.top), top(&r.first_stage));
+            model.insert("mrr".into(), num(r.mrr));
+            first.insert("mrr".into(), num(r.first_stage_mrr));
+            m.insert(
+                "ranking".into(),
+                json!({"queries": r.queries, "candidates": r.candidates, "gold_listed": num(r.listed),
+                       "model": model, "first_stage": first}),
             );
         }
         if !self.by_type.is_empty() {
@@ -220,6 +299,22 @@ pub fn markdown(title: &str, summaries: &[Summary]) -> String {
                 "| {} | {} | {} | {:.4} | {:.4} |",
                 x.suite, f.questions, f.copies, f.rate, f.any
             );
+        }
+    }
+    let ranked: Vec<(&Summary, &Ranking)> =
+        summaries.iter().filter_map(|x| x.ranking.as_ref().map(|r| (x, r))).collect();
+    if !ranked.is_empty() {
+        s.push_str("\n| Suite | Queries | Candidates | Order | Top 1 | Top 5 | Top 10 | MRR |\n|---|---|---|---|---|---|---|---|\n");
+        for (x, r) in ranked {
+            for (order, t, mrr) in
+                [("first stage", &r.first_stage, r.first_stage_mrr), ("model", &r.top, r.mrr)]
+            {
+                let _ = writeln!(
+                    s,
+                    "| {} | {} | {} | {order} | {:.4} | {:.4} | {:.4} | {mrr:.4} |",
+                    x.suite, r.queries, r.candidates, t[0], t[1], t[2]
+                );
+            }
         }
     }
     let extras: Vec<&Summary> = summaries.iter().filter(|x| x.extra != Extra::default()).collect();
@@ -313,6 +408,41 @@ pub fn rows_parquet(suites: &[(String, Vec<Scored>)]) -> Vec<u8> {
 mod tests {
     use super::*;
     use crate::suite::{load, probs_json, score};
+
+    #[test]
+    fn ranks_candidates_by_p_true() {
+        let line = |q: &str, at: usize, gold: bool| {
+            format!(
+                r#"{{"id": "{q}{at}", "state": "s", "questions": {{"c": {{"type": "noul", "instructions": "i"}}}}, "gold": {{"c": {gold}}}, "rank": {{"query": "{q}", "at": {at}}}}}"#
+            )
+        };
+        // Query a: the gold is third in the first stage and first by the model. Query b: the
+        // gold is first in the first stage and second by the model. Query c has no gold listed.
+        let text = [
+            line("a", 0, false),
+            line("a", 1, false),
+            line("a", 2, true),
+            line("b", 0, true),
+            line("b", 1, false),
+            line("c", 0, false),
+        ]
+        .join("\n");
+        let p = [0.2, 0.1, 0.9, 0.5, 0.6, 0.3];
+        let scored: Vec<Scored> = load(&text)
+            .unwrap()
+            .iter()
+            .zip(p)
+            .flat_map(|(c, p)| score(c, |_| Some(vec![1.0 - p, p])).0)
+            .collect();
+        let r = ranking(&scored).unwrap();
+        assert_eq!((r.queries, r.candidates), (3, 6));
+        assert!((r.listed - 2.0 / 3.0).abs() < 1e-12);
+        assert_eq!(r.top.map(|x| (x * 3.0).round() as u8), [1, 2, 2]);
+        assert_eq!(r.first_stage.map(|x| (x * 3.0).round() as u8), [1, 2, 2]);
+        assert!((r.mrr - (1.0 + 0.5) / 3.0).abs() < 1e-12);
+        assert!((r.first_stage_mrr - (1.0 / 3.0 + 1.0) / 3.0).abs() < 1e-12);
+        assert!(ranking(&scored[..0]).is_none());
+    }
 
     #[test]
     fn counts_flips_by_option_name() {

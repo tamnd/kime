@@ -315,6 +315,64 @@ def extra():
     register("en.clinc150", lines, src)
 
 
+CLERC_FILE = "https://huggingface.co/datasets/jhu-clsp/CLERC/resolve/main/teva_train_dir/train_data.jsonl.gz"
+CLERC_NOUL = {
+    "type": "noul",
+    "instructions": "The query excerpt comes from a US federal court opinion and was written immediately around a citation to a precedent; the citation itself has been removed. Could the candidate passage be from that cited precedent \u2014 does it establish the specific legal proposition the query excerpt invokes at its citation point?",
+    "criteria": {
+        "true": "The candidate passage states or establishes the specific rule, standard, holding, or fact pattern that the query excerpt attributes to its removed citation.",
+        "false": "The candidate passage is merely on a similar topic or doctrine; it does not supply the specific proposition the query excerpt relies on.",
+    },
+}
+
+
+def clerc():
+    # CLERC rerank as TypeSafe's re-ranking cookbook (docs.typesafe.ai/cookbooks/rerank_typesafe)
+    # builds it: 170 rows of the training file pooled into one corpus of 3,565 passages, BM25 top
+    # 30 from that corpus for each query, and one noul question a candidate with the cookbook's
+    # wording. The sampling follows leepokai/llm-prompt-techniques-on-jev, which rebuilds the
+    # cookbook's slice and gets its BM25 numbers back. en.clerc_rerank is the cookbook's 40
+    # queries and en.clerc_rerank_more the other 110 of the pool.
+    import hashlib
+
+    import bm25s
+
+    cid = lambda t: hashlib.sha1(t.encode("utf-8")).hexdigest()[:16]
+    rows = []
+    for row in load_dataset("json", data_files=CLERC_FILE, streaming=True, split="train"):
+        if row.get("positive_passages") and len(row.get("negative_passages") or []) == 20:
+            rows.append(row)
+        if len(rows) >= 1000:
+            break
+    rng = random.Random(0)
+    corpus, pool = {}, []
+    for row in rng.sample(rows, 170):
+        gold = row["positive_passages"][0]["text"]
+        corpus[cid(gold)] = gold
+        for neg in row["negative_passages"]:
+            corpus[cid(neg["text"])] = neg["text"]
+        pool.append({"qid": str(row["query_id"]), "query": row["query"], "gold": cid(gold)})
+    cookbook = rng.sample(pool[20:], 40)
+    more = [q for q in pool[20:] if q not in cookbook]
+    corpus = dict(sorted(corpus.items()))
+    cids = list(corpus)
+    r = bm25s.BM25()
+    r.index(bm25s.tokenize([corpus[c] for c in cids], stopwords="en"), show_progress=False)
+    src = {"dataset": "jhu-clsp/CLERC", "config": "teva_train_dir/train_data.jsonl.gz", "split": "train",
+           "revision": None, "corpus_passages": len(corpus)}
+    for name, qs in [("en.clerc_rerank", cookbook), ("en.clerc_rerank_more", more)]:
+        idx, _ = r.retrieve(bm25s.tokenize([q["query"] for q in qs], stopwords="en"), k=30, show_progress=False)
+        lines = []
+        for q, got in zip(qs, idx):
+            for at, j in enumerate(got):
+                c = cids[j]
+                lines.append({"id": "%s-%s-%d" % (name, q["qid"], at),
+                              "state": {"query_excerpt": q["query"], "candidate_passage": corpus[c]},
+                              "questions": {"cited": CLERC_NOUL}, "gold": {"cited": c == q["gold"]},
+                              "rank": {"query": q["qid"], "at": at}})
+        register(name, lines, src)
+
+
 def order(out):
     # Each line of the base suite, then 5 copies with the options of each choice in a random
     # order, marked with perm_of so the report counts how often the answer moves.
@@ -346,7 +404,7 @@ def main():
     p.add_argument("--only", default="")
     a = p.parse_args()
     groups = {"typed_decisions": typed_decisions, "massive": massive, "xnli": xnli, "english": english,
-              "apps": apps, "extra": extra, "order": lambda: order(a.out)}
+              "apps": apps, "extra": extra, "clerc": clerc, "order": lambda: order(a.out)}
     only = [x for x in a.only.split(",") if x]
     for name, build in groups.items():
         if only and name not in only:
