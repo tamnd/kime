@@ -12,7 +12,10 @@
 //! `false`. `soft` holds soft labels in option order and `gold_score` a score that can fall
 //! between levels, both keyed by question like `gold`. `tags` are strings the report groups by.
 //! `perm_of` marks a line as a copy of another line with the options reordered, and the report
-//! counts how often the answer changes between the copies.
+//! counts how often the answer changes between the copies. `rank` marks a line as one candidate
+//! of a reranking query, `{"query": "q1", "at": 3}` with `at` the candidate's place in the first
+//! stage list, and the report ranks each query's candidates by the probability of `true` of their
+//! noul question.
 
 use std::collections::BTreeMap;
 
@@ -35,6 +38,8 @@ pub struct Case {
     pub tags: BTreeMap<String, String>,
     /// The id of the line this one reorders the options of.
     pub perm_of: Option<String>,
+    /// The reranking query this line is a candidate of, and its place in the first stage list.
+    pub rank: Option<(String, usize)>,
 }
 
 /// Reads a suite. A line that is not JSON is an error; a request that does not validate is kept,
@@ -49,7 +54,7 @@ pub fn load(text: &str) -> Result<Vec<Case>, String> {
             .map_or_else(|| (i + 1).to_string(), str::to_string);
         let mut req = body.clone();
         if let Some(m) = req.as_object_mut() {
-            for k in ["id", "gold", "soft", "gold_score", "tags", "perm_of"] {
+            for k in ["id", "gold", "soft", "gold_score", "tags", "perm_of", "rank"] {
                 m.remove(k);
             }
         }
@@ -67,7 +72,12 @@ pub fn load(text: &str) -> Result<Vec<Case>, String> {
             })
             .unwrap_or_default();
         let perm_of = body.get("perm_of").and_then(Value::as_str).map(str::to_string);
-        out.push(Case { id, request, body, tags, perm_of });
+        let rank = body.get("rank").and_then(|r| {
+            let q = r.get("query")?;
+            let q = q.as_str().map_or_else(|| q.to_string(), str::to_string);
+            Some((q, usize::try_from(r.get("at")?.as_u64()?).ok()?))
+        });
+        out.push(Case { id, request, body, tags, perm_of, rank });
     }
     Ok(out)
 }
@@ -144,6 +154,8 @@ pub struct Scored {
     pub tags: BTreeMap<String, String>,
     /// The case this one reorders the options of.
     pub perm_of: Option<String>,
+    /// The reranking query and first stage place, from the line's `rank`.
+    pub rank: Option<(String, usize)>,
     /// The name of the predicted option, which stays the same when the options move.
     pub pred: String,
     /// The gold, the probabilities and the extras.
@@ -181,6 +193,7 @@ pub fn score(
             qtype: q.qtype,
             tags: case.tags.clone(),
             perm_of: case.perm_of.clone(),
+            rank: case.rank.clone(),
             pred: option_name(q, row.pred()),
             row,
         });

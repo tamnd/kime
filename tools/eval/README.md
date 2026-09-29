@@ -10,6 +10,8 @@ CLINC150 has 151 labels, too many option names for one sequence, so each of its 
 
 The order suites, order.massive_intent.en, order.en.emotion and order.xnli.en, hold each line of the base suite and 5 copies with the options in a random order. A copy has `perm_of` set to the id of its original, and the report gives the flip rate, the share of copies whose answer is a different option from the original's, and the share of questions where any copy flips.
 
+en.clerc_rerank and en.clerc_rerank_more are the CLERC rerank setup of TypeSafe's re-ranking cookbook (docs.typesafe.ai/cookbooks/rerank_typesafe): 170 rows of the CLERC training file pooled into one corpus of 3,565 court opinion passages, the BM25 top 30 of that corpus for each query with bm25s and English stopwords, and one noul question for each query and candidate with the cookbook's wording. The rows are drawn as leepokai/llm-prompt-techniques-on-jev draws them, which gets the cookbook's BM25 numbers back. en.clerc_rerank is the cookbook's 40 queries, 1,200 questions, and en.clerc_rerank_more the other 110 of the pool, 3,300 questions. Each line has `rank`, the query and the candidate's BM25 place, and the report ranks each query's candidates by the probability of `true` and gives top 1, top 5, top 10 and MRR for BM25 and for the model. On en.clerc_rerank BM25 alone is 0.050, 0.150 and 0.375, as the cookbook has it. The corpus comes from streaming the first 1,000 usable rows of a 4 GB file, and it needs `bm25s` as well.
+
 `run_laya.py` answers the suites with Laya the way the notebook does, in length sorted fp16 autocast batches with the calibrated temperature of each question type and option count, and writes `<suite>.answers.jsonl`. `kime eval --answers` scores those files with the same code it scores kime with.
 
 ## Running
@@ -21,7 +23,7 @@ kime eval suites --answers laya-ans --out eval-laya
 kime eval suites --device cuda --precision f16 --out eval-kime
 ```
 
-`build_suites.py` needs `datasets`, and `laya` for the email suite, whose states go through Laya's `email_state` as in bench_apps.py (`import laya` does not need torch). It pulls about 3 GB of datasets into the Hugging Face cache. `run_laya.py` needs the `laya` package and PyTorch.
+`build_suites.py` needs `datasets`, `bm25s` for the CLERC suites, and `laya` for the email suite, whose states go through Laya's `email_state` as in bench_apps.py (`import laya` does not need torch). It pulls about 3 GB of datasets into the Hugging Face cache. `run_laya.py` needs the `laya` package and PyTorch.
 
 ## Results
 

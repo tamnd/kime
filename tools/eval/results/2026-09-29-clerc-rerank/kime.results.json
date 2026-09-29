@@ -1,0 +1,90 @@
+{
+  "meta": {
+    "title": "kime eval, laya on metal, Apple M4, F32",
+    "kime": "0.1.4",
+    "model": "laya",
+    "data_manifest": null
+  },
+  "suites": {
+    "en.clerc_rerank": {
+      "n": 1200,
+      "accuracy": 0.340833,
+      "macro_f1": 0.280686,
+      "ece": 0.269115,
+      "brier": 0.635913,
+      "nll": 0.838091,
+      "aurc": 0.749752,
+      "mean_confidence": 0.609727,
+      "acc_at_50_coverage": 0.238333,
+      "acc_at_80_coverage": 0.303125,
+      "auroc": 0.354984,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.313333,
+        0.366667
+      ],
+      "ece_ci": [
+        0.245407,
+        0.297724
+      ],
+      "dropped_questions": 0,
+      "ranking": {
+        "queries": 40,
+        "candidates": 1200,
+        "gold_listed": 1.0,
+        "model": {
+          "top_1": 0.025,
+          "top_5": 0.125,
+          "top_10": 0.25,
+          "mrr": 0.117885
+        },
+        "first_stage": {
+          "top_1": 0.05,
+          "top_5": 0.15,
+          "top_10": 0.375,
+          "mrr": 0.155215
+        }
+      }
+    },
+    "en.clerc_rerank_more": {
+      "n": 3300,
+      "accuracy": 0.377576,
+      "macro_f1": 0.298493,
+      "ece": 0.250502,
+      "brier": 0.611112,
+      "nll": 0.810841,
+      "aurc": 0.690685,
+      "mean_confidence": 0.602861,
+      "acc_at_50_coverage": 0.271515,
+      "acc_at_80_coverage": 0.327273,
+      "auroc": 0.357668,
+      "gold_zero_rate": 0.0,
+      "accuracy_ci": [
+        0.361515,
+        0.395152
+      ],
+      "ece_ci": [
+        0.232409,
+        0.267082
+      ],
+      "dropped_questions": 0,
+      "ranking": {
+        "queries": 110,
+        "candidates": 3300,
+        "gold_listed": 1.0,
+        "model": {
+          "top_1": 0.027273,
+          "top_5": 0.1,
+          "top_10": 0.3,
+          "mrr": 0.115349
+        },
+        "first_stage": {
+          "top_1": 0.045455,
+          "top_5": 0.209091,
+          "top_10": 0.254545,
+          "mrr": 0.136626
+        }
+      }
+    }
+  }
+}
