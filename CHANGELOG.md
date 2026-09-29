@@ -2,7 +2,7 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
-## Unreleased
+## 0.1.6
 
 - `kime eval --suite quality|order|agent|all` keeps only the suites of a group, so `kime eval <dirs> --suite quality` runs every suite of spec/13-benchmarks.md and leaves the order and Mind2Web suites out (#39). Laya through kime on an M4 with Metal gets the same number right as the RTX 4090 run on 47 of 59 suites and is one question off on the other 12 (tools/eval/results/2026-09-29-quality-metal).
 - tools/data converts Mind2Web's train split into browser agent steps in jev-ultrafast's format, labelled with the recorded action, and tools/eval builds three agent step suites from its test splits (#35). The train split gives 6,746 steps after the contamination check. On the suites Laya picks the target 0.05 of the time, cklxx/laya-browser 0.08 and a goal word match with no model 0.19 (tools/eval/results/2026-09-29-mind2web).
