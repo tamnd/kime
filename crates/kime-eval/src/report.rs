@@ -6,6 +6,7 @@ use std::fmt::Write as _;
 use serde_json::{Map, Value, json};
 
 use crate::metrics::{Extra, Hard, Row, bootstrap, extra, hard};
+use crate::parquet::{self, Column};
 use crate::suite::{Scored, type_name};
 
 /// Bootstrap resamples for the intervals, and their seed.
@@ -285,6 +286,27 @@ pub fn rows_tsv(suite: &str, scored: &[Scored], header: bool) -> String {
         );
     }
     s
+}
+
+/// The rows of every suite as a Parquet file, with the columns of [`rows_tsv`] and the
+/// probabilities as a list of doubles.
+#[must_use]
+pub fn rows_parquet(suites: &[(String, Vec<Scored>)]) -> Vec<u8> {
+    let all = || suites.iter().flat_map(|(n, s)| s.iter().map(move |x| (n, x)));
+    let text =
+        |f: &dyn Fn(&str, &Scored) -> String| Column::Str(all().map(|(n, x)| f(n, x)).collect());
+    let int = |f: &dyn Fn(&Scored) -> usize| Column::I64(all().map(|(_, x)| f(x) as i64).collect());
+    parquet::write(&[
+        ("suite", text(&|n, _| n.to_string())),
+        ("case", text(&|_, x| x.case.clone())),
+        ("question", text(&|_, x| x.question.clone())),
+        ("type", text(&|_, x| type_name(x.qtype).to_string())),
+        ("gold", int(&|x| x.row.gold)),
+        ("pred", int(&|x| x.row.pred())),
+        ("confidence", Column::F64(all().map(|(_, x)| x.row.confidence()).collect())),
+        ("correct", Column::Bool(all().map(|(_, x)| x.row.correct()).collect())),
+        ("probs", Column::F64List(all().map(|(_, x)| x.row.probs.clone()).collect())),
+    ])
 }
 
 #[cfg(test)]

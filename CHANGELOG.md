@@ -4,6 +4,7 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 
 ## Unreleased
 
+- `kime eval` also writes rows.parquet, the per question rows of rows.tsv with the probabilities as a list of doubles, for the raw data spec/13-benchmarks.md asks every published number to come with (#39). kime-eval writes it with its own small Parquet writer, one uncompressed row group, so the workspace gains no dependency. pyarrow, polars and duckdb read the file of a 1,500 question Banking77 and CLINC150 run and give the same values as rows.tsv on every row.
 - `tools/data/convert.py --max-options` sets the most options a choice over a large label set gets, which was fixed at 20. The default stays 20 and gives the same bytes as before. Banking77 converted with every option and trained for one epoch with the top 4 layers takes the 77 way en.banking77_full suite from 0.458 to 0.490 accuracy and ECE from 0.222 to 0.175, where the 20 option data left accuracy where Laya had it (tools/eval/results/2026-09-29-train-banking77-options).
 
 ## 0.1.4
