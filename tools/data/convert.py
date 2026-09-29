@@ -312,14 +312,17 @@ def shard(path, name, out, info):
 
 
 def main():
+    global MAX_OPTS
     p = argparse.ArgumentParser()
     p.add_argument("out")
     p.add_argument("--only", default="")
     p.add_argument("--max", type=int, default=300000, help="rows to sample from civil_comments")
+    p.add_argument("--max-options", type=int, default=MAX_OPTS, help="most options a choice over a large label set gets")
     p.add_argument("--kime", default="")
     p.add_argument("--tests", action="append", default=[])
     p.add_argument("--reuse", action="store_true", help="keep raw files already written, for checking elsewhere")
     a = p.parse_args()
+    MAX_OPTS = a.max_options
     only = [x for x in a.only.split(",") if x]
     raw, clean, shards_dir = (os.path.join(a.out, x) for x in ("raw", "clean", "shards"))
     for d in (raw, clean, shards_dir):
@@ -344,6 +347,8 @@ def main():
             os.replace(path + ".part", path)
         entry = {k: src[k] for k in ("name", "dataset", "config", "revision", "split", "license", "task") if k in src}
         entry["rows"] = n
+        if MAX_OPTS != 20:
+            entry["max_options"] = MAX_OPTS
         kept = path
         if a.kime and a.tests:
             report = os.path.join(a.out, name + ".contam.json")

@@ -2,6 +2,10 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
+## Unreleased
+
+- `tools/data/convert.py --max-options` sets the most options a choice over a large label set gets, which was fixed at 20. The default stays 20 and gives the same bytes as before. Banking77 converted with every option and trained for one epoch with the top 4 layers takes the 77 way en.banking77_full suite from 0.458 to 0.490 accuracy and ECE from 0.222 to 0.175, where the 20 option data left accuracy where Laya had it (tools/eval/results/2026-09-29-train-banking77-options).
+
 ## 0.1.4
 
 - `kime-train --loss ce` and `--loss pg` train with cross entropy against the soft target or with rlcd_pg, the Gaussian policy gradient of spec/12-training.md with 8 samples, sigma from 1.0 down to 0.3 and group normalized advantages, for the ablations of #37. The proper score stays the default. On an M4, one epoch of Banking77 and CLINC150 with the top 4 layers gives the same model with cross entropy as with the proper score (Banking77 NLL 2.87 against 2.89, CLINC150 0.454 against 0.448), while rlcd_pg leaves accuracy alone and makes the model confidently wrong, with Banking77 NLL 12.2 and CLINC150 AUROC 0.65 against 0.90. On typed_decisions, with its score and noul questions, rlcd_pg learns but trails the proper score, with accuracy 0.503 against 0.541 and score MAE 0.578 against 0.560 (tools/eval/results/2026-09-29-train-objectives).
