@@ -23,7 +23,10 @@ python tools/eval/build_suites.py suites
 python tools/eval/run_laya.py <laya model dir> laya-ans suites/*.jsonl --device cuda
 kime eval suites --answers laya-ans --out eval-laya
 kime eval suites --device cuda --precision f16 --out eval-kime
+kime eval suites --suite quality --device metal --out eval-quality
 ```
+
+`--suite` keeps the suites of one group: `quality` is every suite of spec/13-benchmarks.md, `order` the order suites and `agent` the Mind2Web steps. It can be given more than once, and without it every suite named runs.
 
 `build_suites.py` needs `datasets`, `bm25s` for the CLERC suites, `ijson`, `unzip` and kime's Python package for the Mind2Web suites, and `laya` for the email suite, whose states go through Laya's `email_state` as in bench_apps.py (`import laya` does not need torch). It pulls about 3 GB of datasets into the Hugging Face cache. `run_laya.py` needs the `laya` package and PyTorch.
 
@@ -32,6 +35,8 @@ kime eval suites --device cuda --precision f16 --out eval-kime
 results/2026-09-28-rtx4090 has both runs on the RTX 4090, Laya 0.3.20 in PyTorch and kime 0.1.0 in FP16, with against-t4.tsv lining up the correct answers of each suite against Laya's published T4 run. Banking77 is not in Laya's published file, so 49 suites and 17,416 questions compare.
 
 kime gets the same number of questions right as the published run on 40 of the 49 suites and is 9 questions off in all, 3 fewer net. AG News is 0.9467, Emotion 0.5733, SST-5 0.3717, BoolQ 0.8300, prompt injections 0.6983, XNLI English 0.8600 and MASSIVE intent English 0.7833, all as published, and typed-decisions is 0.3615 against 0.362. Laya itself on the 4090 is 47 questions off its own T4 run, 11 fewer net, since fp16 on a different GPU flips close questions. ECE matches the published run to about 1e-3 everywhere except the MASSIVE suites, which have 20 options: Laya 0.3.20 raised the lowest calibrated temperature from 0.1 to 0.5 after the T4 run, which moves ECE and NLL on those suites and not accuracy.
+
+results/2026-09-29-quality-metal is the whole quality group on an M4 with Metal, within one question per suite of the 4090 run.
 
 results/2026-09-29-mind2web has the Mind2Web suites answered by Laya, by cklxx/laya-browser and by the baselines.
 

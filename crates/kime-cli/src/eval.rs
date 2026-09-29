@@ -16,14 +16,16 @@ use crate::predict::{device, precision};
 
 const USAGE: &str = "usage: kime eval <suite.jsonl or directory>... [--model laya] [--device auto|cpu|cuda[:N]|metal]
        [--precision f16|f32|int8] [--answers <dir>] [--out <dir>] [--title <text>]
-       [--data-manifest <file>]
+       [--data-manifest <file>] [--suite quality|order|agent|all]...
 Runs every suite through the model and writes <out>/report.md, results.json, rows.tsv,
 rows.parquet and one <suite>.answers.jsonl per suite. With --answers, the answers are read from
 <dir>/<suite>.answers.jsonl,
 one {\"id\": ..., \"answers\": {...}} line per case in Laya's JSON shape, and no model is loaded.
 --data-manifest names the training data manifest of the model under test. Its blake3 goes into
 results.json, and nothing is scored if it lists a test split or the split a suite is drawn from,
-as the manifest.json next to the suites records it.";
+as the manifest.json next to the suites records it.
+--suite keeps only the suites of a group: quality is every suite of spec/13-benchmarks.md,
+order the order.* copies with the options shuffled, and agent the mind2web.* browser steps.";
 
 /// Requests handed to the engine at once.
 const CHUNK: usize = 256;
@@ -37,6 +39,21 @@ struct Opts {
     out: PathBuf,
     title: Option<String>,
     data_manifest: Option<PathBuf>,
+    groups: Vec<String>,
+}
+
+/// The groups `--suite` takes.
+const GROUPS: [&str; 4] = ["quality", "order", "agent", "all"];
+
+/// The group a suite belongs to, by its name.
+fn group(suite: &str) -> &'static str {
+    if suite.starts_with("order.") {
+        "order"
+    } else if suite.starts_with("mind2web.") {
+        "agent"
+    } else {
+        "quality"
+    }
 }
 
 fn opts(args: &[String]) -> Result<Opts, String> {
@@ -49,6 +66,7 @@ fn opts(args: &[String]) -> Result<Opts, String> {
         out: PathBuf::from("eval-out"),
         title: None,
         data_manifest: None,
+        groups: Vec::new(),
     };
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -61,6 +79,16 @@ fn opts(args: &[String]) -> Result<Opts, String> {
             "--out" => o.out = val()?.into(),
             "--title" => o.title = Some(val()?),
             "--data-manifest" => o.data_manifest = Some(val()?.into()),
+            "--suite" => {
+                let g = val()?;
+                if !GROUPS.contains(&g.as_str()) {
+                    return Err(format!(
+                        "no suite group {g:?}, the groups are {}",
+                        GROUPS.join(", ")
+                    ));
+                }
+                o.groups.push(g);
+            }
             "--help" | "-h" => return Err(USAGE.into()),
             p if !p.starts_with('-') => {
                 let p = PathBuf::from(p);
@@ -80,6 +108,12 @@ fn opts(args: &[String]) -> Result<Opts, String> {
                 }
             }
             other => return Err(format!("unknown option {other:?}\n{USAGE}")),
+        }
+    }
+    if !o.groups.is_empty() && !o.groups.iter().any(|g| g == "all") {
+        o.suites.retain(|p| o.groups.iter().any(|g| g == group(&name(p))));
+        if o.suites.is_empty() {
+            return Err(format!("no suite is in {}", o.groups.join(", ")));
         }
     }
     if o.suites.is_empty() {
@@ -273,4 +307,32 @@ fn read_answers(cases: &[Case], path: &Path) -> Result<(Vec<Scored>, usize), Str
         dropped += d;
     }
     Ok((scored, dropped))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(a: &[&str]) -> Vec<String> {
+        a.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn suite_groups() {
+        let files =
+            ["en.sst2.jsonl", "order.xnli.en.jsonl", "mind2web.task.jsonl", "app.phishing.jsonl"];
+        let pick = |extra: &[&str]| {
+            let mut a = args(&files);
+            a.extend(args(extra));
+            opts(&a).map(|o| o.suites.iter().map(|p| name(p)).collect::<Vec<_>>())
+        };
+        assert_eq!(pick(&[]).unwrap().len(), 4);
+        assert_eq!(pick(&["--suite", "quality"]).unwrap(), ["en.sst2", "app.phishing"]);
+        assert_eq!(
+            pick(&["--suite", "agent", "--suite", "order"]).unwrap(),
+            ["order.xnli.en", "mind2web.task"]
+        );
+        assert_eq!(pick(&["--suite", "all"]).unwrap().len(), 4);
+        assert!(pick(&["--suite", "speed"]).is_err());
+    }
 }

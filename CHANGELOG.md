@@ -2,6 +2,11 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
+## Unreleased
+
+- `kime eval --suite quality|order|agent|all` keeps only the suites of a group, so `kime eval <dirs> --suite quality` runs every suite of spec/13-benchmarks.md and leaves the order and Mind2Web suites out (#39). Laya through kime on an M4 with Metal gets the same number right as the RTX 4090 run on 47 of 59 suites and is one question off on the other 12 (tools/eval/results/2026-09-29-quality-metal).
+- tools/data converts Mind2Web's train split into browser agent steps in jev-ultrafast's format, labelled with the recorded action, and tools/eval builds three agent step suites from its test splits (#35). The train split gives 6,746 steps after the contamination check. On the suites Laya picks the target 0.05 of the time, cklxx/laya-browser 0.08 and a goal word match with no model 0.19 (tools/eval/results/2026-09-29-mind2web).
+
 ## 0.1.5
 
 - `kime eval` ranks the candidates of reranking suites, whose lines carry `rank` with the query and the first stage place, and reports top 1, top 5, top 10 and MRR for the first stage and the model (#39). tools/eval builds en.clerc_rerank and en.clerc_rerank_more, the CLERC setup of TypeSafe's re-ranking cookbook, 40 and 110 queries with their BM25 top 30 over a pool of 3,565 passages, and gets the cookbook's BM25 numbers back. Laya does not rerank them: top 10 is 0.250 against 0.375 for BM25 on the cookbook's 40, where the cookbook has Jev at 0.62. kime and Laya's PyTorch code agree on the 1,200 answers to 5.5e-5 (tools/eval/results/2026-09-29-clerc-rerank).
