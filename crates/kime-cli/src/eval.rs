@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use kime::{Device, Kime, Precision};
 use kime_eval::contam::manifest_conflicts;
-use kime_eval::report::{markdown, rows_tsv, summarize};
+use kime_eval::report::{markdown, rows_parquet, rows_tsv, summarize};
 use kime_eval::suite::{Case, Scored, load, probs, probs_json, score};
 use serde_json::{Map, Value, json};
 
@@ -17,8 +17,9 @@ use crate::predict::{device, precision};
 const USAGE: &str = "usage: kime eval <suite.jsonl or directory>... [--model laya] [--device auto|cpu|cuda[:N]|metal]
        [--precision f16|f32|int8] [--answers <dir>] [--out <dir>] [--title <text>]
        [--data-manifest <file>]
-Runs every suite through the model and writes <out>/report.md, results.json, rows.tsv and one
-<suite>.answers.jsonl per suite. With --answers, the answers are read from <dir>/<suite>.answers.jsonl,
+Runs every suite through the model and writes <out>/report.md, results.json, rows.tsv,
+rows.parquet and one <suite>.answers.jsonl per suite. With --answers, the answers are read from
+<dir>/<suite>.answers.jsonl,
 one {\"id\": ..., \"answers\": {...}} line per case in Laya's JSON shape, and no model is loaded.
 --data-manifest names the training data manifest of the model under test. Its blake3 goes into
 results.json, and nothing is scored if it lists a test split or the split a suite is drawn from,
@@ -170,6 +171,7 @@ fn eval(args: &[String]) -> Result<(), String> {
         }
     };
     let (mut summaries, mut results, mut tsv) = (Vec::new(), Map::new(), String::new());
+    let mut rows = Vec::new();
     for path in &o.suites {
         let suite = name(path);
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -194,6 +196,7 @@ fn eval(args: &[String]) -> Result<(), String> {
             results.extend(m);
         }
         summaries.push(s);
+        rows.push((suite, scored));
     }
     let title = o.title.clone().unwrap_or_else(|| match &kime {
         Some(k) => format!("kime eval, {} on {}, {:?}", k.model_id(), k.device(), o.precision),
@@ -213,6 +216,8 @@ fn eval(args: &[String]) -> Result<(), String> {
     });
     write(&o.out.join("report.md"), &md)?;
     write(&o.out.join("rows.tsv"), &tsv)?;
+    let pq = o.out.join("rows.parquet");
+    std::fs::write(&pq, rows_parquet(&rows)).map_err(|e| format!("{}: {e}", pq.display()))?;
     print!("{md}");
     Ok(())
 }
