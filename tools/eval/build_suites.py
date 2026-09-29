@@ -9,6 +9,8 @@ Laya's published results and the numbers can be checked against them. Each suite
 describes. A manifest.json next to them records the dataset, config, split and revision of each.
 
 Needs `datasets`, and `laya` for the email suite (pip install datasets laya, laya without torch is enough).
+The mind2web group also needs `ijson`, `unzip` and kime's Python package, and reads Mind2Web's test
+zip from $MIND2WEB_TEST_ZIP or the hub.
 """
 
 import argparse
@@ -373,6 +375,46 @@ def clerc():
         register(name, lines, src)
 
 
+M2W_REVISION = "17ece8eb89862368edc0cc806acee6fca5163474"
+M2W_STEPS = 500
+
+
+def mind2web():
+    # Browser agent steps from Mind2Web's three test splits, as tools/data/mind2web.py builds them
+    # for training: an operation head and the target head of the recorded operation, in
+    # jev-ultrafast's format. The test files come in a zip whose password the authors publish and
+    # ask not to be redistributed unzipped, so each file is read straight out of the zip. 500 steps
+    # a split, drawn with the seed.
+    import subprocess
+    import sys
+
+    import ijson
+    import kime
+    from huggingface_hub import hf_hub_download
+
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"))
+    import mind2web as m2w
+
+    zip_path = os.environ.get("MIND2WEB_TEST_ZIP") or hf_hub_download(
+        "osunlp/Mind2Web", "test.zip", repo_type="dataset", revision=M2W_REVISION)
+    names = subprocess.run(["unzip", "-Z1", zip_path], check=True, capture_output=True, text=True).stdout.split()
+    for split in ["test_website", "test_task", "test_domain"]:
+        steps = []
+        for member in sorted(n for n in names if n.startswith(split + "/") and n.endswith(".json")):
+            unz = subprocess.Popen(["unzip", "-p", "-P", "mind2web", zip_path, member], stdout=subprocess.PIPE)
+            for task in ijson.items(unz.stdout, "item", use_float=True):
+                for uid, body, _, gold in m2w.steps(task, kime.agent_step):
+                    steps.append({"id": "mind2web.%s-%s" % (split[5:], uid), "state": body["state"],
+                                  "questions": body["questions"], "gold": gold,
+                                  "tags": {"website": task["website"], "domain": task["domain"]}})
+            unz.wait()
+        rng = random.Random(SEED)
+        pick = sorted(rng.sample(range(len(steps)), min(M2W_STEPS, len(steps))))
+        register("mind2web." + split[5:], [steps[i] for i in pick],
+                 {"dataset": "osunlp/Mind2Web", "config": None, "split": split, "revision": M2W_REVISION,
+                  "steps": len(steps)})
+
+
 def order(out):
     # Each line of the base suite, then 5 copies with the options of each choice in a random
     # order, marked with perm_of so the report counts how often the answer moves.
@@ -404,7 +446,7 @@ def main():
     p.add_argument("--only", default="")
     a = p.parse_args()
     groups = {"typed_decisions": typed_decisions, "massive": massive, "xnli": xnli, "english": english,
-              "apps": apps, "extra": extra, "clerc": clerc, "order": lambda: order(a.out)}
+              "apps": apps, "extra": extra, "clerc": clerc, "mind2web": mind2web, "order": lambda: order(a.out)}
     only = [x for x in a.only.split(",") if x]
     for name, build in groups.items():
         if only and name not in only:

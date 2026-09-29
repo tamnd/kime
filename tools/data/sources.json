@@ -27,6 +27,8 @@
      "license": "CC-BY-SA-3.0", "use": "train", "task": "reading comprehension noul"},
     {"name": "squad_v2", "dataset": "rajpurkar/squad_v2", "revision": "3ffb306f725f7d2ce8394bc1873b24868140c412", "split": "train",
      "license": "CC-BY-SA-4.0", "use": "train", "task": "answerability noul, whether the passage answers the question"},
+    {"name": "mind2web", "dataset": "osunlp/Mind2Web", "revision": "17ece8eb89862368edc0cc806acee6fca5163474", "split": "train",
+     "license": "CC-BY-4.0", "use": "train", "task": "browser agent steps on real sites, operation and target heads in jev-ultrafast's format, labelled with the recorded action"},
 
     {"name": "xnli", "dataset": "facebook/xnli", "license": "CC-BY-NC-4.0", "use": "excluded", "why": "non-commercial; MultiNLI is its English train split"},
     {"name": "ms_marco", "dataset": "microsoft/ms_marco", "license": "MS MARCO terms", "use": "excluded", "why": "non-commercial research use only"},

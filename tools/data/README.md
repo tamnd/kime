@@ -6,7 +6,7 @@ The public part of kime's training data, per spec/12-training.md: which datasets
 
 [sources.json](sources.json) lists every public dataset considered, with its license and whether it is used. A source is used only with `"use": "train"`, and only its train split, from the pinned revision. A license that is missing, unknown, non-commercial or research only means the source is excluded, and the reason is written next to it. That is decided here, before training, so a model never has to be retrained to take a source out.
 
-Eleven sources are used: Banking77, CLINC150 with out of scope, MASSIVE intent and scenario in 51 languages, MultiNLI, WANLI, GoEmotions, Civil Comments, deepset's prompt injections, typed-decisions, BoolQ and SQuAD 2.0. Fifteen are excluded, among them XNLI, MS MARCO, ToxicChat, SST, AG News, Emotion and the Enron spam and phishing email sets that app.email_spam and app.phishing are built from.
+Twelve sources are used: Banking77, CLINC150 with out of scope, MASSIVE intent and scenario in 51 languages, MultiNLI, WANLI, GoEmotions, Civil Comments, deepset's prompt injections, typed-decisions, BoolQ, SQuAD 2.0 and Mind2Web's browser steps. Fifteen are excluded, among them XNLI, MS MARCO, ToxicChat, SST, AG News, Emotion and the Enron spam and phishing email sets that app.email_spam and app.phishing are built from.
 
 ## Converting
 
@@ -36,6 +36,9 @@ What each source becomes:
 | typed-decisions | its own questions, with the soft gold of its three labellers as the target |
 | BoolQ | answer, a noul over passage and question |
 | SQuAD 2.0 | answerable, a noul over passage and question |
+| Mind2Web | operation and the target of that operation, choices over a browser agent step in jev-ultrafast's format |
+
+Mind2Web is people doing 1,009 tasks on real websites, with the page before each action and the element they acted on. tools/data/mind2web.py turns each action into the snapshot jev-ultrafast would send for that page and runs it through kime's `agent_step`, so the questions are the ones a browser agent asks. The operation head's target is what the person did, CLICK, TYPE_TEXT or SELECT, and the target head of that operation gets the element they acted on. A page offers a window of up to 100 elements that holds the target, since Laya's head fits about 126 target options. The converter needs `ijson` and kime's Python package, and streams the 5.9 GB train split one file at a time.
 
 With `--kime` and `--tests`, each converted source goes through `kime contam` against the test texts before it is sharded, and lines within Jaccard 0.5 of a test text are dropped. The test texts are the quality suites and the whole of every split they are drawn from, as tools/eval/split_texts.py writes them. `--reuse` starts from the raw files already in `<out dir>/raw`, so the conversion can run where the datasets are cached and the check where the test texts are.
 
@@ -66,3 +69,11 @@ The output is:
 | Total | 1,592,796 | 9,409 | 1,583,387 | 2,175,460 | |
 
 The 14 shards are 1,295 MB of JSON lines and 123 MB compressed. Most of what is dropped is short utterances that are also in a test split, such as MASSIVE's Japanese and Chinese commands (1,218 and 703 lines) and Banking77's questions (307 lines near its test split), and BoolQ passages that recur in its validation split (1,647 lines). `kime eval --data-manifest tools/data/manifest.json` over all 62 suites finds no conflict.
+
+## Mind2Web
+
+Mind2Web is converted on its own, since its pages are checked against the Mind2Web suites and not the text suites:
+
+    python tools/data/convert.py <out dir> --only mind2web --kime target/release/kime --tests <mind2web suites dir>
+
+On the M4 it took about 25 minutes, most of it parsing pages. The 1,009 train tasks give 7,036 usable steps. 290 of them are within Jaccard 0.5 of a suite case and are dropped, all against mind2web.task, whose tasks are on the same websites as the train split, and 6 are the same page and step. The website and domain suites have none. That leaves 6,746 steps and 13,197 questions, 5,661 CLICK, 875 TYPE_TEXT and 210 SELECT, in one shard of 9.8 MB. [results/2026-09-29-mind2web](results/2026-09-29-mind2web) has the manifest and the `kime contam` report. The check is against the 1,500 suite cases, not every step of the test splits.

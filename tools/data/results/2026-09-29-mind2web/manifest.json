@@ -1,0 +1,43 @@
+{
+ "created": "2026-09-29",
+ "format": "kime training JSONL, spec/12-training.md",
+ "seed": 13,
+ "shards": [
+  {
+   "blake3": "ae207ac25a5e87160754b0c68a4e87bb2b6edeb43ff6b90d2cb8a5405b514868",
+   "bytes": 9785923,
+   "config": null,
+   "dataset": "osunlp/Mind2Web",
+   "file": "mind2web-00000.jsonl.zst",
+   "license": "CC-BY-4.0",
+   "questions": 13197,
+   "raw_bytes": 175519567,
+   "rows": 6746,
+   "source": "mind2web",
+   "split": "train"
+  }
+ ],
+ "sources": [
+  {
+   "contamination": {
+    "method": {
+     "bands": 64,
+     "perms": 128,
+     "shingle_words": 5,
+     "threshold": 0.5
+    },
+    "test_texts": 1500
+   },
+   "dataset": "osunlp/Mind2Web",
+   "kept": 6746,
+   "license": "CC-BY-4.0",
+   "name": "mind2web",
+   "near_duplicates": 290,
+   "questions": 13197,
+   "revision": "17ece8eb89862368edc0cc806acee6fca5163474",
+   "rows": 7036,
+   "split": "train",
+   "task": "browser agent steps on real sites, operation and target heads in jev-ultrafast's format, labelled with the recorded action"
+  }
+ ]
+}
