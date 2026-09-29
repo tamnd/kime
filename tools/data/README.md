@@ -10,7 +10,7 @@ Eleven sources are used: Banking77, CLINC150 with out of scope, MASSIVE intent a
 
 ## Converting
 
-    python tools/data/convert.py <out dir> [--only name,name] [--max 300000] \
+    python tools/data/convert.py <out dir> [--only name,name] [--max 300000] [--max-options 20] \
         [--kime target/release/kime --tests <test texts dir> --tests <suites dir>] [--reuse]
 
 Each train row becomes one line with the state, its questions and a target per question:
@@ -20,7 +20,7 @@ Each train row becomes one line with the state, its questions and a target per q
      "questions": {"intent": {"type": "choice", "instructions": "Which banking intent does `text` express?", "criteria": {...}}},
      "targets": {"intent": {"probs": [0.0, 1.0, ...], "hard": 1, "weight": 1.0}}, "episode": null}
 
-`probs` follows the order of the criteria, and `hard` is the index of the gold option. A question gets one of a few instruction phrasings that name the state key in backticks, and the state key itself is picked from a few names. A choice over a large label set gets the gold and a random number of other labels, at most 20 in all and in a random order, and CLINC150 always offers out of scope. The other augmentations of spec/12-training.md, such as renaming labels, chunking and truncation, are applied by the trainer when it reads the data, so they change from epoch to epoch. Every draw comes from a generator seeded with the source and the row, so converting again gives the same bytes.
+`probs` follows the order of the criteria, and `hard` is the index of the gold option. A question gets one of a few instruction phrasings that name the state key in backticks, and the state key itself is picked from a few names. A choice over a large label set gets the gold and a random number of other labels, at most 20 in all (`--max-options`) and in a random order, and CLINC150 always offers out of scope. The other augmentations of spec/12-training.md, such as renaming labels, chunking and truncation, are applied by the trainer when it reads the data, so they change from epoch to epoch. Every draw comes from a generator seeded with the source and the row, so converting again gives the same bytes.
 
 What each source becomes:
 
