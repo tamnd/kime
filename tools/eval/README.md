@@ -12,6 +12,8 @@ The order suites, order.massive_intent.en, order.en.emotion and order.xnli.en, h
 
 en.clerc_rerank and en.clerc_rerank_more are the CLERC rerank setup of TypeSafe's re-ranking cookbook (docs.typesafe.ai/cookbooks/rerank_typesafe): 170 rows of the CLERC training file pooled into one corpus of 3,565 court opinion passages, the BM25 top 30 of that corpus for each query with bm25s and English stopwords, and one noul question for each query and candidate with the cookbook's wording. The rows are drawn as leepokai/llm-prompt-techniques-on-jev draws them, which gets the cookbook's BM25 numbers back. en.clerc_rerank is the cookbook's 40 queries, 1,200 questions, and en.clerc_rerank_more the other 110 of the pool, 3,300 questions. Each line has `rank`, the query and the candidate's BM25 place, and the report ranks each query's candidates by the probability of `true` and gives top 1, top 5, top 10 and MRR for BM25 and for the model. On en.clerc_rerank BM25 alone is 0.050, 0.150 and 0.375, as the cookbook has it. The corpus comes from streaming the first 1,000 usable rows of a 4 GB file, and it needs `bm25s` as well.
 
+mind2web.website, mind2web.task and mind2web.domain are browser agent steps from Mind2Web's three test splits (osunlp/Mind2Web, CC BY 4.0): new websites in the domains of the train split, new tasks on the train split's websites, and domains the train split does not have. Each is 500 steps drawn with the seed from the 1,212, 1,882 and 5,375 usable steps of its split. A step goes through tools/data/mind2web.py and kime's `agent_step`, so its questions are the operation head and the target head of the recorded operation, as jev-ultrafast sends them, and the gold is what the person did. A page offers up to 100 elements, and a target head has a median of 98 options. The test zip is password protected and its authors ask that it is not shared unzipped, so it is only read as a stream and nothing from it is kept but the suites. `baseline_mind2web.py` answers them with no model, the train split's share of each operation and the goal words each element's label holds.
+
 `run_laya.py` answers the suites with Laya the way the notebook does, in length sorted fp16 autocast batches with the calibrated temperature of each question type and option count, and writes `<suite>.answers.jsonl`. `kime eval --answers` scores those files with the same code it scores kime with.
 
 ## Running
@@ -23,13 +25,15 @@ kime eval suites --answers laya-ans --out eval-laya
 kime eval suites --device cuda --precision f16 --out eval-kime
 ```
 
-`build_suites.py` needs `datasets`, `bm25s` for the CLERC suites, and `laya` for the email suite, whose states go through Laya's `email_state` as in bench_apps.py (`import laya` does not need torch). It pulls about 3 GB of datasets into the Hugging Face cache. `run_laya.py` needs the `laya` package and PyTorch.
+`build_suites.py` needs `datasets`, `bm25s` for the CLERC suites, `ijson`, `unzip` and kime's Python package for the Mind2Web suites, and `laya` for the email suite, whose states go through Laya's `email_state` as in bench_apps.py (`import laya` does not need torch). It pulls about 3 GB of datasets into the Hugging Face cache. `run_laya.py` needs the `laya` package and PyTorch.
 
 ## Results
 
 results/2026-09-28-rtx4090 has both runs on the RTX 4090, Laya 0.3.20 in PyTorch and kime 0.1.0 in FP16, with against-t4.tsv lining up the correct answers of each suite against Laya's published T4 run. Banking77 is not in Laya's published file, so 49 suites and 17,416 questions compare.
 
 kime gets the same number of questions right as the published run on 40 of the 49 suites and is 9 questions off in all, 3 fewer net. AG News is 0.9467, Emotion 0.5733, SST-5 0.3717, BoolQ 0.8300, prompt injections 0.6983, XNLI English 0.8600 and MASSIVE intent English 0.7833, all as published, and typed-decisions is 0.3615 against 0.362. Laya itself on the 4090 is 47 questions off its own T4 run, 11 fewer net, since fp16 on a different GPU flips close questions. ECE matches the published run to about 1e-3 everywhere except the MASSIVE suites, which have 20 options: Laya 0.3.20 raised the lowest calibrated temperature from 0.1 to 0.5 after the T4 run, which moves ECE and NLL on those suites and not accuracy.
+
+results/2026-09-29-mind2web has the Mind2Web suites answered by Laya, by cklxx/laya-browser and by the baselines.
 
 against-apps.tsv does the same for the application themes against research/results/app_benchmark_results.json, which Laya 0.2.1 wrote on a CPU. kime matches it on five of the seven, ECE included to 1e-4, is one question off on model routing, and gets two more emails right on spam, as Laya 0.3.20 on the 4090 does, so the spam difference is Laya's email cleaning since 0.2.1 and not the engine.
 

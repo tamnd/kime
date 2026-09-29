@@ -1,0 +1,387 @@
+{
+  "kime": "0.1.4",
+  "method": {
+    "shingle_words": 5,
+    "perms": 128,
+    "bands": 64,
+    "threshold": 0.5
+  },
+  "tests": {
+    "files": [
+      "mind2web.domain",
+      "mind2web.task",
+      "mind2web.website"
+    ],
+    "texts": 1500,
+    "distinct": 1496,
+    "index_secs": 0.792254
+  },
+  "data": {
+    "lines": 7036,
+    "near_duplicates": 290,
+    "check_secs": 7.172617667,
+    "files": [
+      {
+        "file": "mind2web",
+        "lines": 7036,
+        "near_duplicates": 290,
+        "exact": 6,
+        "by_test": {
+          "mind2web.task": 290
+        }
+      }
+    ]
+  },
+  "examples": [
+    {
+      "file": "mind2web",
+      "id": "mind2web-c280a5bd-f3af-43ab-a64b-29e6984be6b8",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0ea3ac62-83de-4848-994d-989ad461b121",
+      "jaccard": 0.5267
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-837177b9-fc1d-4b15-8035-b15efd915693",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-ea2865e4-2858-478c-bf83-93d576cad774",
+      "jaccard": 0.9389
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-d26cb28b-0f54-4b70-bad7-c7e384c799c6",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0ea3ac62-83de-4848-994d-989ad461b121",
+      "jaccard": 0.5356
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-b1ec99ca-9953-4575-b633-8b9e6da0aee4",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0ea3ac62-83de-4848-994d-989ad461b121",
+      "jaccard": 0.5175
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-4f58be7e-a7f8-4d07-b40c-649e97d4ab84",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-214ae899-2389-4d89-86b6-4e15c06e9934",
+      "jaccard": 0.7015
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-f8928c84-d27a-42db-a6d1-dcd1f656d6ab",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0ea3ac62-83de-4848-994d-989ad461b121",
+      "jaccard": 0.5288
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-56dff79d-4441-4435-a096-71da4f343a09",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0ea3ac62-83de-4848-994d-989ad461b121",
+      "jaccard": 0.5223
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-d7821dba-fdc5-4738-ae2a-d5bf94da0dcc",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0cf0c69a-a179-40ad-bab7-fb7ce7dc5878",
+      "jaccard": 0.784
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-bd9a4601-4e54-41e7-ba10-2c10b0d6f156",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-b65c44f9-b467-4e14-ba7a-550931036182",
+      "jaccard": 0.8497
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-9af5e2bf-542b-482b-b479-2cdead789a25",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-c2e65ed7-2b61-457e-aa96-be8a06f3215c",
+      "jaccard": 0.7963
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-4af813e6-fc10-468a-bc8e-cba17f545e06",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-b65c44f9-b467-4e14-ba7a-550931036182",
+      "jaccard": 0.9477
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-4463379b-ecb8-4fd3-a871-b3ba26ce27bc",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-b65c44f9-b467-4e14-ba7a-550931036182",
+      "jaccard": 0.9429
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-6ba16278-a7a3-4e06-8426-356b05e3219c",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-b65c44f9-b467-4e14-ba7a-550931036182",
+      "jaccard": 0.9371
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-c1fda10f-e5ef-47f2-852f-a6385a2ed99f",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-b65c44f9-b467-4e14-ba7a-550931036182",
+      "jaccard": 0.9305
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-a504d03f-205a-4905-8823-9493469d0034",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-b65c44f9-b467-4e14-ba7a-550931036182",
+      "jaccard": 0.8902
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-0f806e67-309d-409d-8959-e24867e11888",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-66f2ea4d-9661-479a-b000-59f3ec25829d",
+      "jaccard": 0.5008
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-1cba5090-1401-4ce5-ab29-6dbb9aaaac26",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-66f2ea4d-9661-479a-b000-59f3ec25829d",
+      "jaccard": 0.7065
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-077c4e0c-a79b-448b-8bfe-0973673ac73a",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-959c6af6-48e0-4571-a7e2-a020f8ecebc5",
+      "jaccard": 0.5531
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-dd2bc1cb-54ad-4246-8005-f7287aa435c4",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-959c6af6-48e0-4571-a7e2-a020f8ecebc5",
+      "jaccard": 0.5531
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-05ba30e9-0691-4d0c-9307-8af2746cc476",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-959c6af6-48e0-4571-a7e2-a020f8ecebc5",
+      "jaccard": 0.5531
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-e7cce11b-e3ef-43c9-bc41-3f6db08f9d2f",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-959c6af6-48e0-4571-a7e2-a020f8ecebc5",
+      "jaccard": 0.5531
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-db4941b4-a391-4fff-911c-fd74052dfd3c",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-959c6af6-48e0-4571-a7e2-a020f8ecebc5",
+      "jaccard": 0.5531
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-b45f21d0-bde6-46c9-a618-7710e5efa2e6",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-959c6af6-48e0-4571-a7e2-a020f8ecebc5",
+      "jaccard": 0.5531
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-2b1af735-6002-4a1b-a021-dd9d263f3e1e",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-959c6af6-48e0-4571-a7e2-a020f8ecebc5",
+      "jaccard": 0.5531
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-40c1286c-8c7e-4b32-b160-227c9e2ef1f2",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-959c6af6-48e0-4571-a7e2-a020f8ecebc5",
+      "jaccard": 0.5531
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-95ec1d75-39b4-41c3-bdd2-fd4404dbe49f",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-1998feff-3ddd-45e7-9455-e4ab01ac44cd",
+      "jaccard": 0.6072
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-8676f7b9-73e2-4bf3-b8e6-d38576f3f87f",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-56b2cafc-a8e0-4298-808d-1667ae36079a",
+      "jaccard": 0.8061
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-73c5cb1c-f750-41f0-8bd2-ab89bf3b403c",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0d4ed9c7-810d-4968-9649-dea40a094bfc",
+      "jaccard": 0.5858
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-bf283bf2-f76d-42be-b04d-3dcf4f25f1ea",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0d4ed9c7-810d-4968-9649-dea40a094bfc",
+      "jaccard": 0.5877
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-600847c5-d8ae-4f6b-96a4-c247607440b2",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0d4ed9c7-810d-4968-9649-dea40a094bfc",
+      "jaccard": 0.5831
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-f8725f0b-18d9-4b4c-845d-ad4fcd1a9d6c",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-6e957356-6390-41d0-839b-953e4fde766c",
+      "jaccard": 0.5138
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-360c51fc-14b3-43ec-a013-8485a168a0f7",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-0d4ed9c7-810d-4968-9649-dea40a094bfc",
+      "jaccard": 0.5223
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-76b93c24-ab52-4865-8491-2c3423d615af",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-6c4802dc-5530-4be9-abc0-41e28ff0b3cd",
+      "jaccard": 0.5805
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-a5e39e4d-8ef5-424e-9370-dc254fdbcb03",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-b6b0c5cb-6b14-417d-9a1f-8054ebf4d76e",
+      "jaccard": 0.5282
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-c05241f0-b26e-40df-b388-6067f69ff404",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-e5ad96fd-d4d8-42d9-90e3-23335d7cbc07",
+      "jaccard": 0.8108
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-4eaaee20-45f8-42fd-8046-0020ea934869",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-f49ed170-c6b3-40d1-8f00-659ff3320b14",
+      "jaccard": 0.5919
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-d44f6051-c9f4-462a-a897-ffa2e2d4ef62",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-f31d303b-7bb5-4fa1-a612-451111c47ba8",
+      "jaccard": 0.5149
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-77eb7f8e-0e43-4535-b87b-9704908c779f",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-b65c44f9-b467-4e14-ba7a-550931036182",
+      "jaccard": 0.9506
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-1ec53584-9015-42d8-b9ef-b956a061181e",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-c2e65ed7-2b61-457e-aa96-be8a06f3215c",
+      "jaccard": 0.8958
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-e26a7560-027d-4467-b206-33ac5f582855",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-e5ad96fd-d4d8-42d9-90e3-23335d7cbc07",
+      "jaccard": 0.8066
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-689efb16-8afc-4054-ae22-289fba6674b1",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-e5ad96fd-d4d8-42d9-90e3-23335d7cbc07",
+      "jaccard": 0.7527
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-2d7c0f04-8f46-4ca8-bd6d-950c31e920f9",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-e5ad96fd-d4d8-42d9-90e3-23335d7cbc07",
+      "jaccard": 0.7603
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-f2c74424-c791-46ac-8ed3-080e0b523ebe",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-e5ad96fd-d4d8-42d9-90e3-23335d7cbc07",
+      "jaccard": 0.7606
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-14d83651-d626-40c5-bb20-7cafc64a78ee",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-e5ad96fd-d4d8-42d9-90e3-23335d7cbc07",
+      "jaccard": 0.7006
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-ecb3d820-f6e3-4ffb-84c9-e31d01c412bf",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-84b5b767-a3c9-4d84-9e77-cf2d24443161",
+      "jaccard": 0.6047
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-098ac9fe-e29c-4f6a-ab2c-78e793bf43d3",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-ea2865e4-2858-478c-bf83-93d576cad774",
+      "jaccard": 1.0
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-30484980-8301-4a3a-ae0f-f2ea7df58336",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-ea2865e4-2858-478c-bf83-93d576cad774",
+      "jaccard": 0.9644
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-8a4a6571-1410-440e-a5f1-1ed1c39160a4",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-fc7f79c2-719b-4c82-b590-b6e5fc28db61",
+      "jaccard": 0.5253
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-9f90d836-c2d6-473c-9f78-705033f9ec52",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-fc7f79c2-719b-4c82-b590-b6e5fc28db61",
+      "jaccard": 0.5237
+    },
+    {
+      "file": "mind2web",
+      "id": "mind2web-8ed5187f-287c-40c5-9ca9-9a142fb87136",
+      "test": "mind2web.task",
+      "test_id": "mind2web.task-fc7f79c2-719b-4c82-b590-b6e5fc28db61",
+      "jaccard": 0.5224
+    }
+  ]
+}

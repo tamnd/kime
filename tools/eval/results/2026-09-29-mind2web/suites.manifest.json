@@ -1,0 +1,23 @@
+{
+  "mind2web.domain": {
+    "config": null,
+    "dataset": "osunlp/Mind2Web",
+    "revision": "17ece8eb89862368edc0cc806acee6fca5163474",
+    "split": "test_domain",
+    "steps": 5375
+  },
+  "mind2web.task": {
+    "config": null,
+    "dataset": "osunlp/Mind2Web",
+    "revision": "17ece8eb89862368edc0cc806acee6fca5163474",
+    "split": "test_task",
+    "steps": 1882
+  },
+  "mind2web.website": {
+    "config": null,
+    "dataset": "osunlp/Mind2Web",
+    "revision": "17ece8eb89862368edc0cc806acee6fca5163474",
+    "split": "test_website",
+    "steps": 1212
+  }
+}

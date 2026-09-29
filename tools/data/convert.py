@@ -23,7 +23,8 @@ was dropped. Shards are about 256 MB of JSONL each before compression. manifest.
 shard's blake3, source, dataset, license, split, rows and questions, and is what `kime eval
 --data-manifest` reads.
 
-Needs `datasets`, `zstandard` and `blake3`. With --reuse, the raw files already in <out dir>/raw are
+Needs `datasets`, `zstandard` and `blake3`, and for Mind2Web also `ijson` and kime's Python package,
+whose `agent_step` builds the agent step questions (tools/data/mind2web.py). With --reuse, the raw files already in <out dir>/raw are
 checked and sharded without converting again, so the conversion can run where the datasets are and
 the check where the test texts are.
 """
@@ -275,11 +276,35 @@ def squad_v2(src):
                    {"answerable": noul(rng.choice(instr).format(p=p, q=q), float(bool(r["answers"]["text"])))})
 
 
+def mind2web(src):
+    """Every usable step of Mind2Web's train split, one file at a time, each deleted once read."""
+    import tempfile
+
+    import ijson
+    import kime
+    from huggingface_hub import HfApi, hf_hub_download
+
+    import mind2web as m2w
+
+    files = sorted(f for f in HfApi().list_repo_files(src["dataset"], repo_type="dataset", revision=src["revision"])
+                   if f.startswith("data/train/"))
+    with tempfile.TemporaryDirectory() as tmp:
+        for name in files:
+            path = hf_hub_download(src["dataset"], name, repo_type="dataset", revision=src["revision"], local_dir=tmp)
+            with open(path, "rb") as f:
+                for task in ijson.items(f, "item", use_float=True):
+                    for uid, body, targets, _ in m2w.steps(task, kime.agent_step):
+                        yield {"id": "mind2web-%s" % uid, "source": "mind2web", "split": "train", "lang": "en",
+                               "state": body["state"], "questions": body["questions"], "targets": targets,
+                               "episode": {"task": task["annotation_id"], "website": task["website"], "domain": task["domain"]}}
+            os.remove(path)
+
+
 CONVERTERS = {
     "banking77": banking77, "clinc150": clinc150, "massive": massive, "multi_nli": multi_nli,
     "wanli": wanli, "go_emotions": go_emotions, "civil_comments": civil_comments,
     "prompt_injections": prompt_injections, "typed_decisions": typed_decisions, "boolq": boolq,
-    "squad_v2": squad_v2,
+    "squad_v2": squad_v2, "mind2web": mind2web,
 }
 
 
