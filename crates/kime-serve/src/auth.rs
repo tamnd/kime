@@ -7,6 +7,12 @@
 //! Each key has two limits, requests per minute and input tokens per second. Each one is a token
 //! bucket kept as a single atomic, the time at which the bucket would be full again (GCRA, the
 //! generic cell rate algorithm). Admitting a request is one compare and swap, with no lock.
+//!
+//! Each key also names a cache scope, and the engine only finds cached states, segments and
+//! answers for the scope that asks, so one caller cannot tell from the time taken whether another
+//! sent the same state (SECURITY.md). Keys given the same name in the keys file are one caller
+//! and share their scope. `shared_cache` puts every key in one scope, which is faster when all the
+//! callers trust each other.
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -17,6 +23,7 @@ use std::time::{Duration, Instant};
 pub struct Auth {
     keys: Vec<Key>,
     laya: bool,
+    shared_cache: bool,
     rpm: Option<u32>,
     tps: Option<u32>,
 }
@@ -24,6 +31,7 @@ pub struct Auth {
 #[derive(Debug)]
 struct Key {
     hash: blake3::Hash,
+    scope: [u8; 32],
     rpm: Option<u32>,
     tps: Option<u32>,
 }
@@ -50,7 +58,8 @@ impl Auth {
 
     /// Adds the keys in a keys file: one key per line as `key [name [rpm [tps]]]`, where `-`
     /// for rpm or tps means the server default. Blank lines and lines starting with `#` are
-    /// skipped. The name is for the operator and is not used yet.
+    /// skipped. Keys with the same name share their cache scope, and a key with no name, or the
+    /// name `-`, has one of its own.
     ///
     /// # Errors
     ///
@@ -63,7 +72,7 @@ impl Auth {
             }
             let mut f = line.split_whitespace();
             let key = f.next().unwrap_or_default();
-            let _name = f.next();
+            let name = f.next().filter(|&n| n != "-");
             let limit = |v: Option<&str>, what: &str| match v {
                 None | Some("-") => Ok(None),
                 Some(v) => v.parse::<u32>().ok().filter(|&n| n > 0).map(Some).ok_or_else(|| {
@@ -75,7 +84,7 @@ impl Auth {
             if f.next().is_some() {
                 return Err(format!("line {}: expected key [name [rpm [tps]]]", i + 1));
             }
-            self.add(key, rpm, tps).map_err(|e| format!("line {}: {e}", i + 1))?;
+            self.add_named(key, name, rpm, tps).map_err(|e| format!("line {}: {e}", i + 1))?;
         }
         Ok(())
     }
@@ -86,12 +95,53 @@ impl Auth {
     ///
     /// When the key is already there.
     pub fn add(&mut self, key: &str, rpm: Option<u32>, tps: Option<u32>) -> Result<(), String> {
+        self.add_named(key, None, rpm, tps)
+    }
+
+    /// Adds one key under a name. Keys with the same name share their cache scope.
+    ///
+    /// # Errors
+    ///
+    /// When the key is already there.
+    pub fn add_named(
+        &mut self,
+        key: &str,
+        name: Option<&str>,
+        rpm: Option<u32>,
+        tps: Option<u32>,
+    ) -> Result<(), String> {
         let hash = blake3::hash(key.as_bytes());
         if self.keys.iter().any(|k| k.hash == hash) {
             return Err("the same key is given twice".into());
         }
-        self.keys.push(Key { hash, rpm, tps });
+        let scope = match name {
+            Some(n) => {
+                *blake3::Hasher::new().update(b"name\0").update(n.as_bytes()).finalize().as_bytes()
+            }
+            None => *blake3::Hasher::new()
+                .update(b"key\0")
+                .update(hash.as_bytes())
+                .finalize()
+                .as_bytes(),
+        };
+        self.keys.push(Key { hash, scope, rpm, tps });
         Ok(())
+    }
+
+    /// Every key in one cache scope when `on`, so a state one caller sent is found for all.
+    #[must_use]
+    pub fn shared_cache(mut self, on: bool) -> Self {
+        self.shared_cache = on;
+        self
+    }
+
+    /// The cache scope of the key at `at`, `None` for the one shared scope when there are no keys
+    /// or the cache is shared.
+    pub(crate) fn scope(&self, at: usize) -> Option<[u8; 32]> {
+        if self.shared_cache {
+            return None;
+        }
+        self.keys.get(at).map(|k| k.scope)
     }
 
     /// laya-serve's `LAYA_API_KEY`: one key, and laya-serve's single 401 for a missing or wrong

@@ -479,8 +479,8 @@ struct Item<'a> {
 }
 
 impl Item<'_> {
-    fn key(&self) -> cache::Key {
-        AnswerCache::key(&self.seq, self.q.qtype.index() as u8)
+    fn key(&self, scope: Option<&[u8; 32]>) -> cache::Key {
+        AnswerCache::key(scope, &self.seq, self.q.qtype.index() as u8)
     }
 
     fn fill(&mut self, e: Entry) {
@@ -697,12 +697,13 @@ impl Compat {
         }
         let parsed = [parse(&req.to_json(), &Limits::LAYA).ok()?];
         let mut items = self.lay_out(&parsed).ok()?;
-        let keys: Vec<_> = items.iter().map(Item::key).collect();
+        let scope = req.cache_scope.as_ref();
+        let keys: Vec<_> = items.iter().map(|it| it.key(scope)).collect();
         for (it, e) in items.iter_mut().zip(cache.all(&keys)?) {
             it.fill(e);
         }
         let mut joint = self.reranks(&parsed, &items);
-        let keys: Vec<_> = joint.iter().map(Item::key).collect();
+        let keys: Vec<_> = joint.iter().map(|it| it.key(scope)).collect();
         for (it, e) in joint.iter_mut().zip(cache.all(&keys)?) {
             it.fill(e);
         }
@@ -897,7 +898,8 @@ impl Compat {
     /// to run, and every item's key, none when the cache is off.
     fn look_up(&self, reqs: &[Request], items: &mut [Item<'_>]) -> (Vec<usize>, Vec<cache::Key>) {
         let Some(c) = &self.inner.cache else { return ((0..items.len()).collect(), Vec::new()) };
-        let keys: Vec<_> = items.iter().map(Item::key).collect();
+        let keys: Vec<_> =
+            items.iter().map(|it| it.key(reqs[it.req].cache_scope.as_ref())).collect();
         let look: Vec<usize> =
             (0..items.len()).filter(|&i| mode(&reqs[items[i].req]) == CacheMode::Use).collect();
         let found = c.get(&look.iter().map(|&i| keys[i]).collect::<Vec<_>>());

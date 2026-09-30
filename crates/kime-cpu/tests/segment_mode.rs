@@ -178,6 +178,26 @@ fn a_small_budget_changes_only_the_work() {
 }
 
 #[test]
+fn scopes_do_not_share_segments() {
+    let Some(tok) = tokenizer() else { return };
+    let spec = V1Spec::from_json(&config(128, 2, 64, 3, 1, 1)).unwrap();
+    let t = load(&spec);
+    let split = Split::new(&spec, &V1Graph::bind(&spec, &t).unwrap(), &t, 4);
+    let segs = segments(&tok, &spec, &trace()[0]);
+    let segs: Vec<&[u32]> = segs.iter().map(Vec::as_slice).collect();
+    let mut cache = SegmentCache::default();
+    let a = split.state_segments_in(Some(&[1; 32]), &segs, &mut cache);
+    let computed = cache.tokens_computed;
+    // Another scope finds none of them and computes every token again, to the same bits.
+    let b = split.state_segments_in(Some(&[2; 32]), &segs, &mut cache);
+    assert_eq!(cache.tokens_computed, 2 * computed);
+    assert_eq!((a.states, a.kv), (b.states, b.kv));
+    // The first scope finds all of its own.
+    let _ = split.state_segments_in(Some(&[1; 32]), &segs, &mut cache);
+    assert_eq!(cache.tokens_computed, 2 * computed);
+}
+
+#[test]
 fn segment_bench() {
     if std::env::var_os("KIME_SEGMENT_BENCH").is_none() {
         return;

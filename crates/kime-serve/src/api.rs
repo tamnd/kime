@@ -171,7 +171,7 @@ async fn request_id(mut req: HttpRequest, next: Next) -> HttpResponse {
 
 /// Checks the key and the rate limits in front of the `/v1` routes, and charges the tokens of the
 /// answer afterwards.
-async fn guard(req: HttpRequest, next: Next) -> HttpResponse {
+async fn guard(mut req: HttpRequest, next: Next) -> HttpResponse {
     let Some(s) = req.extensions().get::<Shared>().cloned() else { return next.run(req).await };
     let header = req.headers().get(header::AUTHORIZATION).map(HeaderValue::as_bytes);
     let at = s.auth.check(header).and_then(|at| s.buckets[at].admit().map(|()| at));
@@ -184,11 +184,21 @@ async fn guard(req: HttpRequest, next: Next) -> HttpResponse {
             return denied(d, s.auth.laya_style());
         }
     };
+    req.extensions_mut().insert(CacheScope(s.auth.scope(at)));
     let res = next.run(req).await;
     if let Some(v) = res.extensions().get::<Served>() {
         s.buckets[at].charge(v.tokens);
     }
     res
+}
+
+/// The caller's cache scope, from its key.
+#[derive(Debug, Clone, Copy)]
+struct CacheScope(Option<[u8; 32]>);
+
+/// The scope a handler gives its requests: the one `guard` found, or the shared one.
+fn scope(s: Option<Extension<CacheScope>>) -> Option<[u8; 32]> {
+    s.and_then(|Extension(CacheScope(sc))| sc)
 }
 
 /// Jev's 403, 401 and 429, or laya-serve's 401 when the key came from `LAYA_API_KEY`.
@@ -525,6 +535,7 @@ fn messages(p: &[Problem]) -> String {
 async fn systemone(
     Extension(s): Extension<Shared>,
     Extension(id): Extension<RequestId>,
+    caller: Option<Extension<CacheScope>>,
     body: Body,
 ) -> HttpResponse {
     let start = Instant::now();
@@ -553,6 +564,7 @@ async fn systemone(
         Err(p) if laya => return detail(StatusCode::UNPROCESSABLE_ENTITY, messages(&p)),
         Err(p) => return invalid(&p),
     };
+    req.cache_scope = scope(caller);
     let o = match opts(body.get("kime")) {
         Ok(o) => o,
         Err(p) => return invalid(&p),
@@ -641,6 +653,7 @@ fn timing(h: &mut HeaderMap, done: &Done, total: Duration) {
 async fn batch(
     Extension(s): Extension<Shared>,
     Extension(id): Extension<RequestId>,
+    caller: Option<Extension<CacheScope>>,
     body: Body,
 ) -> HttpResponse {
     let start = Instant::now();
@@ -668,6 +681,7 @@ async fn batch(
         }
     };
     // Each item is parsed alone and fails alone. The good ones share the forward passes.
+    let sc = scope(caller);
     let mut ids = Vec::with_capacity(items.len());
     let mut slots: Vec<Result<usize, Value>> = Vec::with_capacity(items.len());
     let mut good = Vec::new();
@@ -687,7 +701,8 @@ async fn batch(
             _ => parse(item, &Limits::JEV),
         };
         slots.push(match parsed {
-            Ok(r) => {
+            Ok(mut r) => {
+                r.cache_scope = sc;
                 good.push(r);
                 Ok(good.len() - 1)
             }

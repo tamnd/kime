@@ -47,6 +47,10 @@ Multiple GPUs: each device has its own scheduler. A request goes to the device w
 - Eviction: LRU with a byte budget. The default is 25% of free device memory at start, or 1 GiB on CPU. It can be set with `--state-cache`. With the s tier's 2 KiB per token, 1 GiB holds about 500k state tokens.
 - In agent loops and multi call workflows this is what turns a 5k token state into a question tower only call. The TypeSafe cookbooks' "13 questions in one call is 10x faster than 13 calls" becomes true for separate calls too, as long as they share the state.
 
+### Cache scopes
+
+A cache hit is fast, so a shared cache would let one caller time a request and learn whether some other caller sent the same state. So every cache key, for states, segments and answers, also holds the caller's scope, and a request only finds what was kept for its own scope. In the server the scope comes from the API key: keys with the same name in the keys file share one, and a key with no name has its own. `--shared-cache` (`shared_cache = true`, `KIME_SHARED_CACHE=1`) puts every key in one scope, for a deployment where all the callers trust each other and want each other's hits. With no keys the server cannot tell callers apart and they all share one scope. In the library, `Request::cache_scope` is `None`, the shared scope, unless the program sets it.
+
 ### Answer cache
 
 - Key: `blake3(model id, version, state tokens, question tower row tokens, calibration version, kime options)`.
@@ -162,6 +166,7 @@ jev_aliases = true
 api_keys_file = "/run/secrets/kime-keys"
 rpm = 600
 tps = 20000
+shared_cache = false
 log_level = "info"
 ```
 

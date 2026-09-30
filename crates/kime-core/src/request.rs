@@ -110,6 +110,12 @@ pub struct Request {
     pub questions: Vec<Question>,
     /// The `kime` extension object, not yet interpreted.
     pub kime: Option<Map<String, Value>>,
+    /// Who the engine's caches are kept for. Requests with different scopes never find each
+    /// other's cached states, segments or answers, so one caller cannot tell from the time taken
+    /// whether another sent the same state. `None` is the shared scope, which a program that is
+    /// its own only caller can keep. It is not part of the JSON: the server sets it from the
+    /// caller's API key.
+    pub cache_scope: Option<[u8; 32]>,
 }
 
 /// What a request asks about: text, or any JSON value, which is rendered the way the model
@@ -155,7 +161,13 @@ impl Request {
     /// A request about `state` with no questions yet.
     #[must_use]
     pub fn new(state: impl Into<State>) -> Self {
-        Request { state: state.into().0, model: None, questions: Vec::new(), kime: None }
+        Request {
+            state: state.into().0,
+            model: None,
+            questions: Vec::new(),
+            kime: None,
+            cache_scope: None,
+        }
     }
 
     /// Adds a question, or replaces the one with the same id where it stands, as a repeated key
@@ -453,7 +465,11 @@ pub fn parse(body: &Value, limits: &Limits) -> Result<Request, Vec<Problem>> {
         }
     }
 
-    if p.0.is_empty() { Ok(Request { state, model, questions, kime }) } else { Err(p.0) }
+    if p.0.is_empty() {
+        Ok(Request { state, model, questions, kime, cache_scope: None })
+    } else {
+        Err(p.0)
+    }
 }
 
 fn question(id: &str, q: &Value, limits: &Limits, p: &mut Problems) -> Option<Question> {

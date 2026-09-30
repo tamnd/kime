@@ -19,7 +19,7 @@ All bodies are UTF-8 JSON. Requests may be gzip or zstd compressed with `Content
 
 ## Authentication
 
-Keys are configured with `--api-keys-file` (one key per line as `key [name [rpm [tps]]]`, with `-` for the server default and `#` for comments), or the `KIME_API_KEYS` env var (comma separated). Clients send `Authorization: Bearer <key>` on every `/v1` route. `/health`, `/ready` and `/metrics` need no key. When no keys are configured, auth is off and the server logs a warning at start if it is bound to a non-loopback address. The error bodies match Jev exactly:
+Keys are configured with `--api-keys-file` (one key per line as `key [name [rpm [tps]]]`, with `-` for the server default and `#` for comments, where keys with the same name share their cache scope as spec/11-serving.md says), or the `KIME_API_KEYS` env var (comma separated). Clients send `Authorization: Bearer <key>` on every `/v1` route. `/health`, `/ready` and `/metrics` need no key. When no keys are configured, auth is off and the server logs a warning at start if it is bound to a non-loopback address. The error bodies match Jev exactly:
 
 - Missing header: `403` with `{"detail":{"error_type":"authentication_error","message":"Must supply an API key! Check your request and try again."}}`
 - Unknown key: `401` with `{"detail":{"error_type":"authentication_error","message":"Cannot authenticate with the server. Please check your API key and try again."}}`

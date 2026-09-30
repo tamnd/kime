@@ -1,8 +1,10 @@
 //! The answer cache from spec/11-serving.md. A question's answer depends only on its own row of
 //! token ids, its option markers and its type, since every question is its own sequence and the
 //! engine gives the same bits whatever else is in the batch. So one entry is the logits and the
-//! act head output of one row, keyed by the blake3 of what went to the device. The answer JSON is
-//! built from them again on a hit, which keeps the labels the request sent.
+//! act head output of one row, keyed by the blake3 of what went to the device and the request's
+//! cache scope. The answer JSON is built from them again on a hit, which keeps the labels the
+//! request sent. A request only finds answers kept for its own scope, so one caller cannot learn
+//! from the time taken what another asked.
 //!
 //! Each cache belongs to one loaded model, so the model, its version and its precision are part
 //! of the key without being hashed. Eviction keeps two generations: new entries go in the young
@@ -89,8 +91,12 @@ impl AnswerCache {
         }
     }
 
-    pub(crate) fn key(seq: &CompatSequence, qtype: u8) -> Key {
+    pub(crate) fn key(scope: Option<&[u8; 32]>, seq: &CompatSequence, qtype: u8) -> Key {
         let mut h = blake3::Hasher::new();
+        match scope {
+            Some(sc) => h.update(&[1]).update(sc),
+            None => h.update(&[0]),
+        };
         h.update(&[qtype]);
         h.update(&(seq.ids.len() as u64).to_le_bytes());
         for id in &seq.ids {
