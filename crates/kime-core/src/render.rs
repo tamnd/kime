@@ -3,7 +3,8 @@
 //! Only the compat family is here for now. It reproduces what Laya 0.3.7 feeds its tokenizer
 //! (`build_sequence`, `render_options`, `render_criterion` and `serialize_state` in
 //! `laya/common.py`, and `Agent._to_internal`), because a single differing space changes the ids.
-//! The native family renders differently (spec/06-input.md) and arrives with the native models.
+//! The native family renders differently (spec/06-input.md). Its state rendering is here, whole
+//! and in segments. Its questions arrive with the native models.
 
 use serde_json::Value;
 
@@ -99,6 +100,63 @@ pub fn compat_state(state: &Value, mask: &str) -> String {
     s.replace(mask, " ")
 }
 
+/// The native state text: a string as it is, anything else as compact JSON with raw Unicode.
+#[must_use]
+pub fn native_state(state: &Value) -> String {
+    match state {
+        Value::String(s) => s.clone(),
+        v => json(v),
+    }
+}
+
+fn json(v: &Value) -> String {
+    serde_json::to_string(v).expect("a Value always serializes")
+}
+
+/// The native state text cut into segments for segment mode, each tokenized and cached on its
+/// own. Every top level key of an object is a segment, and so is every element of an array,
+/// whether the array is the state or the value of a top level key. The punctuation between
+/// segments goes at the start of the next one, and the closing brackets at the end form the last
+/// segment, so the segments join to exactly [`native_state`], and appending an element or a key
+/// leaves every earlier segment as it was. A string or scalar state is one segment.
+#[must_use]
+pub fn native_segments(state: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut pending = String::new();
+    let array = |a: &[Value], pending: &mut String, out: &mut Vec<String>| {
+        pending.push('[');
+        for (j, e) in a.iter().enumerate() {
+            if j > 0 {
+                pending.push(',');
+            }
+            pending.push_str(&json(e));
+            out.push(std::mem::take(pending));
+        }
+        pending.push(']');
+    };
+    match state {
+        Value::Object(m) if !m.is_empty() => {
+            for (i, (k, v)) in m.iter().enumerate() {
+                pending.push(if i == 0 { '{' } else { ',' });
+                pending.push_str(&json(&Value::String(k.clone())));
+                pending.push(':');
+                match v {
+                    Value::Array(a) if !a.is_empty() => array(a, &mut pending, &mut out),
+                    v => {
+                        pending.push_str(&json(v));
+                        out.push(std::mem::take(&mut pending));
+                    }
+                }
+            }
+            pending.push('}');
+        }
+        Value::Array(a) if !a.is_empty() => array(a, &mut pending, &mut out),
+        v => pending = native_state(v),
+    }
+    out.push(pending);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,6 +166,42 @@ mod tests {
     fn render(q: Value) -> CompatText {
         let r = parse(&json!({"state": "", "questions": {"q": q}}), &Limits::LAYA).unwrap();
         compat_question(&r.questions[0], "[MASK]")
+    }
+
+    #[test]
+    fn segments_join_to_the_state() {
+        let state = json!({"page": {"url": "u", "text": "東京 \"a\""}, "elements": [{"id": 1}, "x", [2]],
+            "empty": [], "recent_actions": ["a", "b"], "n": null});
+        let segs = native_segments(&state);
+        assert_eq!(
+            segs,
+            [
+                r#"{"page":{"url":"u","text":"東京 \"a\""}"#,
+                r#","elements":[{"id":1}"#,
+                r#","x""#,
+                r#",[2]"#,
+                r#"],"empty":[]"#,
+                r#","recent_actions":["a""#,
+                r#","b""#,
+                r#"],"n":null"#,
+                "}",
+            ]
+        );
+        assert_eq!(segs.concat(), native_state(&state));
+        let mut more = state.clone();
+        more["recent_actions"].as_array_mut().unwrap().push(json!("c"));
+        let after = native_segments(&more);
+        assert_eq!(after.len(), segs.len() + 1);
+        assert!(segs.iter().all(|s| after.contains(s)), "an old segment changed");
+        for (v, want) in [
+            (json!("plain"), vec!["plain"]),
+            (json!([1, 2]), vec!["[1", ",2", "]"]),
+            (json!({}), vec!["{}"]),
+            (json!([]), vec!["[]"]),
+            (json!(3.5), vec!["3.5"]),
+        ] {
+            assert_eq!(native_segments(&v), want, "{v}");
+        }
     }
 
     #[test]

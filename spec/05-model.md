@@ -90,14 +90,14 @@ Design points:
 - **Chunking.** A question with more than 32 options is split into chunks of at most 32 option segments. Every chunk carries the same header. Chunks of one question are independent rows in the batch. See 04 for how they are merged.
 - **Pooled state embedding.** The mean of `S` over state tokens, L2 normalized. Used for shortlisting and returned by `return_embedding`.
 - **Positions.** State tokens take positions 0 to n-1, and a local state layer sees the tokens within window/2 on either side, as in ModernBERT. In a question chunk the header takes positions 0 to h-1 and every option segment starts again at h, and its first token is its marker. Cross attention scales by 1/sqrt(64) like self attention.
-- **Weight names.** A `kime-v1` checkpoint's `model.safetensors` holds `state.embeddings.tok_embeddings.weight`, `state.embeddings.norm.weight`, `state.layers.N.{attn_norm,attn.Wqkv,attn.Wo,mlp_norm,mlp.Wi,mlp.Wo}.weight` in ModernBERT's shapes (layer 0 has no `attn_norm`), `state.final_norm.weight`, `type_emb.weight` [3, d], `question.layers.N.{attn_norm,attn.Wqkv,attn.Wo,cross_norm,cross.Wq,cross.Wk,cross.Wv,cross.Wo,mlp_norm,mlp.Wi,mlp.Wo}.weight` with `cross.Wk` and `cross.Wv` of shape [128, d], `question.final_norm.weight`, `ord_emb.weight` [d, 4], `scorer.norm.weight`, `scorer.Wa.weight` [d, d], `scorer.Wb.weight` [1, d] and `scorer.type_bias` [3]. Linears and norms have no bias. The loader rejects missing, extra and wrongly shaped tensors and names each one.
+- **Weight names.** A `kime-v1` checkpoint's `model.safetensors` holds `state.embeddings.tok_embeddings.weight`, `state.embeddings.norm.weight`, `state.layers.N.{attn_norm,attn.Wqkv,attn.Wo,mlp_norm,mlp.Wi,mlp.Wo}.weight` in ModernBERT's shapes (layer 0 has no `attn_norm`), `state.final_norm.weight`, `type_emb.weight` [3, d], `question.layers.N.{attn_norm,attn.Wqkv,attn.Wo,cross_norm,cross.Wq,cross.Wk,cross.Wv,cross.Wo,mlp_norm,mlp.Wi,mlp.Wo}.weight` with `cross.Wk` and `cross.Wv` of shape [128, d], `question.final_norm.weight`, `ord_emb.weight` [d, 4], `scorer.norm.weight`, `scorer.Wa.weight` [d, d], `scorer.Wb.weight` [1, d], `scorer.type_bias` [3] and `state.segment_emb.weight` [max_segments, d]. Linears and norms have no bias. The loader rejects missing, extra and wrongly shaped tensors and names each one.
 
 ### Segmented state encoding
 
 Agent loops send nearly the same state every step: the same page with one field changed, plus one more history entry. Recomputing 5k tokens every step wastes most of the work. With `state_segments` on, an object state is split into segments at its top level keys (arrays are split at elements). Long segments are split every 1,024 tokens. The state tower then runs in two parts:
 
 - Layers 0 to N_s - g - 1 use a block diagonal mask, so every token sees only its own segment, with positions restarting per segment. Each segment's output at layer N_s - g is a pure function of that segment's tokens, and it is cached under `blake3(model, segment tokens)`.
-- The top g layers (g = 3 for the s tier, one global and two local) run over the concatenation of all segments with the normal mask, plus a learned segment index embedding added at layer N_s - g.
+- The top g layers (g = 3 for the s tier, one global and two local) run over the concatenation of all segments with the normal mask and positions 0 to n-1, plus a learned segment index embedding added at layer N_s - g. The embedding has `max_segments` rows (512 for released models), and segments past the last row share it.
 
 An agent step with one changed segment then costs the low layers on that segment, plus g layers on the full state, plus the question tower. For the Google Flights trace, that is about 20% of the full state tower cost (see the estimate in 13). The model is trained with segment mode on for half of the batches, so it works well either way, and `auto` turns it on for object states over 1,024 tokens.
 
@@ -142,7 +142,7 @@ Each checkpoint directory (or single `.kime` file, see 07) has a `kime.json`:
   "version": "1.0.0",
   "tokenizer": {"kind": "bpe-bytelevel", "file": "tokenizer.json", "cls": 50281, "sep": 50282, "pad": 50283, "specials": {"opt": 50368, "no": 50369, "yes": 50370, "cls_s": 50371, "cls_q": 50372}},
   "dims": {"d": 512, "heads": 8, "head_dim": 64, "inter": 1344, "vocab": 50373},
-  "state_tower": {"layers": 12, "global_every": 3, "window": 128, "rope_theta_global": 160000, "rope_theta_local": 10000, "segment_top_layers": 3, "max_tokens": 32768},
+  "state_tower": {"layers": 12, "global_every": 3, "window": 128, "rope_theta_global": 160000, "rope_theta_local": 10000, "segment_top_layers": 3, "max_tokens": 32768, "max_segments": 512},
   "question_tower": {"layers": 4, "kv_heads": 2, "max_options_per_chunk": 32, "max_tokens": 4096},
   "gelu": "erf",
   "norm_eps": 1e-5,

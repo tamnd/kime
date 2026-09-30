@@ -3173,8 +3173,11 @@ dependencies = [
 name = "kime-cpu"
 version = "0.1.7"
 dependencies = [
+ "blake3",
+ "kime-core",
  "kime-model",
  "kime-tensor",
+ "kime-tok",
  "libm",
  "serde_json",
 ]

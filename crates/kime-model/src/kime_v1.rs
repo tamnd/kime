@@ -25,6 +25,11 @@
 //! token sees the header, its own segment and every marker. Question layers attend globally with
 //! the global RoPE base.
 //!
+//! In segment mode the state is a list of segments. The state layers below the top
+//! `segment_top_layers` run on each segment alone, with positions from 0, so a segment's output
+//! there depends only on its own tokens and can be cached. Then `segment_emb[index]` is added to
+//! every token of each segment and the top layers run over all of them with positions 0 to n - 1.
+//!
 //! Every linear and LayerNorm has no bias, as in ModernBERT. The state tower and the embedding use
 //! ModernBERT's tensor names under `state.`, so a ModernBERT or Ettin checkpoint maps onto them.
 
@@ -82,6 +87,8 @@ pub struct V1Spec {
     pub segment_top_layers: usize,
     /// Longest state.
     pub state_max_tokens: usize,
+    /// Rows of the segment index embedding. Later segments use the last row.
+    pub max_segments: usize,
     /// Question tower layers.
     pub question_layers: usize,
     /// Key and value heads of the cross attention.
@@ -156,6 +163,10 @@ impl V1Spec {
                 "kime.json: segment_top_layers {segment_top_layers} is more than the {state_layers} state layers"
             )));
         }
+        let max_segments = usize_at(v, "/state_tower/max_segments")?;
+        if max_segments == 0 {
+            return Err(Error::format("kime.json: max_segments is 0".to_string()));
+        }
         let specials = Specials {
             cls: u32_at(v, "/tokenizer/cls")?,
             sep: u32_at(v, "/tokenizer/sep")?,
@@ -190,6 +201,7 @@ impl V1Spec {
             rope_local: f64_at(v, "/state_tower/rope_theta_local")?,
             segment_top_layers,
             state_max_tokens: usize_at(v, "/state_tower/max_tokens")?,
+            max_segments,
             question_layers: usize_at(v, "/question_tower/layers")?,
             kv_heads,
             max_options: usize_at(v, "/question_tower/max_options_per_chunk")?,
@@ -245,6 +257,7 @@ impl V1Spec {
         put("scorer.Wa.weight".into(), &[d, d]);
         put("scorer.Wb.weight".into(), &[1, d]);
         put("scorer.type_bias".into(), &[3]);
+        put("state.segment_emb.weight".into(), &[self.max_segments, d]);
         out
     }
 }
@@ -300,6 +313,7 @@ pub struct V1Graph {
     pub scorer_a: W,
     pub scorer_b: W,
     pub type_bias: W,
+    pub segment_emb: W,
 }
 
 impl V1Graph {
@@ -362,8 +376,25 @@ impl V1Graph {
             scorer_a: w("scorer.Wa.weight"),
             scorer_b: w("scorer.Wb.weight"),
             type_bias: w("scorer.type_bias"),
+            segment_emb: w("state.segment_emb.weight"),
         })
     }
+}
+
+/// Longest segment in segment mode. Longer segments are cut at this many tokens.
+pub const SEGMENT_MAX_TOKENS: usize = 1024;
+
+/// The segments the state tower reads in segment mode, from the token ids of each segment text:
+/// `[CLS_S]` and `[SEP]` as segments of their own around them, empty segments left out and long
+/// ones cut every [`SEGMENT_MAX_TOKENS`] tokens.
+#[must_use]
+pub fn state_segments(spec: &V1Spec, segments: &[Vec<u32>]) -> Vec<Vec<u32>> {
+    let mut out = vec![vec![spec.specials.cls_s]];
+    for s in segments {
+        out.extend(s.chunks(SEGMENT_MAX_TOKENS).map(<[u32]>::to_vec));
+    }
+    out.push(vec![spec.specials.sep]);
+    out
 }
 
 /// Seeded random weights for every tensor of `spec`, in [`V1Spec::expected`] order, for tests
@@ -420,7 +451,8 @@ mod tests {
                 "specials": {"opt": 3, "no": 4, "yes": 5, "cls_s": 6, "cls_q": 7}},
             "dims": {"d": 256, "heads": 4, "head_dim": 64, "inter": 320, "vocab": 400},
             "state_tower": {"layers": 4, "global_every": 3, "window": 16, "rope_theta_global": 160000.0,
-                "rope_theta_local": 10000.0, "segment_top_layers": 3, "max_tokens": 1024},
+                "rope_theta_local": 10000.0, "segment_top_layers": 3, "max_tokens": 1024,
+                "max_segments": 64},
             "question_tower": {"layers": 2, "kv_heads": 2, "max_options_per_chunk": 32, "max_tokens": 512},
             "gelu": "erf", "norm_eps": 1e-5
         })
@@ -471,6 +503,17 @@ mod tests {
         let mut v = tiny();
         v["tokenizer"]["specials"]["cls_q"] = json!(400);
         assert!(V1Spec::from_json(&v).unwrap_err().to_string().contains("past the vocabulary"));
+    }
+
+    #[test]
+    fn segment_layout() {
+        let spec = V1Spec::from_json(&tiny()).unwrap();
+        let long: Vec<u32> = (0..2500).map(|i| 8 + i % 300).collect();
+        let segs = state_segments(&spec, &[vec![9, 10], vec![], long.clone()]);
+        let lens: Vec<usize> = segs.iter().map(Vec::len).collect();
+        assert_eq!(lens, [1, 2, 1024, 1024, 452, 1]);
+        assert_eq!((segs[0][0], segs[5][0]), (6, 2));
+        assert_eq!(segs[2..5].concat(), long);
     }
 
     #[test]

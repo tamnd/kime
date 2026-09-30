@@ -13,11 +13,14 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+blake3.workspace = true
 kime-model.workspace = true
 kime-tensor.workspace = true
 libm.workspace = true
 
 [dev-dependencies]
+kime-core.workspace = true
+kime-tok.workspace = true
 serde_json.workspace = true
 
 # Without libtest's harness, whose own threads allocate (its 60 second warning, for one) while
