@@ -5,6 +5,7 @@ Notable changes, newest first. The project is pre-1.0 and makes no compatibility
 ## Unreleased
 
 - A choice whose options do not fit one sequence is scored in chunks of up to 32 options with the same question header, and when it has more than 16 options its best 16 are scored again together, as spec/04-semantics.md describes (#46). `kime.chunk` in a request sets the chunk size. A choice that fits is still scored in one pass, so Laya's answers do not change. Before this such a question failed with `TooLong`.
+- `kime eval --gate` runs the model behaviour tests of spec/15-testing.md after the quality suites and fails when any misses its threshold (#47): order flips, score mirror, noul polarity, level coverage, label neutrality, chunk consistency and, with `--baseline`, calibration regression against the previous release's results.json. It writes gate.md and gate.json. Laya fails 14 of the 27 checks that ran, including score mirror at 0.200 on SST-5 and noul polarity at 0 on phishing (tools/eval/results/2026-09-30-gate).
 
 ## 0.1.6
 

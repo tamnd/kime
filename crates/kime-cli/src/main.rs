@@ -11,6 +11,7 @@ use std::process::ExitCode;
 mod contam;
 mod convert;
 mod eval;
+mod gate;
 mod predict;
 mod pull;
 mod serve;
