@@ -89,6 +89,8 @@ Design points:
 - **Type embedding.** Added to every question tower token. There are three rows, one per type.
 - **Chunking.** A question with more than 32 options is split into chunks of at most 32 option segments. Every chunk carries the same header. Chunks of one question are independent rows in the batch. See 04 for how they are merged.
 - **Pooled state embedding.** The mean of `S` over state tokens, L2 normalized. Used for shortlisting and returned by `return_embedding`.
+- **Positions.** State tokens take positions 0 to n-1, and a local state layer sees the tokens within window/2 on either side, as in ModernBERT. In a question chunk the header takes positions 0 to h-1 and every option segment starts again at h, and its first token is its marker. Cross attention scales by 1/sqrt(64) like self attention.
+- **Weight names.** A `kime-v1` checkpoint's `model.safetensors` holds `state.embeddings.tok_embeddings.weight`, `state.embeddings.norm.weight`, `state.layers.N.{attn_norm,attn.Wqkv,attn.Wo,mlp_norm,mlp.Wi,mlp.Wo}.weight` in ModernBERT's shapes (layer 0 has no `attn_norm`), `state.final_norm.weight`, `type_emb.weight` [3, d], `question.layers.N.{attn_norm,attn.Wqkv,attn.Wo,cross_norm,cross.Wq,cross.Wk,cross.Wv,cross.Wo,mlp_norm,mlp.Wi,mlp.Wo}.weight` with `cross.Wk` and `cross.Wv` of shape [128, d], `question.final_norm.weight`, `ord_emb.weight` [d, 4], `scorer.norm.weight`, `scorer.Wa.weight` [d, d], `scorer.Wb.weight` [1, d] and `scorer.type_bias` [3]. Linears and norms have no bias. The loader rejects missing, extra and wrongly shaped tensors and names each one.
 
 ### Segmented state encoding
 

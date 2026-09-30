@@ -2,6 +2,10 @@
 
 Notable changes, newest first. The project is pre-1.0 and makes no compatibility promise until it does. The minor version is the number of milestones finished, per [CONTRIBUTING.md](CONTRIBUTING.md), and the milestones are the issues at https://github.com/tamnd/kime/milestones.
 
+## Unreleased
+
+- kime-model loads the kime-v1 split encoder of spec/05-model.md from its `kime.json` and weights, and names every missing, extra or wrongly shaped tensor, and kime-cpu runs it: the state tower once per state with its per layer K and V memory and pooled embedding, and the question tower per chunk with the question mask, grouped cross attention, ordinal embedding and scorer (#40). tools/ref/kime_ref.py is an independent float64 numpy forward of the same spec. On seeded random weights kime matches it on all 20 rows within 1.1e-7 on logits and 3.4e-8 on probabilities, well inside the 1e-4 and 1e-5 of spec/15-testing.md, and breaking the local window, the marker mask or the ordinal features in the reference fails the test.
+
 ## 0.1.7
 
 - A choice whose options do not fit one sequence is scored in chunks of up to 32 options with the same question header, and when it has more than 16 options its best 16 are scored again together, as spec/04-semantics.md describes (#46). `kime.chunk` in a request sets the chunk size. A choice that fits is still scored in one pass, so Laya's answers do not change. Before this such a question failed with `TooLong`.

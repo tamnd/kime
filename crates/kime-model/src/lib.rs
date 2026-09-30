@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 mod error;
+pub mod kime_v1;
 pub mod laya;
 mod model;
 pub mod pack;

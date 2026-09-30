@@ -10,6 +10,8 @@ These scripts produce the numbers kime is checked against. They need PyTorch and
 
 `laya_tensors.py` builds Laya's `DecisionModel` from each checkpoint's own configs, the way `laya.Agent` does, and writes every parameter name and shape to `crates/kime-model/tests/fixtures/laya-tensors.json`, along with each tensor's dtype, sum and first four values as the safetensors library reads them. The loader test in `kime-model` checks its graph and its f16 reading against that file. The script also times `laya.Agent` loading on the CPU, best of three: 0.27 seconds for English and 1.57 seconds for multilingual on the i9-13900K.
 
+`kime_ref.py` is a forward of the kime-v1 split encoder written from spec/05-model.md in float64 numpy, and needs nothing else. There are no trained kime-v1 weights yet, so it draws the same seeded random weights as `kime_model::kime_v1::random_weights` for a tiny config (d 256, 4 state layers, 2 question layers) and writes `crates/kime-cpu/tests/fixtures/kime-v1-random.json`: 4 states of 2 to 99 tokens and 20 question rows, with choices of 1, 3 and 12 options, a 5 level score and a noul. The kime-cpu test `kime_v1_parity` runs the same rows through the CPU forward. Run it with `python3 tools/ref/kime_ref.py`, which takes under a second.
+
 ## Regenerating
 
 ```
