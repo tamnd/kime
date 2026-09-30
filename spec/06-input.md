@@ -74,7 +74,7 @@ The native family has two separate inputs.
 ```
 
 - A string state is tokenized as is. An object or array state is rendered to compact JSON.
-- In segment mode, each top level key becomes a segment, `"key":value`. Arrays split at elements. Segments longer than 1,024 tokens are split at token boundaries. Each segment is tokenized separately, so it can be cached separately. The segment list and each segment's token count are part of the plan.
+- In segment mode, each top level key becomes a segment, `"key":value`. Arrays split at elements, both an array state and an array under a top level key, so an agent's `elements` and `recent_actions` are one segment per entry. The commas and brackets between segments go at the start of the next segment and the closing brackets form the last one, so the segments join to exactly the compact JSON and appending an entry leaves the earlier segments unchanged. `[CLS_S]` and `[SEP]` are segments of their own. Segments longer than 1,024 tokens are split at token boundaries. Each segment is tokenized separately, so it can be cached separately. The segment list and each segment's token count are part of the plan.
 - If the state is longer than the model's `max_tokens` (32,768 for released models), it is truncated by the strategy in `kime.truncation`. `middle` keeps the first and last halves and inserts a `[CUT]` special token. Truncation is reported in the extension block and counted in a Prometheus counter. It is never silent.
 
 ### Question tower input

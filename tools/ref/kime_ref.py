@@ -25,7 +25,7 @@ CONFIG = {
                   "specials": {"opt": 3, "no": 4, "yes": 5, "cls_s": 6, "cls_q": 7}},
     "dims": {"d": 256, "heads": 4, "head_dim": 64, "inter": 320, "vocab": 400},
     "state_tower": {"layers": 4, "global_every": 3, "window": 16, "rope_theta_global": 160000.0,
-                    "rope_theta_local": 10000.0, "segment_top_layers": 3, "max_tokens": 1024},
+                    "rope_theta_local": 10000.0, "segment_top_layers": 3, "max_tokens": 1024, "max_segments": 4},
     "question_tower": {"layers": 2, "kv_heads": 2, "max_options_per_chunk": 32, "max_tokens": 512},
     "gelu": "erf", "norm_eps": 1e-5,
 }
@@ -53,7 +53,8 @@ def names(c):
                 (p + ".mlp_norm.weight", [d]), (p + ".mlp.Wi.weight", [2 * inter, d]),
                 (p + ".mlp.Wo.weight", [d, inter])]
     out += [("question.final_norm.weight", [d]), ("ord_emb.weight", [d, 4]), ("scorer.norm.weight", [d]),
-            ("scorer.Wa.weight", [d, d]), ("scorer.Wb.weight", [1, d]), ("scorer.type_bias", [3])]
+            ("scorer.Wa.weight", [d, d]), ("scorer.Wb.weight", [1, d]), ("scorer.type_bias", [3]),
+            ("state.segment_emb.weight", [c["state_tower"]["max_segments"], d])]
     return out
 
 
@@ -152,17 +153,40 @@ class Model:
         o = attend(q, k, v, allowed).reshape(t, d)
         return h + o @ self.w[p + ".attn.Wo.weight"].T
 
-    def state(self, ids):
-        t = len(ids)
-        h = self.embed(ids)
-        pos = np.arange(t)
-        near = np.abs(pos[:, None] - pos[None, :]) <= self.half
-        for i, glob in enumerate(self.global_):
+    def layers(self, h, which, pos, seg):
+        """State layers `which` on h, where a token sees only tokens of the same seg and, on a
+        local layer, only those within window/2 positions of it."""
+        pos, seg = np.asarray(pos), np.asarray(seg)
+        same = seg[:, None] == seg[None, :]
+        near = same & (np.abs(pos[:, None] - pos[None, :]) <= self.half)
+        for i in which:
+            glob = self.global_[i]
             p = "state.layers.%d" % i
             x = h if i == 0 else ln(h, self.w[p + ".attn_norm.weight"], self.eps)
-            allowed = np.ones((t, t), bool) if glob else near
-            h = self.self_attn(h, p, x, pos, self.theta_g if glob else self.theta_l, allowed)
+            h = self.self_attn(h, p, x, pos, self.theta_g if glob else self.theta_l, same if glob else near)
             h = self.mlp(h, p)
+        return h
+
+    def state(self, ids):
+        t = len(ids)
+        h = self.layers(self.embed(ids), range(len(self.global_)), np.arange(t), np.zeros(t))
+        return self.memory(h)
+
+    def state_segments(self, segments):
+        """Segment mode: the low layers per segment with positions from 0, then the segment index
+        embedding, then the top layers over all tokens with positions 0 to n - 1."""
+        n_s = len(self.global_)
+        low = n_s - self.c["state_tower"]["segment_top_layers"]
+        rows = self.c["state_tower"]["max_segments"]
+        parts = []
+        for i, g in enumerate(segments):
+            h = self.layers(self.embed(np.array(g)), range(low), np.arange(len(g)), np.zeros(len(g)))
+            parts.append(h + self.w["state.segment_emb.weight"][min(i, rows - 1)])
+        h = np.concatenate(parts)
+        t = h.shape[0]
+        return self.memory(self.layers(h, range(low, n_s), np.arange(t), np.zeros(t)))
+
+    def memory(self, h):
         s = ln(h, self.w["state.final_norm.weight"], self.eps)
         mem = []
         for j in range(self.c["question_tower"]["layers"]):
@@ -234,6 +258,19 @@ def cases(c):
                 options = [[sp["opt"]] + word(int(rng.integers(1, 9))) + [sep] for _ in range(k)]
             rows.append({"qtype": qtype, "header": header, "options": options})
         out.append({"state": state, "rows": rows})
+    # Segment mode: a lone [CLS_S] and [SEP] around the content, segments shorter and longer than
+    # the window, one segment repeated, and more segments than the embedding has rows.
+    for lens in [[5], [30, 3, 12], [7, 20, 7, 1, 9]]:
+        content = [[sp["cls_s"]]] + [word(n) for n in lens] + [[sep]]
+        if len(lens) == 5:
+            content[3] = content[1]
+        rows = []
+        for qtype, k in [(0, 4), (1, 3), (2, 2)]:
+            header = [sp["cls_q"]] + word(int(rng.integers(3, 12))) + [sep]
+            mark = [sp["no"], sp["yes"]] if qtype == 2 else [sp["opt"]] * k
+            rows.append({"qtype": qtype, "header": header,
+                         "options": [[m] + word(int(rng.integers(0, 6))) + [sep] for m in mark]})
+        out.append({"segments": content, "rows": rows})
     return out
 
 
@@ -242,7 +279,10 @@ def main():
     model = Model(CONFIG, w)
     out = []
     for case in cases(CONFIG):
-        mem, pooled = model.state(np.array(case["state"]))
+        if "segments" in case:
+            mem, pooled = model.state_segments(case["segments"])
+        else:
+            mem, pooled = model.state(np.array(case["state"]))
         for r in case["rows"]:
             r["logits"] = [float(x) for x in model.question(mem, r["qtype"], r["header"], r["options"])]
         case["pooled"] = [float(x) for x in pooled]
@@ -254,7 +294,8 @@ def main():
         json.dump(doc, f, separators=(",", ":"))
         f.write("\n")
     rows = sum(len(c["rows"]) for c in out)
-    print("%d states and %d question rows to %s" % (len(out), rows, os.path.relpath(OUT)))
+    seg = sum("segments" in c for c in out)
+    print("%d states, %d of them in segment mode, and %d question rows to %s" % (len(out), seg, rows, os.path.relpath(OUT)))
 
 
 if __name__ == "__main__":

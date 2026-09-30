@@ -3,7 +3,7 @@
 //! fixture holds only token ids and outputs. The bounds are the CPU tolerances of
 //! spec/15-testing.md: logits within 1e-4, probabilities within 1e-5 and argmax on every row.
 
-use kime_cpu::split::{Row, Split};
+use kime_cpu::split::{Row, SegmentCache, Split};
 use kime_model::kime_v1::{V1Graph, V1Spec, random_weights};
 use kime_model::{Tensors, safetensors};
 use kime_tensor::Blob;
@@ -62,8 +62,25 @@ fn kime_v1_parity() {
     let graph = V1Graph::bind(&spec, &t).unwrap();
     let split = Split::new(&spec, &graph, &t, 2);
     let (mut logit, mut prob, mut pool, mut rows) = (0f64, 0f64, 0f64, 0);
+    let mut cache = SegmentCache::default();
     for case in fx["cases"].as_array().unwrap() {
-        let mem = split.state(&ids(&case["state"]));
+        let mem = match case.get("segments") {
+            Some(g) => {
+                let segs: Vec<Vec<u32>> = g.as_array().unwrap().iter().map(ids).collect();
+                let segs: Vec<&[u32]> = segs.iter().map(Vec::as_slice).collect();
+                cache.reset_counts();
+                let mem = split.state_segments(&segs, &mut cache);
+                let distinct = segs.iter().collect::<std::collections::HashSet<_>>().len();
+                // Every case shares [CLS_S] and [SEP] with the ones before it.
+                assert!(cache.misses <= distinct && cache.misses + cache.hits == segs.len());
+                cache.reset_counts();
+                let again = split.state_segments(&segs, &mut cache);
+                assert_eq!((cache.hits, cache.misses), (segs.len(), 0));
+                assert_eq!(again.states, mem.states, "a cached segment gives other bits");
+                mem
+            }
+            None => split.state(&ids(&case["state"])),
+        };
         for (a, b) in mem.pooled.iter().zip(nums(&case["pooled"])) {
             pool = pool.max((f64::from(*a) - b).abs());
         }

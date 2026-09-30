@@ -2,13 +2,16 @@
 //! [`kime_model::kime_v1`] describe it.
 //!
 //! [`Split::state`] runs the state tower once and keeps the state memory, the keys and values of
-//! every question layer. [`Split::question`] runs one question row against a state memory. This
+//! every question layer. [`Split::state_segments`] does the same in segment mode, taking the
+//! output of the low layers from a [`SegmentCache`] for every segment it has seen before. [`Split::question`] runs one question row against a state memory. This
 //! is the plain forward the reference is checked against: state layers use the packed attention
 //! of the compat path, and the question tower's masked self attention and cross attention are
 //! computed directly, row by row. Batching rows and fused kernels come with the scheduler.
 
+use std::collections::HashMap;
+
 use kime_model::Tensors;
-use kime_model::kime_v1::{HEAD_DIM, ORD_FEATURES, V1Graph, V1Spec};
+use kime_model::kime_v1::{HEAD_DIM, ORD_FEATURES, StateLayer, V1Graph, V1Spec};
 
 use crate::attention::attention;
 use crate::gemm::linear;
@@ -38,6 +41,48 @@ pub struct Row<'a> {
     pub header: &'a [u32],
     /// `[OPT] option [SEP]` for each option, or `[NO] ...` and `[YES] ...` for a noul.
     pub options: &'a [Vec<u32>],
+}
+
+/// The output of the low state layers of segments, keyed by the blake3 of the model id and the
+/// segment's token ids, with counts of what was found and what had to be computed.
+#[derive(Debug, Default)]
+pub struct SegmentCache {
+    map: HashMap<[u8; 32], Vec<f32>>,
+    /// Segments found in the cache.
+    pub hits: usize,
+    /// Segments computed.
+    pub misses: usize,
+    /// Tokens the low layers ran on.
+    pub tokens_computed: usize,
+}
+
+impl SegmentCache {
+    /// Segments held.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Whether no segment is held.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    /// Clears the counts and keeps the entries.
+    pub fn reset_counts(&mut self) {
+        (self.hits, self.misses, self.tokens_computed) = (0, 0, 0);
+    }
+}
+
+fn segment_key(model: &str, ids: &[u32]) -> [u8; 32] {
+    let mut h = blake3::Hasher::new();
+    h.update(&(model.len() as u64).to_le_bytes());
+    h.update(model.as_bytes());
+    ids.iter().for_each(|id| {
+        h.update(&id.to_le_bytes());
+    });
+    *h.finalize().as_bytes()
 }
 
 /// A kime-v1 checkpoint ready to run on the CPU.
@@ -102,36 +147,38 @@ impl Split {
         add(h, &self.linear(&act, s.inter, wo));
     }
 
-    /// Runs the state tower over `[CLS_S] state [SEP]` and builds the state memory.
-    ///
-    /// # Panics
-    ///
-    /// If a token id is past the vocabulary.
-    #[must_use]
-    pub fn state(&self, ids: &[u32]) -> Memory {
+    /// Runs `layers` on `h` in place. `cu` holds the sequence boundaries, as in [`attention`],
+    /// and `pos` the position of every token.
+    fn layers(&self, h: &mut [f32], layers: &[StateLayer], pos: &[usize], cu: &[usize]) {
         let s = &self.spec;
-        let (d, t) = (s.d, ids.len());
-        let mut h = self.embed(ids);
-        let ropes = [Rope::new(s.rope_global, HEAD_DIM, t), Rope::new(s.rope_local, HEAD_DIM, t)];
+        let (d, t) = (s.d, pos.len());
+        let len = pos.iter().max().map_or(0, |m| m + 1);
+        let ropes =
+            [Rope::new(s.rope_global, HEAD_DIM, len), Rope::new(s.rope_local, HEAD_DIM, len)];
         let mut att = vec![0f32; t * d];
-        for layer in &self.graph.state {
+        for layer in layers {
             let x = match layer.attn_norm {
-                Some(n) => self.norm(&h, n),
-                None => h.clone(),
+                Some(n) => self.norm(h, n),
+                None => h.to_vec(),
             };
             let mut qkv = self.linear(&x, d, layer.wqkv);
             let rope = &ropes[usize::from(!layer.global)];
-            for (pos, row) in qkv.chunks_exact_mut(3 * d).enumerate() {
+            for (row, &p) in qkv.chunks_exact_mut(3 * d).zip(pos) {
                 for head in row[..2 * d].as_chunks_mut::<HEAD_DIM>().0 {
-                    rope.apply(head, pos);
+                    rope.apply(head, p);
                 }
             }
             let window = (!layer.global).then_some(s.window / 2);
-            attention(&qkv, s.heads, &[0, t], window, &mut att, self.threads);
-            add(&mut h, &self.linear(&att, d, layer.wo));
-            self.mlp(&mut h, layer.mlp_norm, layer.wi, layer.mlp_wo);
+            attention(&qkv, s.heads, cu, window, &mut att, self.threads);
+            add(h, &self.linear(&att, d, layer.wo));
+            self.mlp(h, layer.mlp_norm, layer.wi, layer.mlp_wo);
         }
-        let states = self.norm(&h, self.graph.state_norm);
+    }
+
+    /// The final norm, the keys and values of every question layer and the pooled embedding.
+    fn memory(&self, h: &[f32]) -> Memory {
+        let d = self.spec.d;
+        let states = self.norm(h, self.graph.state_norm);
         let kv = self
             .graph
             .question
@@ -145,7 +192,76 @@ impl Split {
         let len = pooled.iter().map(|v| v * v).sum::<f64>().sqrt();
         let pooled =
             pooled.iter().map(|v| if len > 0.0 { (v / len) as f32 } else { 0.0 }).collect();
-        Memory { tokens: t, states, kv, pooled }
+        Memory { tokens: h.len() / d, states, kv, pooled }
+    }
+
+    /// Runs the state tower over `[CLS_S] state [SEP]` and builds the state memory.
+    ///
+    /// # Panics
+    ///
+    /// If a token id is past the vocabulary.
+    #[must_use]
+    pub fn state(&self, ids: &[u32]) -> Memory {
+        let t = ids.len();
+        let mut h = self.embed(ids);
+        let pos: Vec<usize> = (0..t).collect();
+        self.layers(&mut h, &self.graph.state, &pos, &[0, t]);
+        self.memory(&h)
+    }
+
+    /// Runs the state tower in segment mode. The low layers run on each segment alone, with
+    /// positions from 0, and only for segments `cache` does not hold. Then every token gets its
+    /// segment's index embedding and the top `segment_top_layers` run over the whole state.
+    ///
+    /// # Panics
+    ///
+    /// If a segment is empty or a token id is past the vocabulary.
+    #[must_use]
+    pub fn state_segments(&self, segments: &[&[u32]], cache: &mut SegmentCache) -> Memory {
+        let s = &self.spec;
+        let d = s.d;
+        assert!(segments.iter().all(|g| !g.is_empty()), "a state segment is empty");
+        let low = s.state_layers - s.segment_top_layers;
+        let keys: Vec<[u8; 32]> = segments.iter().map(|g| segment_key(&s.id, g)).collect();
+
+        // The low layers on every segment not in the cache, all in one packed pass. A segment
+        // that occurs twice is computed once.
+        let mut todo: Vec<usize> = Vec::new();
+        for (i, k) in keys.iter().enumerate() {
+            if cache.map.contains_key(k) || todo.iter().any(|&j| keys[j] == *k) {
+                cache.hits += 1;
+            } else {
+                todo.push(i);
+            }
+        }
+        if !todo.is_empty() {
+            let ids: Vec<u32> = todo.iter().flat_map(|&i| segments[i].iter().copied()).collect();
+            let pos: Vec<usize> = todo.iter().flat_map(|&i| 0..segments[i].len()).collect();
+            let mut cu = vec![0];
+            todo.iter().for_each(|&i| cu.push(cu[cu.len() - 1] + segments[i].len()));
+            let mut h = self.embed(&ids);
+            self.layers(&mut h, &self.graph.state[..low], &pos, &cu);
+            for (n, &i) in todo.iter().enumerate() {
+                cache.map.insert(keys[i], h[cu[n] * d..cu[n + 1] * d].to_vec());
+            }
+            cache.misses += todo.len();
+            cache.tokens_computed += ids.len();
+        }
+
+        // The top layers over the whole state.
+        let seg = self.w(self.graph.segment_emb);
+        let mut h = Vec::with_capacity(segments.iter().map(|g| g.len()).sum::<usize>() * d);
+        for (i, k) in keys.iter().enumerate() {
+            let row = i.min(s.max_segments - 1);
+            let e = &seg[row * d..(row + 1) * d];
+            let at = h.len();
+            h.extend_from_slice(&cache.map[k]);
+            h[at..].chunks_exact_mut(d).for_each(|r| add(r, e));
+        }
+        let t = h.len() / d;
+        let pos: Vec<usize> = (0..t).collect();
+        self.layers(&mut h, &self.graph.state[low..], &pos, &[0, t]);
+        self.memory(&h)
     }
 
     /// The option logits of one question row against `mem`.
