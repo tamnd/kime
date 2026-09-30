@@ -108,7 +108,7 @@ A batch is padded up to its bucket's token count with a dummy zero-length tail, 
 
 ## Weight format and loading
 
-The native checkpoint format is a directory with `kime.json`, `tokenizer.json`, `calibration.json` and `weights.safetensors`. `kime convert --pack` produces a single `.kime` file: a 4 KiB header (magic `KIME\x01`, JSON offsets) followed by the same contents, with every tensor aligned to 4 KiB so it can be mmapped straight into device-friendly layouts.
+The native checkpoint format is a directory with `kime.json`, `tokenizer.json`, `calibration.json` and `model.safetensors`. `kime convert --pack` produces a single `.kime` file: a 4 KiB header (magic `KIME\x01`, JSON offsets) followed by the same contents, with every tensor aligned to 4 KiB so it can be mmapped straight into device-friendly layouts.
 
 Load path, with a target of 200 ms or less for `kime-v1-s-en` on an L4 or an M3:
 

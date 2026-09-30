@@ -2,7 +2,8 @@
 //!
 //! What is here today is the compat path end to end: open a Laya checkpoint, lay each question out
 //! as Laya does, run the questions of one or many requests in shared batches on the CPU or a CUDA
-//! GPU, and build Laya's answers from the logits. The scheduler that merges requests from many
+//! GPU, and build Laya's answers from the logits. kime-v1 checkpoints run on the CPU: the state tower
+//! once per distinct state, kept in a state cache, and the question rows against it. The scheduler that merges requests from many
 //! callers arrives with the server, so for now a call runs on the caller's thread and callers
 //! share the device through a lock.
 //!
@@ -30,6 +31,7 @@ use serde_json::Value;
 mod cache;
 mod chunk;
 pub mod hub;
+mod native;
 mod split;
 
 use cache::{AnswerCache, Entry};
@@ -181,6 +183,19 @@ impl Builder {
     pub fn build(self) -> Result<Kime, Error> {
         let name = self.model.unwrap_or_else(|| "laya".into());
         let path = hub::resolve(&name).map_err(Error::NotFound)?;
+        if path.is_dir() && native::is_native(&path) {
+            let threads = match self.device {
+                Device::Auto => 0,
+                Device::Cpu { threads } => threads,
+                d => {
+                    return Err(Error::Unsupported(format!(
+                        "kime-v1 runs on the CPU for now, not on {d:?}"
+                    )));
+                }
+            };
+            let n = native::Native::open(&path, threads)?;
+            return Ok(Kime { imp: Imp::Native(Arc::new(n)) });
+        }
         let model = Model::open(&path).map_err(Error::Model)?;
         let tok_json = model
             .file("tokenizer/tokenizer.json")
@@ -201,22 +216,24 @@ impl Builder {
         let embed_buckets = Buckets::default().stage(EMBED_STAGE).to_vec();
         let (weights, plans) = runner.memory();
         Ok(Kime {
-            inner: Arc::new(Inner {
-                id: model.spec.id.clone(),
-                mask: tok.mask_text().to_string(),
-                tok,
-                budget,
-                temps,
-                buckets,
-                embed_buckets,
-                d: model.spec.encoder.d,
-                memory: [AtomicUsize::new(weights), AtomicUsize::new(plans)],
-                cache: (self.answer_cache > 0).then(|| AnswerCache::new(self.answer_cache)),
-                runner: Mutex::new(Session {
-                    runner,
-                    embed,
-                    buf: BatchBuf::default(),
-                    out: Outputs::default(),
+            imp: Imp::Compat(Compat {
+                inner: Arc::new(Inner {
+                    id: model.spec.id.clone(),
+                    mask: tok.mask_text().to_string(),
+                    tok,
+                    budget,
+                    temps,
+                    buckets,
+                    embed_buckets,
+                    d: model.spec.encoder.d,
+                    memory: [AtomicUsize::new(weights), AtomicUsize::new(plans)],
+                    cache: (self.answer_cache > 0).then(|| AnswerCache::new(self.answer_cache)),
+                    runner: Mutex::new(Session {
+                        runner,
+                        embed,
+                        buf: BatchBuf::default(),
+                        out: Outputs::default(),
+                    }),
                 }),
             }),
         })
@@ -395,12 +412,25 @@ struct Inner {
 /// A loaded model on a device. Clones share it, and it can be used from any thread.
 #[derive(Clone)]
 pub struct Kime {
+    imp: Imp,
+}
+
+/// The two families: Laya's compat path and kime-v1.
+#[derive(Clone)]
+enum Imp {
+    Compat(Compat),
+    Native(Arc<native::Native>),
+}
+
+/// A Laya checkpoint on a device.
+#[derive(Clone)]
+struct Compat {
     inner: Arc<Inner>,
 }
 
 impl fmt::Debug for Kime {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Kime").field("model", &self.inner.id).finish_non_exhaustive()
+        f.debug_struct("Kime").field("model", &self.model_id()).finish_non_exhaustive()
     }
 }
 
@@ -419,6 +449,8 @@ pub struct Timing {
     pub cut_tokens: usize,
     /// Questions answered from the answer cache, which took no device time.
     pub cached: usize,
+    /// State tower passes, for kime-v1: states the state cache did not hold.
+    pub states: usize,
 }
 
 /// Bytes a model holds on its device.
@@ -485,36 +517,52 @@ impl Kime {
         Builder::default()
     }
 
-    /// The model's name, `laya` or `laya-multilingual` for the published checkpoints.
+    /// The model's name: `laya` or `laya-multilingual` for the published Laya checkpoints, and
+    /// the `id` of `kime.json` for kime-v1.
     #[must_use]
     pub fn model_id(&self) -> &str {
-        &self.inner.id
+        match &self.imp {
+            Imp::Compat(c) => c.model_id(),
+            Imp::Native(n) => &n.id,
+        }
     }
 
     /// The device the model runs on, in words.
     #[must_use]
     pub fn device(&self) -> String {
-        self.lock().runner.describe()
+        match &self.imp {
+            Imp::Compat(c) => c.device(),
+            Imp::Native(n) => n.device(),
+        }
     }
 
     /// The most tokens one question's row can hold: the state, the question and its options.
-    /// Longer states are cut to fit.
+    /// Longer states are cut to fit. For kime-v1 it is the state tower's limit, since the
+    /// question rows read the state separately.
     #[must_use]
     pub fn max_row_tokens(&self) -> usize {
-        self.inner.budget.max_len
+        match &self.imp {
+            Imp::Compat(c) => c.max_row_tokens(),
+            Imp::Native(n) => n.max_state_tokens(),
+        }
     }
 
     /// The bytes the model holds on its device, as of the last forward pass.
     #[must_use]
     pub fn memory(&self) -> Memory {
-        let m = &self.inner.memory;
-        Memory { weights: m[0].load(Ordering::Relaxed), plans: m[1].load(Ordering::Relaxed) }
+        match &self.imp {
+            Imp::Compat(c) => c.memory(),
+            Imp::Native(n) => Memory { weights: n.weights(), plans: 0 },
+        }
     }
 
     /// The answer cache's counts, all 0 when it is off.
     #[must_use]
     pub fn cache_stats(&self) -> CacheStats {
-        self.inner.cache.as_ref().map(AnswerCache::stats).unwrap_or_default()
+        match &self.imp {
+            Imp::Compat(c) => c.cache_stats(),
+            Imp::Native(_) => CacheStats::default(),
+        }
     }
 
     /// The answer to `req` when the answer cache holds every one of its questions, found without
@@ -522,27 +570,10 @@ impl Kime {
     /// then nothing is counted, since the request goes on to [`Kime::decide_batch`].
     #[must_use]
     pub fn cached(&self, req: &Request) -> Option<Response> {
-        let cache = self.inner.cache.as_ref()?;
-        if mode(req) != CacheMode::Use || req.questions.is_empty() {
-            return None;
+        match &self.imp {
+            Imp::Compat(c) => c.cached(req),
+            Imp::Native(_) => None,
         }
-        let parsed = [parse(&req.to_json(), &Limits::LAYA).ok()?];
-        let mut items = self.lay_out(&parsed).ok()?;
-        let keys: Vec<_> = items.iter().map(Item::key).collect();
-        for (it, e) in items.iter_mut().zip(cache.all(&keys)?) {
-            it.fill(e);
-        }
-        let mut joint = self.reranks(&parsed, &items);
-        let keys: Vec<_> = joint.iter().map(Item::key).collect();
-        for (it, e) in joint.iter_mut().zip(cache.all(&keys)?) {
-            it.fill(e);
-        }
-        items.append(&mut joint);
-        self.respond(&parsed, &items).pop()
-    }
-
-    fn lock(&self) -> std::sync::MutexGuard<'_, Session> {
-        self.inner.runner.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// The tokens a request holds before anything is cut: its state once plus every question
@@ -550,14 +581,10 @@ impl Kime {
     /// is queued.
     #[must_use]
     pub fn count_tokens(&self, req: &Request) -> usize {
-        let inner = &*self.inner;
-        let mut n = inner.tok.encode(&compat_state(&req.state, &inner.mask)).len();
-        for q in &req.questions {
-            let text = compat_question(q, &inner.mask);
-            n += inner.tok.encode(&text.head).len();
-            n += text.options.iter().map(|o| inner.tok.encode(o).len()).sum::<usize>();
+        match &self.imp {
+            Imp::Compat(c) => c.count_tokens(req),
+            Imp::Native(n) => n.count_tokens(req),
         }
-        n
     }
 
     /// Answers one request.
@@ -586,6 +613,131 @@ impl Kime {
     ///
     /// As [`Kime::decide_batch`].
     pub fn decide_batch_timed(&self, reqs: &[Request]) -> Result<(Vec<Response>, Timing), Error> {
+        match &self.imp {
+            Imp::Compat(c) => c.decide_batch_timed(reqs),
+            Imp::Native(n) => n.decide_batch_timed(reqs),
+        }
+    }
+
+    /// Each text's encoder output mean pooled over its tokens, as Laya's `embed_fn_from_agent`
+    /// computes it: `[CLS]`, the text cut to `max_length` tokens with the specials, `[SEP]`. It
+    /// runs no decision head. Each row is as wide as the encoder. For kime-v1 it is the pooled
+    /// state memory of the text read as a string state.
+    ///
+    /// # Errors
+    ///
+    /// Device errors, and [`Error::Unsupported`] on a backend without the pooled graph or in
+    /// INT8, which puts some rows far from Laya's.
+    pub fn embed(&self, texts: &[&str], max_length: usize) -> Result<Vec<Vec<f32>>, Error> {
+        match &self.imp {
+            Imp::Compat(c) => c.embed(texts, max_length),
+            Imp::Native(n) => Ok(n.embed(texts, max_length)),
+        }
+    }
+
+    /// [`Kime::decide`] on a thread of its own, for async callers. It works with any executor,
+    /// since it needs nothing from one but a waker.
+    #[must_use]
+    pub fn decide_async(&self, req: &Request) -> Decision {
+        let shared = Arc::new(Mutex::new((None, None::<Waker>)));
+        let (kime, req, done) = (self.clone(), req.clone(), shared.clone());
+        std::thread::spawn(move || {
+            let r = kime.decide(&req);
+            let mut g = done.lock().unwrap_or_else(PoisonError::into_inner);
+            g.0 = Some(r);
+            if let Some(w) = g.1.take() {
+                w.wake();
+            }
+        });
+        Decision { shared }
+    }
+}
+
+impl Compat {
+    /// The model's name, `laya` or `laya-multilingual` for the published checkpoints.
+    #[must_use]
+    pub(crate) fn model_id(&self) -> &str {
+        &self.inner.id
+    }
+
+    /// The device the model runs on, in words.
+    #[must_use]
+    pub(crate) fn device(&self) -> String {
+        self.lock().runner.describe()
+    }
+
+    /// The most tokens one question's row can hold: the state, the question and its options.
+    /// Longer states are cut to fit.
+    #[must_use]
+    pub(crate) fn max_row_tokens(&self) -> usize {
+        self.inner.budget.max_len
+    }
+
+    /// The bytes the model holds on its device, as of the last forward pass.
+    #[must_use]
+    pub(crate) fn memory(&self) -> Memory {
+        let m = &self.inner.memory;
+        Memory { weights: m[0].load(Ordering::Relaxed), plans: m[1].load(Ordering::Relaxed) }
+    }
+
+    /// The answer cache's counts, all 0 when it is off.
+    #[must_use]
+    pub(crate) fn cache_stats(&self) -> CacheStats {
+        self.inner.cache.as_ref().map(AnswerCache::stats).unwrap_or_default()
+    }
+
+    /// The answer to `req` when the answer cache holds every one of its questions, found without
+    /// the device lock, so the server can answer it without queueing it. `None` otherwise, and
+    /// then nothing is counted, since the request goes on to [`Kime::decide_batch`].
+    #[must_use]
+    pub(crate) fn cached(&self, req: &Request) -> Option<Response> {
+        let cache = self.inner.cache.as_ref()?;
+        if mode(req) != CacheMode::Use || req.questions.is_empty() {
+            return None;
+        }
+        let parsed = [parse(&req.to_json(), &Limits::LAYA).ok()?];
+        let mut items = self.lay_out(&parsed).ok()?;
+        let keys: Vec<_> = items.iter().map(Item::key).collect();
+        for (it, e) in items.iter_mut().zip(cache.all(&keys)?) {
+            it.fill(e);
+        }
+        let mut joint = self.reranks(&parsed, &items);
+        let keys: Vec<_> = joint.iter().map(Item::key).collect();
+        for (it, e) in joint.iter_mut().zip(cache.all(&keys)?) {
+            it.fill(e);
+        }
+        items.append(&mut joint);
+        self.respond(&parsed, &items).pop()
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, Session> {
+        self.inner.runner.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The tokens a request holds before anything is cut: its state once plus every question
+    /// with its options. The server refuses a request over its limit with this count, before it
+    /// is queued.
+    #[must_use]
+    pub(crate) fn count_tokens(&self, req: &Request) -> usize {
+        let inner = &*self.inner;
+        let mut n = inner.tok.encode(&compat_state(&req.state, &inner.mask)).len();
+        for q in &req.questions {
+            let text = compat_question(q, &inner.mask);
+            n += inner.tok.encode(&text.head).len();
+            n += text.options.iter().map(|o| inner.tok.encode(o).len()).sum::<usize>();
+        }
+        n
+    }
+
+    /// [`Kime::decide_batch`], and where the time went.
+    ///
+    /// # Errors
+    ///
+    /// As [`Kime::decide_batch`].
+    pub(crate) fn decide_batch_timed(
+        &self,
+        reqs: &[Request],
+    ) -> Result<(Vec<Response>, Timing), Error> {
         let t0 = Instant::now();
         let mut parsed = Vec::with_capacity(reqs.len());
         for r in reqs {
@@ -609,6 +761,7 @@ impl Kime {
             truncated: cut.clone().filter(|&n| n > 0).count(),
             cut_tokens: cut.sum(),
             cached,
+            states: 0,
         };
         Ok((self.respond(&parsed, &items), timing))
     }
@@ -839,7 +992,7 @@ impl Kime {
     ///
     /// Device errors, and [`Error::Unsupported`] on a backend without the pooled graph or in
     /// INT8, which puts some rows far from Laya's.
-    pub fn embed(&self, texts: &[&str], max_length: usize) -> Result<Vec<Vec<f32>>, Error> {
+    pub(crate) fn embed(&self, texts: &[&str], max_length: usize) -> Result<Vec<Vec<f32>>, Error> {
         let inner = &*self.inner;
         if self.lock().runner.int8() {
             // On 125 texts the worst row had a cosine of 0.53 to Laya's, too far to shortlist on.
@@ -877,23 +1030,6 @@ impl Kime {
         inner.memory[0].store(weights, Ordering::Relaxed);
         inner.memory[1].store(plans, Ordering::Relaxed);
         Ok(rows)
-    }
-
-    /// [`Kime::decide`] on a thread of its own, for async callers. It works with any executor,
-    /// since it needs nothing from one but a waker.
-    #[must_use]
-    pub fn decide_async(&self, req: &Request) -> Decision {
-        let shared = Arc::new(Mutex::new((None, None::<Waker>)));
-        let (kime, req, done) = (self.clone(), req.clone(), shared.clone());
-        std::thread::spawn(move || {
-            let r = kime.decide(&req);
-            let mut g = done.lock().unwrap_or_else(PoisonError::into_inner);
-            g.0 = Some(r);
-            if let Some(w) = g.1.take() {
-                w.wake();
-            }
-        });
-        Decision { shared }
     }
 }
 

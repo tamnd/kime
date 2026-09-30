@@ -14,9 +14,10 @@ use kime_model::Tensors;
 use kime_model::kime_v1::{HEAD_DIM, ORD_FEATURES, StateLayer, V1Graph, V1Spec};
 
 use crate::attention::attention;
-use crate::gemm::linear;
+use crate::gemm::{Gemm, pack, scratch_len};
 use crate::ops::{Rope, add, geglu, gelu, layer_norm};
 use crate::par;
+use kime_tensor::Epilogue;
 
 /// What a question row reads from its state: the final state representation and, per question
 /// layer, its keys and values.
@@ -30,6 +31,9 @@ pub struct Memory {
     pub kv: Vec<(Vec<f32>, Vec<f32>)>,
     /// The mean of `states` over tokens, L2 normalized.
     pub pooled: Vec<f32>,
+    /// Per question layer and kv head, the keys `[tokens, 64]` and the values transposed
+    /// `[64, tokens]`, packed for the GEMM so every question reads them as they are.
+    pub cross: Vec<Vec<(Vec<f32>, Vec<f32>)>>,
 }
 
 /// One question row: a header and option segments, each starting with its marker token.
@@ -45,9 +49,16 @@ pub struct Row<'a> {
 
 /// The output of the low state layers of segments, keyed by the blake3 of the model id and the
 /// segment's token ids, with counts of what was found and what had to be computed.
-#[derive(Debug, Default)]
+///
+/// It holds at most its byte budget in two generations of half the budget each: new entries go
+/// in the young one, and when that is full the old one is dropped and the young one takes its
+/// place. A hit in the old generation moves the entry back.
+#[derive(Debug)]
 pub struct SegmentCache {
-    map: HashMap<[u8; 32], Vec<f32>>,
+    young: HashMap<[u8; 32], Vec<f32>>,
+    old: HashMap<[u8; 32], Vec<f32>>,
+    young_bytes: usize,
+    budget: usize,
     /// Segments found in the cache.
     pub hits: usize,
     /// Segments computed.
@@ -56,22 +67,72 @@ pub struct SegmentCache {
     pub tokens_computed: usize,
 }
 
+impl Default for SegmentCache {
+    fn default() -> Self {
+        Self::with_budget(usize::MAX)
+    }
+}
+
 impl SegmentCache {
+    /// A cache that holds at most `bytes` of segment outputs.
+    #[must_use]
+    pub fn with_budget(bytes: usize) -> Self {
+        Self {
+            young: HashMap::new(),
+            old: HashMap::new(),
+            young_bytes: 0,
+            budget: bytes,
+            hits: 0,
+            misses: 0,
+            tokens_computed: 0,
+        }
+    }
+
     /// Segments held.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.map.len()
+        self.young.len() + self.old.len()
     }
 
     /// Whether no segment is held.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
+        self.len() == 0
+    }
+
+    /// Bytes held, at most the budget.
+    #[must_use]
+    pub fn bytes(&self) -> usize {
+        self.young_bytes + self.old.values().map(|v| v.len() * 4).sum::<usize>()
     }
 
     /// Clears the counts and keeps the entries.
     pub fn reset_counts(&mut self) {
         (self.hits, self.misses, self.tokens_computed) = (0, 0, 0);
+    }
+
+    fn get(&mut self, k: &[u8; 32]) -> Option<Vec<f32>> {
+        if let Some(v) = self.young.get(k) {
+            return Some(v.clone());
+        }
+        let v = self.old.remove(k)?;
+        self.put(*k, v.clone());
+        Some(v)
+    }
+
+    fn put(&mut self, k: [u8; 32], v: Vec<f32>) {
+        let n = v.len() * 4;
+        if n > self.budget / 2 {
+            return;
+        }
+        if self.young_bytes + n > self.budget / 2 {
+            self.old = std::mem::take(&mut self.young);
+            self.young_bytes = 0;
+        }
+        self.young_bytes += n;
+        if let Some(old) = self.young.insert(k, v) {
+            self.young_bytes -= old.len() * 4;
+        }
     }
 }
 
@@ -91,15 +152,33 @@ pub struct Split {
     spec: V1Spec,
     graph: V1Graph,
     w: Vec<Vec<f32>>,
+    /// The rows of every weight, its first dimension.
+    rows: Vec<usize>,
     threads: usize,
 }
 
 impl Split {
-    /// Converts the weights to f32 on `threads` threads, which the forward uses too.
+    /// Converts the weights to f32 on `threads` threads, which the forward uses too. The
+    /// weights of the linears are packed for the GEMM once here, so a short question row does
+    /// not pay for it on every call.
     #[must_use]
     pub fn new(spec: &V1Spec, graph: &V1Graph, t: &Tensors, threads: usize) -> Self {
-        let w = par::map(t.entries().len(), threads, |i| t.view(i).to_f32());
-        Self { spec: spec.clone(), graph: graph.clone(), w, threads: threads.max(1) }
+        let g = graph;
+        let mut linears: Vec<usize> = vec![g.scorer_a, g.scorer_b];
+        for l in &g.state {
+            linears.extend([l.wqkv, l.wo, l.wi, l.mlp_wo]);
+        }
+        for l in &g.question {
+            linears
+                .extend([l.wqkv, l.wo, l.cross_q, l.cross_k, l.cross_v, l.cross_o, l.wi, l.mlp_wo]);
+        }
+        let w = par::map(t.entries().len(), threads, |i| {
+            let v = t.view(i).to_f32();
+            let shape = &t.entries()[i].shape;
+            if linears.contains(&i) { pack(&v, shape[0], shape[1]) } else { v }
+        });
+        let rows = t.entries().iter().map(|e| e.shape.first().copied().unwrap_or(1)).collect();
+        Self { spec: spec.clone(), graph: graph.clone(), w, rows, threads: threads.max(1) }
     }
 
     /// The checkpoint's configuration.
@@ -113,10 +192,15 @@ impl Split {
     }
 
     fn linear(&self, x: &[f32], k: usize, w: usize) -> Vec<f32> {
+        self.linear_on(x, k, w, self.threads)
+    }
+
+    /// `x wᵀ` for the packed weight `w` of `n` rows, `n` given since packing can pad.
+    fn linear_on(&self, x: &[f32], k: usize, w: usize, threads: usize) -> Vec<f32> {
         let m = x.len() / k;
-        let n = self.w[w].len() / k;
+        let n = self.rows[w];
         let mut y = vec![0f32; m * n];
-        linear(x, m, k, self.w(w), n, None, &mut y, self.threads);
+        gemm(x, m, k, self.w(w), n, &mut y, threads);
         y
     }
 
@@ -138,13 +222,13 @@ impl Split {
         self.norm(&h, self.graph.embed_norm)
     }
 
-    fn mlp(&self, h: &mut [f32], norm: usize, wi: usize, wo: usize) {
+    fn mlp(&self, h: &mut [f32], norm: usize, wi: usize, wo: usize, threads: usize) {
         let s = &self.spec;
         let x = self.norm(h, norm);
-        let u = self.linear(&x, s.d, wi);
+        let u = self.linear_on(&x, s.d, wi, threads);
         let mut act = vec![0f32; u.len() / 2];
         geglu(&u, s.inter, &mut act);
-        add(h, &self.linear(&act, s.inter, wo));
+        add(h, &self.linear_on(&act, s.inter, wo, threads));
     }
 
     /// Runs `layers` on `h` in place. `cu` holds the sequence boundaries, as in [`attention`],
@@ -171,7 +255,7 @@ impl Split {
             let window = (!layer.global).then_some(s.window / 2);
             attention(&qkv, s.heads, cu, window, &mut att, self.threads);
             add(h, &self.linear(&att, d, layer.wo));
-            self.mlp(h, layer.mlp_norm, layer.wi, layer.mlp_wo);
+            self.mlp(h, layer.mlp_norm, layer.wi, layer.mlp_wo, self.threads);
         }
     }
 
@@ -179,7 +263,7 @@ impl Split {
     fn memory(&self, h: &[f32]) -> Memory {
         let d = self.spec.d;
         let states = self.norm(h, self.graph.state_norm);
-        let kv = self
+        let kv: Vec<(Vec<f32>, Vec<f32>)> = self
             .graph
             .question
             .iter()
@@ -192,7 +276,29 @@ impl Split {
         let len = pooled.iter().map(|v| v * v).sum::<f64>().sqrt();
         let pooled =
             pooled.iter().map(|v| if len > 0.0 { (v / len) as f32 } else { 0.0 }).collect();
-        Memory { tokens: h.len() / d, states, kv, pooled }
+        let tokens = h.len() / d;
+        let kvw = self.spec.kv();
+        let cross = kv
+            .iter()
+            .map(|(k, v): &(Vec<f32>, Vec<f32>)| {
+                (0..self.spec.kv_heads)
+                    .map(|kh| {
+                        let mut kt = Vec::with_capacity(tokens * HEAD_DIM);
+                        let mut vt = vec![0f32; HEAD_DIM * tokens];
+                        for b in 0..tokens {
+                            kt.extend_from_slice(&k[b * kvw + kh * HEAD_DIM..][..HEAD_DIM]);
+                            for (c, &x) in
+                                v[b * kvw + kh * HEAD_DIM..][..HEAD_DIM].iter().enumerate()
+                            {
+                                vt[c * tokens + b] = x;
+                            }
+                        }
+                        (pack(&kt, tokens, HEAD_DIM), pack(&vt, HEAD_DIM, tokens))
+                    })
+                    .collect()
+            })
+            .collect();
+        Memory { tokens, states, kv, pooled, cross }
     }
 
     /// Runs the state tower over `[CLS_S] state [SEP]` and builds the state memory.
@@ -226,9 +332,13 @@ impl Split {
 
         // The low layers on every segment not in the cache, all in one packed pass. A segment
         // that occurs twice is computed once.
+        let mut outs: Vec<Option<Vec<f32>>> = vec![None; segments.len()];
         let mut todo: Vec<usize> = Vec::new();
         for (i, k) in keys.iter().enumerate() {
-            if cache.map.contains_key(k) || todo.iter().any(|&j| keys[j] == *k) {
+            if let Some(v) = cache.get(k) {
+                outs[i] = Some(v);
+                cache.hits += 1;
+            } else if todo.iter().any(|&j| keys[j] == *k) {
                 cache.hits += 1;
             } else {
                 todo.push(i);
@@ -242,7 +352,9 @@ impl Split {
             let mut h = self.embed(&ids);
             self.layers(&mut h, &self.graph.state[..low], &pos, &cu);
             for (n, &i) in todo.iter().enumerate() {
-                cache.map.insert(keys[i], h[cu[n] * d..cu[n + 1] * d].to_vec());
+                let v = h[cu[n] * d..cu[n + 1] * d].to_vec();
+                cache.put(keys[i], v.clone());
+                outs[i] = Some(v);
             }
             cache.misses += todo.len();
             cache.tokens_computed += ids.len();
@@ -255,7 +367,10 @@ impl Split {
             let row = i.min(s.max_segments - 1);
             let e = &seg[row * d..(row + 1) * d];
             let at = h.len();
-            h.extend_from_slice(&cache.map[k]);
+            // A repeat of a segment computed in this call takes the first one's output.
+            let first = keys.iter().position(|x| x == k).unwrap_or(i);
+            let out = outs[i].as_ref().or(outs[first].as_ref()).expect("found or computed above");
+            h.extend_from_slice(out);
             h[at..].chunks_exact_mut(d).for_each(|r| add(r, e));
         }
         let t = h.len() / d;
@@ -272,6 +387,24 @@ impl Split {
     /// empty.
     #[must_use]
     pub fn question(&self, mem: &Memory, row: Row<'_>) -> Vec<f32> {
+        self.question_on(mem, row, self.threads)
+    }
+
+    /// The option logits of many rows, each against its own memory. Rows are short, so they
+    /// run side by side on one thread each rather than one after another on all of them.
+    ///
+    /// # Panics
+    ///
+    /// As [`Split::question`].
+    #[must_use]
+    pub fn questions(&self, rows: &[(&Memory, Row<'_>)]) -> Vec<Vec<f32>> {
+        if rows.len() == 1 {
+            return vec![self.question(rows[0].0, rows[0].1)];
+        }
+        par::map(rows.len(), self.threads, |i| self.question_on(rows[i].0, rows[i].1, 1))
+    }
+
+    fn question_on(&self, mem: &Memory, row: Row<'_>, threads: usize) -> Vec<f32> {
         let s = &self.spec;
         let g = &self.graph;
         let d = s.d;
@@ -303,11 +436,10 @@ impl Split {
         let rope = Rope::new(s.rope_global, HEAD_DIM, pos.iter().max().map_or(0, |m| m + 1));
         let scale = 1.0 / (HEAD_DIM as f32).sqrt();
         let group = s.heads / s.kv_heads;
-        let kv = s.kv();
-        for (l, (k_mem, v_mem)) in g.question.iter().zip(&mem.kv) {
+        for (l, cross) in g.question.iter().zip(&mem.cross) {
             // Self attention under the question mask.
             let x = self.norm(&h, l.attn_norm);
-            let mut qkv = self.linear(&x, d, l.wqkv);
+            let mut qkv = self.linear_on(&x, d, l.wqkv, threads);
             for (i, r) in qkv.chunks_exact_mut(3 * d).enumerate() {
                 for head in r[..2 * d].as_chunks_mut::<HEAD_DIM>().0 {
                     rope.apply(head, pos[i]);
@@ -327,27 +459,46 @@ impl Split {
                     mix(&scores, vals, &mut att[a * d + hd * HEAD_DIM..][..HEAD_DIM]);
                 }
             }
-            add(&mut h, &self.linear(&att, d, l.wo));
+            add(&mut h, &self.linear_on(&att, d, l.wo, threads));
 
-            // Cross attention into the state memory, query heads grouped onto the kv heads.
+            // Cross attention into the state memory, query heads grouped onto the kv heads: for
+            // each kv head the scores of all its query heads are one GEMM against the packed
+            // keys, and the mix of values one more against the packed transposed values.
             let x = self.norm(&h, l.cross_norm);
-            let q = self.linear(&x, d, l.cross_q);
+            let q = self.linear_on(&x, d, l.cross_q, threads);
             let mut att = vec![0f32; t * d];
-            for a in 0..t {
-                for hd in 0..s.heads {
-                    let kh = hd / group;
-                    let qa = &q[a * d + hd * HEAD_DIM..][..HEAD_DIM];
-                    let scores: Vec<f32> = (0..mem.tokens)
-                        .map(|b| dot(qa, &k_mem[b * kv + kh * HEAD_DIM..][..HEAD_DIM]) * scale)
-                        .collect();
-                    let vals =
-                        (0..mem.tokens).map(|b| &v_mem[b * kv + kh * HEAD_DIM..][..HEAD_DIM]);
-                    mix(&scores, vals, &mut att[a * d + hd * HEAD_DIM..][..HEAD_DIM]);
+            let n = mem.tokens;
+            for (kh, (kp, vp)) in cross.iter().enumerate() {
+                let heads = kh * group..(kh + 1) * group;
+                let mut qs = Vec::with_capacity(group * t * HEAD_DIM);
+                for hd in heads.clone() {
+                    for a in 0..t {
+                        qs.extend(
+                            q[a * d + hd * HEAD_DIM..][..HEAD_DIM].iter().map(|&v| v * scale),
+                        );
+                    }
+                }
+                let m = group * t;
+                let mut p = vec![0f32; m * n];
+                gemm(&qs, m, HEAD_DIM, kp, n, &mut p, threads);
+                for row in p.chunks_exact_mut(n) {
+                    let top = row.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                    let e: Vec<f64> = row.iter().map(|&s| f64::from(s - top).exp()).collect();
+                    let z: f64 = e.iter().sum();
+                    row.iter_mut().zip(e).for_each(|(r, e)| *r = (e / z) as f32);
+                }
+                let mut o = vec![0f32; m * HEAD_DIM];
+                gemm(&p, m, n, vp, HEAD_DIM, &mut o, threads);
+                for (g, hd) in heads.enumerate() {
+                    for a in 0..t {
+                        att[a * d + hd * HEAD_DIM..][..HEAD_DIM]
+                            .copy_from_slice(&o[(g * t + a) * HEAD_DIM..][..HEAD_DIM]);
+                    }
                 }
             }
-            add(&mut h, &self.linear(&att, d, l.cross_o));
+            add(&mut h, &self.linear_on(&att, d, l.cross_o, threads));
 
-            self.mlp(&mut h, l.mlp_norm, l.wi, l.mlp_wo);
+            self.mlp(&mut h, l.mlp_norm, l.wi, l.mlp_wo, threads);
         }
         let hq = self.norm(&h, g.question_norm);
 
@@ -366,10 +517,10 @@ impl Split {
             m.extend_from_slice(&v);
         }
         let x = self.norm(&m, g.scorer_norm);
-        let mut a = self.linear(&x, d, g.scorer_a);
+        let mut a = self.linear_on(&x, d, g.scorer_a, threads);
         a.iter_mut().for_each(|v| *v = gelu(*v));
         let bias = self.w(g.type_bias)[row.qtype];
-        self.linear(&a, d, g.scorer_b).into_iter().map(|z| z + bias).collect()
+        self.linear_on(&a, d, g.scorer_b, threads).into_iter().map(|z| z + bias).collect()
     }
 }
 
@@ -387,13 +538,21 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// `out = softmax(scores) · values`, the softmax in f64.
+/// `y = x wᵀ` for `x` `[m, k]` and `w` `[n, k]` as [`pack`] lays it out.
+fn gemm(x: &[f32], m: usize, k: usize, w: &[f32], n: usize, y: &mut [f32], threads: usize) {
+    let g = Gemm { x, m, k, w, n, b: None, ep: Epilogue::None };
+    let len = scratch_len(k, n);
+    g.run(y, threads, |tasks, f| par::for_each(tasks, threads, |t| f(t, &mut vec![0.0; len])));
+}
+
 fn mix<'a>(scores: &[f32], values: impl Iterator<Item = &'a [f32]>, out: &mut [f32]) {
     let top = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let e: Vec<f64> = scores.iter().map(|&s| f64::from(s - top).exp()).collect();
     let z: f64 = e.iter().sum();
     let mut acc = vec![0f64; out.len()];
     for (p, v) in e.iter().zip(values) {
-        acc.iter_mut().zip(v).for_each(|(a, &x)| *a += p / z * f64::from(x));
+        let w = p / z;
+        acc.iter_mut().zip(v).for_each(|(a, &x)| *a += w * f64::from(x));
     }
     out.iter_mut().zip(acc).for_each(|(o, a)| *o = a as f32);
 }

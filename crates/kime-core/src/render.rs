@@ -157,6 +157,55 @@ pub fn native_segments(state: &Value) -> Vec<String> {
     out
 }
 
+/// The texts of one question tower row of the native family, before the markers go in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeText {
+    /// `"<type_text> <instructions>"`, where the type text is `choose:`, `rate:` or
+    /// `true or false:`.
+    pub head: String,
+    /// One per option, in option order: a choice's `label` or `label: description`, a score
+    /// level's description, and a noul's false then true criterion, empty when not given.
+    pub options: Vec<String>,
+}
+
+/// A question as the native family lays it out, spec/06-tokenization.md. Values that are not
+/// strings render as compact JSON, like the state.
+#[must_use]
+pub fn native_question(q: &Question) -> NativeText {
+    let text = |v: &Value| match v {
+        Value::String(s) => s.clone(),
+        v => json(v),
+    };
+    let type_text = match q.qtype {
+        crate::request::QType::Choice => "choose:",
+        crate::request::QType::Score => "rate:",
+        crate::request::QType::Noul => "true or false:",
+    };
+    let head = match q.instructions.as_ref().map(text) {
+        Some(ins) if !ins.is_empty() => format!("{type_text} {ins}"),
+        _ => type_text.to_string(),
+    };
+    let options = match &q.criteria {
+        Criteria::Choice(opts) => opts
+            .iter()
+            .map(|o| match &o.description {
+                None => o.label.clone(),
+                Some(Value::String(s)) if s.is_empty() => o.label.clone(),
+                Some(v) => format!("{}: {}", o.label, text(v)),
+            })
+            .collect(),
+        Criteria::Score(levels) => levels.iter().map(text).collect(),
+        Criteria::Noul { when_false, when_true, .. } => [when_false, when_true]
+            .into_iter()
+            .map(|v| match v {
+                None | Some(Value::Null) => String::new(),
+                Some(v) => text(v),
+            })
+            .collect(),
+    };
+    NativeText { head, options }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,5 +279,23 @@ mod tests {
             "{\"k\": \"ü\", \"n\": [1e-05]}"
         );
         assert_eq!(compat_state(&json!("a<mask>b"), "<mask>"), "a b");
+    }
+
+    #[test]
+    fn native_rows() {
+        let q = |q: Value| {
+            let r = parse(&json!({"state": "", "questions": {"q": q}}), &Limits::LAYA).unwrap();
+            native_question(&r.questions[0])
+        };
+        let c = q(json!({"type": "choice", "instructions": "Pick one",
+            "criteria": {"a": "", "b": null, "c": {"x": 1}}}));
+        assert_eq!(c.head, "choose: Pick one");
+        assert_eq!(c.options, ["a", "b", "c: {\"x\":1}"]);
+        let s = q(json!({"type": "score", "criteria": ["bad", "good"]}));
+        assert_eq!((s.head.as_str(), s.options), ("rate:", vec!["bad".to_string(), "good".into()]));
+        let n = q(json!({"type": "noul", "instructions": {"k": [1, 2]},
+            "criteria": {"true": "spam"}}));
+        assert_eq!(n.head, "true or false: {\"k\":[1,2]}");
+        assert_eq!(n.options, ["", "spam"]);
     }
 }
