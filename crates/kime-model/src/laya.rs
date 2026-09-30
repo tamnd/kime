@@ -374,30 +374,7 @@ impl LayaGraph {
     ///
     /// Never. Binding looks up only names the check above has found.
     pub fn bind(spec: &LayaSpec, tensors: &Tensors) -> Result<Self> {
-        let expected = spec.expected();
-        let mut problems = Vec::new();
-        for (name, shape) in &expected {
-            match tensors.get(name) {
-                None => problems.push(format!("missing {name} {shape:?}")),
-                Some(v) if v.shape != shape.as_slice() => {
-                    problems.push(format!("{name} has shape {:?}, expected {shape:?}", v.shape));
-                }
-                Some(v) if !v.dtype.is_float() => {
-                    problems.push(format!("{name} is {}, expected a float type", v.dtype));
-                }
-                Some(_) => {}
-            }
-        }
-        let known: std::collections::HashSet<&str> =
-            expected.iter().map(|(n, _)| n.as_str()).collect();
-        for e in tensors.entries() {
-            if !known.contains(e.name.as_str()) {
-                problems.push(format!("unexpected {} {:?}", e.name, e.shape));
-            }
-        }
-        if !problems.is_empty() {
-            return Err(Error::Mismatch(problems));
-        }
+        crate::tensors::check(&spec.expected(), tensors)?;
         let w = |name: &str| tensors.index(name).expect("checked above");
         let aff = |p: &str| Affine { w: w(&format!("{p}.weight")), b: w(&format!("{p}.bias")) };
         let enc = &spec.encoder;

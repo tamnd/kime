@@ -126,3 +126,32 @@ pub(crate) fn check_disjoint(ranges: &mut [(usize, usize, &str)]) -> Result<()> 
     }
     Ok(())
 }
+
+/// Checks `tensors` against the names and shapes a model expects.
+///
+/// # Errors
+///
+/// [`Error::Mismatch`] listing every missing tensor, extra tensor, wrong shape and non float
+/// dtype, in that order.
+pub(crate) fn check(expected: &[(String, Vec<usize>)], tensors: &Tensors) -> Result<()> {
+    let mut problems = Vec::new();
+    for (name, shape) in expected {
+        match tensors.get(name) {
+            None => problems.push(format!("missing {name} {shape:?}")),
+            Some(v) if v.shape != shape.as_slice() => {
+                problems.push(format!("{name} has shape {:?}, expected {shape:?}", v.shape));
+            }
+            Some(v) if !v.dtype.is_float() => {
+                problems.push(format!("{name} is {}, expected a float type", v.dtype));
+            }
+            Some(_) => {}
+        }
+    }
+    let known: std::collections::HashSet<&str> = expected.iter().map(|(n, _)| n.as_str()).collect();
+    for e in tensors.entries() {
+        if !known.contains(e.name.as_str()) {
+            problems.push(format!("unexpected {} {:?}", e.name, e.shape));
+        }
+    }
+    if problems.is_empty() { Ok(()) } else { Err(Error::Mismatch(problems)) }
+}

@@ -11,6 +11,7 @@ pub mod par;
 pub mod plan;
 pub mod pool;
 pub mod qgemm;
+pub mod split;
 #[cfg(test)]
 mod testing;
 
