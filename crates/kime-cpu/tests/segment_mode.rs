@@ -157,6 +157,27 @@ fn warm_steps_recompute_only_changed_segments() {
 }
 
 #[test]
+fn a_small_budget_changes_only_the_work() {
+    let Some(tok) = tokenizer() else { return };
+    let spec = V1Spec::from_json(&config(128, 2, 64, 3, 1, 1)).unwrap();
+    let t = load(&spec);
+    let split = Split::new(&spec, &V1Graph::bind(&spec, &t).unwrap(), &t, 4);
+    // About a fifth of what the first state takes, so most segments are evicted between steps.
+    let budget = 128 * 4 * 400;
+    let (mut big, mut small) = (SegmentCache::default(), SegmentCache::with_budget(budget));
+    for state in trace().iter().take(6) {
+        let segs = segments(&tok, &spec, state);
+        let segs: Vec<&[u32]> = segs.iter().map(Vec::as_slice).collect();
+        let a = split.state_segments(&segs, &mut big);
+        let b = split.state_segments(&segs, &mut small);
+        assert_eq!(a.states, b.states);
+        assert_eq!(a.kv, b.kv);
+        assert!(small.bytes() <= budget, "{} over {budget}", small.bytes());
+    }
+    assert!(small.misses > big.misses);
+}
+
+#[test]
 fn segment_bench() {
     if std::env::var_os("KIME_SEGMENT_BENCH").is_none() {
         return;
