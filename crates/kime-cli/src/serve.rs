@@ -21,7 +21,7 @@ options: --device auto|cpu|cuda[:N]|metal  --threads N  --precision f16|f32|int8
          --max-batch N  --max-batch-tokens N  --max-body BYTES  --max-request-tokens N
          --max-queue-ms MS (0 is off)  --max-pending N (0 is off)  --io-threads N  --no-jev-aliases
          --answer-cache N (answers kept per model, 100000 by default, 0 is off)
-         --api-keys-file PATH  --rpm N  --tps N  --log-level info
+         --api-keys-file PATH  --rpm N  --tps N  --shared-cache  --log-level info
          --log-requests  --log-format text|json  --otlp-endpoint http://HOST:4318  --otlp-service NAME
 Every option is also a kime.toml field (--max-batch is max_batch) and a KIME_ variable
 (KIME_MAX_BATCH). Flags win over KIME_ variables, which win over the file, which wins over
@@ -56,6 +56,7 @@ struct Settings {
     api_keys_file: Option<String>,
     rpm: Option<u32>,
     tps: Option<u32>,
+    shared_cache: Option<bool>,
     log_level: Option<String>,
     log_requests: Option<bool>,
     log_format: Option<String>,
@@ -86,6 +87,7 @@ impl Settings {
             rpm: over.rpm.or(self.rpm),
             tps: over.tps.or(self.tps),
             log_level: over.log_level.or(self.log_level),
+            shared_cache: over.shared_cache.or(self.shared_cache),
             log_requests: over.log_requests.or(self.log_requests),
             log_format: over.log_format.or(self.log_format),
             otlp_endpoint: over.otlp_endpoint.or(self.otlp_endpoint),
@@ -151,6 +153,7 @@ impl Settings {
             rpm: num("KIME_RPM", var("KIME_RPM"))?,
             tps: num("KIME_TPS", var("KIME_TPS"))?,
             log_level: var("KIME_LOG_LEVEL"),
+            shared_cache: bool("KIME_SHARED_CACHE")?,
             log_requests: bool("KIME_LOG_REQUESTS")?,
             log_format: var("KIME_LOG_FORMAT"),
             // The OpenTelemetry names, when kime's own are not set. The general endpoint is a
@@ -237,6 +240,7 @@ impl Settings {
                 "--rpm" => s.rpm = Some(num(a, &val()?)?),
                 "--tps" => s.tps = Some(num(a, &val()?)?),
                 "--log-level" => s.log_level = Some(val()?),
+                "--shared-cache" => s.shared_cache = Some(true),
                 "--log-requests" => s.log_requests = Some(true),
                 "--log-format" => s.log_format = Some(val()?),
                 "--otlp-endpoint" => s.otlp_endpoint = Some(val()?),
@@ -335,7 +339,9 @@ fn config(s: Settings) -> Result<kime_serve::Config, String> {
     let ip: IpAddr = host.parse().map_err(|e| format!("host {host:?}: {e}"))?;
     let rpm = s.rpm.map(|n| limit("rpm", n)).transpose()?;
     let tps = s.tps.map(|n| limit("tps", n)).transpose()?;
-    let auth = auth(s.api_keys_file.as_deref(), quiet)?.with_defaults(rpm, tps);
+    let auth = auth(s.api_keys_file.as_deref(), quiet)?
+        .with_defaults(rpm, tps)
+        .shared_cache(s.shared_cache.unwrap_or(false));
     let mut models = Vec::with_capacity(names.len());
     for name in &names {
         let t = Instant::now();

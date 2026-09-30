@@ -244,3 +244,43 @@ fn native_bench() {
         );
     }
 }
+
+#[test]
+fn cache_scopes_and_modes() {
+    let Some(tok) = laya_tokenizer() else {
+        eprintln!("no Laya tokenizer, skipped");
+        return;
+    };
+    let c = checkpoint(&config("native-scopes", 128, 2, 64, [3, 1, 1]), &tok);
+    let kime = open(&c, 4);
+    let states = |r: &Request| {
+        let (res, t) = kime.decide_batch_timed(std::slice::from_ref(r)).unwrap();
+        (t.states, res.into_iter().next().unwrap().answers)
+    };
+    let scoped = |n: usize, scope: Option<u8>, cache: &str| {
+        let mut r = request(state(n), questions());
+        r.cache_scope = scope.map(|b| [b; 32]);
+        r.kime = Some(Map::from_iter([("cache".to_string(), json!(cache))]));
+        r
+    };
+
+    // Each scope runs the state once, and they all get the same answers.
+    let (ran, want) = states(&scoped(4, Some(1), "use"));
+    assert_eq!(ran, 1);
+    assert_eq!(states(&scoped(4, Some(1), "use")), (0, want.clone()));
+    assert_eq!(states(&scoped(4, Some(2), "use")), (1, want.clone()));
+    assert_eq!(states(&scoped(4, None, "use")), (1, want.clone()));
+    assert_eq!(states(&scoped(4, None, "use")).0, 0);
+
+    // A batch with the same state for two scopes runs it for each.
+    let (_, t) =
+        kime.decide_batch_timed(&[scoped(5, Some(1), "use"), scoped(5, Some(2), "use")]).unwrap();
+    assert_eq!(t.states, 2);
+
+    // bypass neither reads nor keeps, refresh runs and keeps.
+    assert_eq!(states(&scoped(4, Some(1), "bypass")).0, 1);
+    assert_eq!(states(&scoped(6, Some(1), "bypass")).0, 1);
+    assert_eq!(states(&scoped(6, Some(1), "use")).0, 1);
+    assert_eq!(states(&scoped(7, Some(1), "refresh")).0, 1);
+    assert_eq!(states(&scoped(7, Some(1), "use")).0, 0);
+}

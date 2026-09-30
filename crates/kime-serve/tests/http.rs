@@ -437,3 +437,63 @@ async fn serve_answer_cache() {
     let _ = stop.send(());
     server.await.unwrap().unwrap();
 }
+
+/// One caller never finds what another caller put in the answer cache, so the time taken says
+/// nothing about what others asked. Keys with the same name are one caller, and `shared_cache`
+/// makes every key one caller.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn serve_answer_cache_per_key() {
+    let model =
+        std::env::var("KIME_MODELS").map_or_else(|_| "laya".into(), |d| format!("{d}/laya"));
+    let build = || {
+        Kime::builder()
+            .model(model.clone())
+            .device(Device::Cpu { threads: 0 })
+            .answer_cache(1000)
+            .build()
+    };
+    if let Err(e) = build() {
+        assert!(std::env::var_os("KIME_REQUIRE_WEIGHTS").is_none(), "{e}");
+        eprintln!("skipping: {e}");
+        return;
+    }
+    let body = json!({"state": "My parcel never came and I want my money back",
+        "questions": {"refund": {"type": "noul", "instructions": "Does the customer want a refund?"}},
+        "kime": {"extensions": true}})
+    .to_string();
+    for (shared, calls) in [
+        (false, [("a1", "miss"), ("a2", "hit"), ("b", "miss"), ("b", "hit"), ("c", "miss")]),
+        (true, [("a1", "miss"), ("a2", "hit"), ("b", "hit"), ("b", "hit"), ("c", "hit")]),
+    ] {
+        let mut auth = kime_serve::Auth::off();
+        auth.add_keys_file("a1 team-a\na2 team-a\nb\nc -\n").unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        // A fresh engine each time, with an empty cache.
+        let mut cfg = kime_serve::Config::new(addr, vec![build().unwrap()]);
+        cfg.auth = auth.shared_cache(shared);
+        let server = tokio::spawn(kime_serve::serve(listener, cfg, async {
+            let _ = stopped.await;
+        }));
+        let mut first = Value::Null;
+        for (key, want) in calls {
+            let (s, _, v) = call(
+                addr,
+                "POST",
+                "/v1/systemone",
+                &body,
+                &format!("authorization: Bearer {key}\r\n"),
+            )
+            .await;
+            assert_eq!(s, 200, "{v}");
+            assert_eq!(v["kime"]["cache"]["answers"], want, "shared {shared}, key {key}");
+            if first.is_null() {
+                first = v["answers"].clone();
+            }
+            assert_eq!(v["answers"], first);
+        }
+        let _ = stop.send(());
+        server.await.unwrap().unwrap();
+    }
+}

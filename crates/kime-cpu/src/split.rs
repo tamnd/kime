@@ -47,8 +47,8 @@ pub struct Row<'a> {
     pub options: &'a [Vec<u32>],
 }
 
-/// The output of the low state layers of segments, keyed by the blake3 of the model id and the
-/// segment's token ids, with counts of what was found and what had to be computed.
+/// The output of the low state layers of segments, keyed by the blake3 of the model id, the
+/// caller's cache scope and the segment's token ids, with counts of what was found and what had to be computed.
 ///
 /// It holds at most its byte budget in two generations of half the budget each: new entries go
 /// in the young one, and when that is full the old one is dropped and the young one takes its
@@ -136,10 +136,14 @@ impl SegmentCache {
     }
 }
 
-fn segment_key(model: &str, ids: &[u32]) -> [u8; 32] {
+fn segment_key(model: &str, scope: Option<&[u8; 32]>, ids: &[u32]) -> [u8; 32] {
     let mut h = blake3::Hasher::new();
     h.update(&(model.len() as u64).to_le_bytes());
     h.update(model.as_bytes());
+    match scope {
+        Some(sc) => h.update(&[1]).update(sc),
+        None => h.update(&[0]),
+    };
     ids.iter().for_each(|id| {
         h.update(&id.to_le_bytes());
     });
@@ -324,11 +328,27 @@ impl Split {
     /// If a segment is empty or a token id is past the vocabulary.
     #[must_use]
     pub fn state_segments(&self, segments: &[&[u32]], cache: &mut SegmentCache) -> Memory {
+        self.state_segments_in(None, segments, cache)
+    }
+
+    /// [`Split::state_segments`] with the segments cached for `scope` alone, so a caller only
+    /// ever finds segments computed for the same scope.
+    ///
+    /// # Panics
+    ///
+    /// As [`Split::state_segments`].
+    #[must_use]
+    pub fn state_segments_in(
+        &self,
+        scope: Option<&[u8; 32]>,
+        segments: &[&[u32]],
+        cache: &mut SegmentCache,
+    ) -> Memory {
         let s = &self.spec;
         let d = s.d;
         assert!(segments.iter().all(|g| !g.is_empty()), "a state segment is empty");
         let low = s.state_layers - s.segment_top_layers;
-        let keys: Vec<[u8; 32]> = segments.iter().map(|g| segment_key(&s.id, g)).collect();
+        let keys: Vec<[u8; 32]> = segments.iter().map(|g| segment_key(&s.id, scope, g)).collect();
 
         // The low layers on every segment not in the cache, all in one packed pass. A segment
         // that occurs twice is computed once.

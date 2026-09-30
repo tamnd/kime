@@ -2,7 +2,8 @@
 //! cached, then every question row reads it, as spec/06-tokenization.md and spec/11-serving.md
 //! describe.
 //!
-//! A state is looked up by the blake3 of the model id, the mode and its token ids, so a request
+//! A state is looked up by the blake3 of the model id, the caller's cache scope, the mode and its
+//! token ids, so a request
 //! that repeats a state, or a batch where many questions share one, runs the state tower once.
 //! In segment mode the low state layers are cached per segment as well, so a state that differs
 //! from an earlier one in a few segments recomputes only those.
@@ -22,6 +23,7 @@ use kime_tensor::Blob;
 use kime_tok::Tokenizer;
 use serde_json::Value;
 
+use crate::cache::CacheMode;
 use crate::{Error, Timing, chunk};
 
 /// Tokens of a question header, `[CLS_Q]` and `[SEP]` included.
@@ -97,6 +99,8 @@ pub(crate) struct Native {
 /// One state as the tower reads it.
 struct StatePlan {
     key: [u8; 32],
+    scope: Option<[u8; 32]>,
+    cache: CacheMode,
     /// The whole state as one sequence, or its segments.
     ids: Result<Vec<u32>, Vec<Vec<u32>>>,
     tokens: usize,
@@ -187,7 +191,8 @@ impl Native {
     /// How `req` asks for its state to be read: segment mode when `kime.state_segments` is true,
     /// or when it is missing or `auto` and the state is an object of more than
     /// [`SEGMENT_MAX_TOKENS`] tokens.
-    fn plan_state(&self, req: &Request) -> StatePlan {
+    fn plan_state(&self, req: &Request, scope: Option<[u8; 32]>) -> StatePlan {
+        let cache = crate::mode(req);
         let s = self.spec();
         let flag = req.kime.as_ref().and_then(|k| k.get("state_segments"));
         let whole = self.tok.encode(&native_state(&req.state));
@@ -203,8 +208,8 @@ impl Native {
                 state_segments(s, &ids).into_iter().filter(|g| !g.is_empty()).collect();
             let tokens = segs.iter().map(Vec::len).sum();
             if tokens <= s.state_max_tokens {
-                let key = self.key(1, segs.iter().map(Vec::as_slice));
-                return StatePlan { key, ids: Err(segs), tokens, cut: 0 };
+                let key = self.key(scope.as_ref(), 1, segs.iter().map(Vec::as_slice));
+                return StatePlan { key, scope, cache, ids: Err(segs), tokens, cut: 0 };
             }
         }
         // Keep the end of a conversation and the start of anything else, as the compat family
@@ -221,14 +226,23 @@ impl Native {
         ids.push(s.specials.cls_s);
         ids.extend_from_slice(kept);
         ids.push(s.specials.sep);
-        let key = self.key(0, std::iter::once(ids.as_slice()));
-        StatePlan { key, tokens: ids.len(), ids: Ok(ids), cut }
+        let key = self.key(scope.as_ref(), 0, std::iter::once(ids.as_slice()));
+        StatePlan { key, scope, cache, tokens: ids.len(), ids: Ok(ids), cut }
     }
 
-    fn key<'a>(&self, mode: u8, parts: impl Iterator<Item = &'a [u32]>) -> [u8; 32] {
+    fn key<'a>(
+        &self,
+        scope: Option<&[u8; 32]>,
+        mode: u8,
+        parts: impl Iterator<Item = &'a [u32]>,
+    ) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
         h.update(&(self.id.len() as u64).to_le_bytes());
         h.update(self.id.as_bytes());
+        match scope {
+            Some(sc) => h.update(&[1]).update(sc),
+            None => h.update(&[0]),
+        };
         h.update(&[mode]);
         for p in parts {
             h.update(&(p.len() as u64).to_le_bytes());
@@ -240,21 +254,31 @@ impl Native {
     }
 
     /// The memory of `plan`, from the cache or the state tower. The flag says whether the tower
-    /// ran.
+    /// ran. `bypass` neither reads nor writes the caches, and `refresh` runs the whole tower and
+    /// then keeps the state.
     fn memory(&self, plan: &StatePlan) -> (Arc<Memory>, bool) {
         let lock = || self.states.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(m) = lock().get(&plan.key) {
+        if plan.cache == CacheMode::Use
+            && let Some(m) = lock().get(&plan.key)
+        {
             return (m, false);
         }
         let m = Arc::new(match &plan.ids {
             Ok(ids) => self.split.state(ids),
             Err(segs) => {
                 let segs: Vec<&[u32]> = segs.iter().map(Vec::as_slice).collect();
-                let mut cache = self.segments.lock().unwrap_or_else(PoisonError::into_inner);
-                self.split.state_segments(&segs, &mut cache)
+                let scope = plan.scope.as_ref();
+                if plan.cache == CacheMode::Use {
+                    let mut cache = self.segments.lock().unwrap_or_else(PoisonError::into_inner);
+                    self.split.state_segments_in(scope, &segs, &mut cache)
+                } else {
+                    self.split.state_segments_in(scope, &segs, &mut SegmentCache::default())
+                }
             }
         });
-        lock().put(plan.key, m.clone());
+        if plan.cache != CacheMode::Bypass {
+            lock().put(plan.key, m.clone());
+        }
         (m, true)
     }
 
@@ -295,8 +319,13 @@ impl Native {
         for r in reqs {
             parsed.push(parse(&r.to_json(), &Limits::JEV).map_err(Error::Invalid)?);
         }
-        let plans: Vec<Option<StatePlan>> =
-            parsed.iter().map(|r| (!r.questions.is_empty()).then(|| self.plan_state(r))).collect();
+        let plans: Vec<Option<StatePlan>> = parsed
+            .iter()
+            .zip(reqs)
+            .map(|(r, sent)| {
+                (!r.questions.is_empty()).then(|| self.plan_state(r, sent.cache_scope))
+            })
+            .collect();
         let max_options = self.spec().max_options;
         let mut rows: Vec<RowPlan<'_>> = Vec::new();
         let mut slot = 0;

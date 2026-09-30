@@ -187,6 +187,7 @@ fn changed<'a>(
             model: None,
             questions: vec![q],
             kime: None,
+            cache_scope: None,
         });
         if orig.len() == MIRROR_QUESTIONS {
             break;
@@ -243,6 +244,7 @@ fn chunk_check(kime: &Kime, r: &Ran<'_>) -> Result<Check, String> {
                 model: None,
                 questions: vec![q.clone()],
                 kime: Some(kime_ext.clone()),
+                cache_scope: None,
             })
             .collect();
         for (p, got) in picks.iter_mut().zip(ask(kime, &reqs)?) {
