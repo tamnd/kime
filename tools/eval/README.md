@@ -42,6 +42,8 @@ results/2026-09-29-mind2web has the Mind2Web suites answered by Laya, by cklxx/l
 
 `chunk_consistency.py` is the chunk consistency test of spec/15-testing.md: the same 64 option choices from banking77 and the Mind2Web target heads, scored in one pass and in chunks of 8, 16 and 32 with `kime.chunk`, and how often the sizes pick the same option. results/2026-09-30-chunking has Laya's run.
 
+`kime eval --gate` runs the model behaviour tests of spec/15-testing.md on the suites it was given, after the quality run, and exits non-zero when one misses its threshold. The flip rate comes from the order suites, the score mirror and noul polarity tests ask the model again with the levels reversed or the true and false criteria swapped, label neutrality renames the options of English choices whose every option has a description to `option 1` and up, and chunk consistency cuts 300 en.banking77_full questions to 64 options and scores them with `kime.chunk` 8, 16 and 32. `--baseline` names the results.json of the previous release, and each suite's ECE may rise by at most 0.01 against it. results/2026-09-30-gate has Laya's run, which fails 14 of 27 checks.
+
 against-apps.tsv does the same for the application themes against research/results/app_benchmark_results.json, which Laya 0.2.1 wrote on a CPU. kime matches it on five of the seven, ECE included to 1e-4, is one question off on model routing, and gets two more emails right on spam, as Laya 0.3.20 on the 4090 does, so the spam difference is Laya's email cleaning since 0.2.1 and not the engine.
 
 | Order suite | kime flip rate | Laya 0.3.20 flip rate | Laya's notebook, 1 order of 200 |

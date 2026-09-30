@@ -8,15 +8,16 @@ use std::time::Instant;
 
 use kime::{Device, Kime, Precision};
 use kime_eval::contam::manifest_conflicts;
-use kime_eval::report::{markdown, rows_parquet, rows_tsv, summarize};
+use kime_eval::report::{Summary, markdown, rows_parquet, rows_tsv, summarize};
 use kime_eval::suite::{Case, Scored, load, probs, probs_json, score};
 use serde_json::{Map, Value, json};
 
+use crate::gate::{self, Ran};
 use crate::predict::{device, precision};
 
 const USAGE: &str = "usage: kime eval <suite.jsonl or directory>... [--model laya] [--device auto|cpu|cuda[:N]|metal]
        [--precision f16|f32|int8] [--answers <dir>] [--out <dir>] [--title <text>]
-       [--data-manifest <file>] [--suite quality|order|agent|all]...
+       [--data-manifest <file>] [--suite quality|order|agent|all]... [--gate [--baseline <results.json>]]
 Runs every suite through the model and writes <out>/report.md, results.json, rows.tsv,
 rows.parquet and one <suite>.answers.jsonl per suite. With --answers, the answers are read from
 <dir>/<suite>.answers.jsonl,
@@ -25,10 +26,13 @@ one {\"id\": ..., \"answers\": {...}} line per case in Laya's JSON shape, and no
 results.json, and nothing is scored if it lists a test split or the split a suite is drawn from,
 as the manifest.json next to the suites records it.
 --suite keeps only the suites of a group: quality is every suite of spec/13-benchmarks.md,
-order the order.* copies with the options shuffled, and agent the mind2web.* browser steps.";
+order the order.* copies with the options shuffled, and agent the mind2web.* browser steps.
+--gate then runs the model behaviour tests of spec/15-testing.md on the same suites, writes
+<out>/gate.md and gate.json, and fails if any test misses its threshold. --baseline is the
+results.json of the previous release, for the calibration regression test.";
 
 /// Requests handed to the engine at once.
-const CHUNK: usize = 256;
+pub(crate) const CHUNK: usize = 256;
 
 struct Opts {
     suites: Vec<PathBuf>,
@@ -40,6 +44,8 @@ struct Opts {
     title: Option<String>,
     data_manifest: Option<PathBuf>,
     groups: Vec<String>,
+    gate: bool,
+    baseline: Option<PathBuf>,
 }
 
 /// The groups `--suite` takes.
@@ -67,6 +73,8 @@ fn opts(args: &[String]) -> Result<Opts, String> {
         title: None,
         data_manifest: None,
         groups: Vec::new(),
+        gate: false,
+        baseline: None,
     };
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -79,6 +87,8 @@ fn opts(args: &[String]) -> Result<Opts, String> {
             "--out" => o.out = val()?.into(),
             "--title" => o.title = Some(val()?),
             "--data-manifest" => o.data_manifest = Some(val()?.into()),
+            "--gate" => o.gate = true,
+            "--baseline" => o.baseline = Some(val()?.into()),
             "--suite" => {
                 let g = val()?;
                 if !GROUPS.contains(&g.as_str()) {
@@ -118,6 +128,12 @@ fn opts(args: &[String]) -> Result<Opts, String> {
     }
     if o.suites.is_empty() {
         return Err(USAGE.into());
+    }
+    if o.gate && o.answers.is_some() {
+        return Err("--gate asks the model again, so it needs a model, not --answers".into());
+    }
+    if o.baseline.is_some() && !o.gate {
+        return Err("--baseline is only read by --gate".into());
     }
     Ok(o)
 }
@@ -189,6 +205,13 @@ fn data_manifest(o: &Opts) -> Result<Value, String> {
 fn eval(args: &[String]) -> Result<(), String> {
     let o = opts(args)?;
     let manifest = data_manifest(&o)?;
+    let baseline = match &o.baseline {
+        Some(p) => {
+            let t = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+            Some(serde_json::from_str::<Value>(&t).map_err(|e| format!("{}: {e}", p.display()))?)
+        }
+        None => None,
+    };
     std::fs::create_dir_all(&o.out).map_err(|e| format!("{}: {e}", o.out.display()))?;
     let kime = match o.answers {
         Some(_) => None,
@@ -205,7 +228,7 @@ fn eval(args: &[String]) -> Result<(), String> {
         }
     };
     let (mut summaries, mut results, mut tsv) = (Vec::new(), Map::new(), String::new());
-    let mut rows = Vec::new();
+    let (mut rows, mut loaded) = (Vec::new(), Vec::new());
     for path in &o.suites {
         let suite = name(path);
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -231,6 +254,7 @@ fn eval(args: &[String]) -> Result<(), String> {
         }
         summaries.push(s);
         rows.push((suite, scored));
+        loaded.push(cases);
     }
     let title = o.title.clone().unwrap_or_else(|| match &kime {
         Some(k) => format!("kime eval, {} on {}, {:?}", k.model_id(), k.device(), o.precision),
@@ -253,7 +277,43 @@ fn eval(args: &[String]) -> Result<(), String> {
     let pq = o.out.join("rows.parquet");
     std::fs::write(&pq, rows_parquet(&rows)).map_err(|e| format!("{}: {e}", pq.display()))?;
     print!("{md}");
-    Ok(())
+    match (&kime, o.gate) {
+        (Some(k), true) => {
+            run_gate(k, &title, &rows, &loaded, &summaries, baseline.as_ref(), &o.out)
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Runs the behaviour tests, writes gate.md and gate.json, and fails when a test fails.
+fn run_gate(
+    kime: &Kime,
+    title: &str,
+    rows: &[(String, Vec<Scored>)],
+    loaded: &[Vec<Case>],
+    summaries: &[Summary],
+    baseline: Option<&Value>,
+    out: &Path,
+) -> Result<(), String> {
+    let t = Instant::now();
+    let ran: Vec<Ran<'_>> = rows
+        .iter()
+        .zip(loaded)
+        .zip(summaries)
+        .map(|(((name, scored), cases), summary)| Ran { name, cases, scored, summary })
+        .collect();
+    let checks = gate::checks(kime, &ran, baseline)?;
+    let md = kime_eval::gate::markdown(&format!("Release gate, {title}"), &checks);
+    write(&out.join("gate.md"), &md)?;
+    let json = serde_json::to_string_pretty(&kime_eval::gate::to_json(&checks)).unwrap_or_default();
+    write(&out.join("gate.json"), &(json + "\n"))?;
+    print!("\n{md}");
+    eprintln!("gate in {:.1?}", t.elapsed());
+    if kime_eval::gate::passed(&checks) {
+        Ok(())
+    } else {
+        Err("the checkpoint does not pass the gate, see gate.md".into())
+    }
 }
 
 /// Answers every valid request of a suite with kime, writes the answers, and scores them.

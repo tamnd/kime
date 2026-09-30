@@ -1,0 +1,275 @@
+{
+  "passed": false,
+  "checks": [
+    {
+      "test": "Order flips",
+      "suite": "order.en.emotion",
+      "value": 0.04766666666666667,
+      "target": "<= 0.02",
+      "n": 3000,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Order flips",
+      "suite": "order.massive_intent.en",
+      "value": 0.16,
+      "target": "<= 0.02",
+      "n": 1500,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Order flips",
+      "suite": "order.xnli.en",
+      "value": 0.0013333333333333333,
+      "target": "<= 0.02",
+      "n": 1500,
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "test": "Score mirror",
+      "suite": "en.sst5",
+      "value": 0.2,
+      "target": ">= 0.98",
+      "n": 600,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Score mirror",
+      "suite": "typed_decisions",
+      "value": 0.73125,
+      "target": ">= 0.98",
+      "n": 800,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Noul polarity",
+      "suite": "typed_decisions",
+      "value": 0.2625,
+      "target": ">= 0.97 within 0.05",
+      "n": 400,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Noul polarity",
+      "suite": "app.phishing",
+      "value": 0.0,
+      "target": ">= 0.97 within 0.05",
+      "n": 400,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Level coverage",
+      "suite": "en.sst5",
+      "value": 0.0,
+      "target": "0 questions",
+      "n": 600,
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "test": "Level coverage",
+      "suite": "typed_decisions",
+      "value": 3.0,
+      "target": "0 questions",
+      "n": 800,
+      "result": "fail",
+      "note": "discrepancy_severity of 4 levels never picks [1, 3], severity of 5 levels never picks [4], urgency of 4 levels never picks [0]"
+    },
+    {
+      "test": "Label neutrality",
+      "suite": "typed_decisions",
+      "value": 0.03333333333333333,
+      "target": "within 0.01",
+      "n": 600,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Label neutrality",
+      "suite": "massive_intent.en",
+      "value": 0.013333333333333334,
+      "target": "within 0.01",
+      "n": 300,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Label neutrality",
+      "suite": "massive_scenario.en",
+      "value": -0.05333333333333334,
+      "target": "within 0.01",
+      "n": 300,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Label neutrality",
+      "suite": "xnli.en",
+      "value": -0.44666666666666666,
+      "target": "within 0.01",
+      "n": 300,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Label neutrality",
+      "suite": "en.ag_news",
+      "value": -0.006666666666666667,
+      "target": "within 0.01",
+      "n": 600,
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "test": "Label neutrality",
+      "suite": "app.support_triage",
+      "value": -0.0275,
+      "target": "within 0.01",
+      "n": 400,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Label neutrality",
+      "suite": "app.model_routing_domain",
+      "value": -0.05764411027568922,
+      "target": "within 0.01",
+      "n": 399,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Chunk consistency",
+      "suite": "en.banking77_full",
+      "value": 0.8033333333333333,
+      "target": ">= 0.99",
+      "n": 300,
+      "result": "fail",
+      "note": ""
+    },
+    {
+      "test": "Segment consistency",
+      "suite": "",
+      "value": null,
+      "target": ">= 0.99",
+      "n": 0,
+      "result": "not run",
+      "note": "segment mode is not built yet (M4)"
+    },
+    {
+      "test": "Routing",
+      "suite": "",
+      "value": null,
+      "target": ">= 0.99",
+      "n": 0,
+      "result": "not run",
+      "note": "the routing set is not built yet"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "en.sst5",
+      "value": -4.907069205695169e-7,
+      "target": "ECE up by <= 0.01",
+      "n": 600,
+      "result": "pass",
+      "note": "0.2478 to 0.2478"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "typed_decisions",
+      "value": 3.203551769415114e-7,
+      "target": "ECE up by <= 0.01",
+      "n": 2000,
+      "result": "pass",
+      "note": "0.1742 to 0.1742"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "app.phishing",
+      "value": -3.6002606687741967e-7,
+      "target": "ECE up by <= 0.01",
+      "n": 400,
+      "result": "pass",
+      "note": "0.0121 to 0.0121"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "massive_intent.en",
+      "value": -8.292611450300136e-8,
+      "target": "ECE up by <= 0.01",
+      "n": 300,
+      "result": "pass",
+      "note": "0.1810 to 0.1810"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "massive_scenario.en",
+      "value": 1.8958743419617008e-7,
+      "target": "ECE up by <= 0.01",
+      "n": 300,
+      "result": "pass",
+      "note": "0.3628 to 0.3628"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "xnli.en",
+      "value": 3.672293027445761e-7,
+      "target": "ECE up by <= 0.01",
+      "n": 300,
+      "result": "pass",
+      "note": "0.0685 to 0.0685"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "en.ag_news",
+      "value": 4.098893801526837e-7,
+      "target": "ECE up by <= 0.01",
+      "n": 600,
+      "result": "pass",
+      "note": "0.0410 to 0.0410"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "app.support_triage",
+      "value": -2.2118860483477665e-7,
+      "target": "ECE up by <= 0.01",
+      "n": 400,
+      "result": "pass",
+      "note": "0.0933 to 0.0933"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "app.model_routing_domain",
+      "value": 4.3748128981946355e-7,
+      "target": "ECE up by <= 0.01",
+      "n": 399,
+      "result": "pass",
+      "note": "0.0888 to 0.0888"
+    },
+    {
+      "test": "Calibration regression",
+      "suite": "en.banking77_full",
+      "value": 8.802163609100688e-8,
+      "target": "ECE up by <= 0.01",
+      "n": 500,
+      "result": "pass",
+      "note": "0.3189 to 0.3189"
+    },
+    {
+      "test": "Quality targets",
+      "suite": "",
+      "value": null,
+      "target": "spec/13-benchmarks.md",
+      "n": 0,
+      "result": "not run",
+      "note": "read report.md against the targets of the model's tier"
+    }
+  ]
+}

@@ -54,7 +54,7 @@ One binary, with subcommands:
 | `kime convert` | Convert a Laya checkpoint to kime format, pack to `.kime`, prepack for a backend, build ANE packages, or trim a vocabulary. Refuses to overwrite existing output without `--force`, as laya-mlx's `convert` does. |
 | `kime train` | Fine tune (see 12). |
 | `kime calibrate` | Fit temperatures on a labelled file and write `calibration.json`. |
-| `kime eval` | Run quality suites (see 13). |
+| `kime eval` | Run quality suites (see 13), and with `--gate` the behaviour tests of the release gate (see 15). |
 | `kime bench` | Run speed suites (see 13). `--tune` tunes GEMM tiles for the local GPU. |
 | `kime report` | Build the scorecard from eval and bench outputs. |
 | `kime doctor` | Print the detected devices, drivers, CPU features, the cache location and size, and run a 1 second self test per backend. |
